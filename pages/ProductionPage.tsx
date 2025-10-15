@@ -210,8 +210,18 @@ const ProductionPage: FC<{
   const [viewMode, setViewMode] = useState<'kanban' | 'timeline'>('kanban');
   const [modalOrder, setModalOrder] = useState<ServiceOrder | null>(null);
   const [viewingOrder, setViewingOrder] = useState<ServiceOrder | null>(null);
+  const [professionalFilter, setProfessionalFilter] = useState<string>('');
 
   const productionTeam = useMemo(() => mockProductionProfessionals, []);
+
+  const filteredServiceOrders = useMemo(() => {
+    if (!professionalFilter) {
+      return serviceOrders;
+    }
+    return serviceOrders.filter(order =>
+      order.assignedToIds.includes(professionalFilter)
+    );
+  }, [serviceOrders, professionalFilter]);
   
   const handleDragStart = (e: DragEvent<HTMLElement>, orderId: string) => {
     e.dataTransfer.setData("orderId", orderId);
@@ -236,8 +246,8 @@ const ProductionPage: FC<{
   }
 
   const sortedTimelineOrders = useMemo(() => {
-    return [...serviceOrders].sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
-  }, [serviceOrders]);
+    return [...filteredServiceOrders].sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
+  }, [filteredServiceOrders]);
 
 
   return (
@@ -263,9 +273,26 @@ const ProductionPage: FC<{
           <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Painel de Produção</h1>
           <p className="mt-2 text-text-secondary dark:text-slate-400">Acompanhe e gerencie as Ordens de Serviço (OS).</p>
         </div>
-        <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-lg">
-            <button onClick={() => setViewMode('kanban')} className={`px-4 py-1 text-sm font-semibold rounded-md ${viewMode === 'kanban' ? 'bg-surface dark:bg-dark shadow' : 'text-text-secondary dark:text-slate-400'}`}>Kanban</button>
-            <button onClick={() => setViewMode('timeline')} className={`px-4 py-1 text-sm font-semibold rounded-md ${viewMode === 'timeline' ? 'bg-surface dark:bg-dark shadow' : 'text-text-secondary dark:text-slate-400'}`}>Timeline</button>
+        <div className="flex items-center space-x-4">
+             <div className="flex-shrink-0">
+                <label htmlFor="professional-filter" className="sr-only">Filtrar por Profissional</label>
+                <select
+                    id="professional-filter"
+                    value={professionalFilter}
+                    onChange={(e) => setProfessionalFilter(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-border bg-slate-50 dark:border-slate-600 dark:bg-slate-700 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+                    aria-label="Filtrar por profissional"
+                >
+                    <option value="">Todos os Profissionais</option>
+                    {mockProductionProfessionals.map(prof => (
+                        <option key={prof.id} value={prof.id}>{prof.name}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-lg">
+                <button onClick={() => setViewMode('kanban')} className={`px-4 py-1 text-sm font-semibold rounded-md ${viewMode === 'kanban' ? 'bg-surface dark:bg-dark shadow' : 'text-text-secondary dark:text-slate-400'}`}>Kanban</button>
+                <button onClick={() => setViewMode('timeline')} className={`px-4 py-1 text-sm font-semibold rounded-md ${viewMode === 'timeline' ? 'bg-surface dark:bg-dark shadow' : 'text-text-secondary dark:text-slate-400'}`}>Timeline</button>
+            </div>
         </div>
       </div>
       
@@ -283,7 +310,7 @@ const ProductionPage: FC<{
                 <h3 className="font-semibold text-text-primary dark:text-slate-100">{column.title}</h3>
               </div>
               <div className="flex-1 overflow-y-auto pr-1">
-                {serviceOrders
+                {filteredServiceOrders
                   .filter(order => order.status === column.id)
                   .map(order => (
                     <KanbanCard key={order.id} order={order} onDragStart={handleDragStart} onAssign={setModalOrder} onView={setViewingOrder} />
@@ -319,6 +346,11 @@ const ProductionPage: FC<{
                                 <td className="p-3 text-right">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             </tr>
                         ))}
+                         {sortedTimelineOrders.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhuma Ordem de Serviço encontrada para o profissional selecionado.</td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>
