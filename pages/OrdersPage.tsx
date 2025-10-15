@@ -87,7 +87,7 @@ const CreateServiceOrderModal: FC<{
                     type="date"
                     value={deliveryDate}
                     onChange={e => setDeliveryDate(e.target.value)}
-                    className={`p-2 border rounded w-full text-text-primary dark:bg-slate-700 dark:text-slate-200 ${error && !deliveryDate ? 'border-error' : 'border-border dark:border-slate-700'}`}
+                    className={`p-2 border rounded w-full text-text-primary bg-slate-50 dark:bg-slate-700 dark:text-slate-200 ${error && !deliveryDate ? 'border-error' : 'border-border dark:border-slate-700'}`}
                 />
             </div>
             {error && <p className="text-error text-center text-sm mb-4">{error}</p>}

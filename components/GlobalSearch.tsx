@@ -9,8 +9,9 @@ const QuoteStatusBadge: React.FC<{ status: QuoteStatus }> = ({ status }) => {
         sent: { label: "Enviado", variant: "primary" },
         approved: { label: "Aprovado", variant: "success" },
         rejected: { label: "Rejeitado", variant: "error" },
+        archived: { label: "Arquivado", variant: "default" },
     };
-    return <Badge variant={statusMap[status].variant}>{statusMap[status].label}</Badge>;
+    return <Badge variant={statusMap[status]?.variant || 'default'}>{statusMap[status]?.label || status}</Badge>;
 };
 
 const InvoiceStatusBadge: React.FC<{ status: InvoiceStatus }> = ({ status }) => {
@@ -53,7 +54,17 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
             c.email.toLowerCase().includes(lowerCaseQuery)
         ).slice(0, 3);
 
-        const filteredQuotes = mockQuotes.filter(q =>
+        const now = new Date();
+        const archiveLimit = 120 * 24 * 60 * 60 * 1000; // 120 days
+        const processedQuotes = mockQuotes.map(quote => {
+            const isOld = now.getTime() - new Date(quote.createdAt).getTime() > archiveLimit;
+            if ((quote.status === 'draft' || quote.status === 'sent') && isOld) {
+                return { ...quote, status: 'archived' as QuoteStatus };
+            }
+            return quote;
+        });
+
+        const filteredQuotes = processedQuotes.filter(q =>
             q.id.toLowerCase().includes(lowerCaseQuery) ||
             q.clientName.toLowerCase().includes(lowerCaseQuery)
         ).slice(0, 3);
@@ -132,7 +143,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => hasResults && setIsOpen(true)}
-                    className="w-full max-w-xs py-2 pl-10 pr-4 text-text-primary dark:text-slate-100 bg-surface dark:bg-slate-700 border border-border dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full max-w-xs py-2 pl-10 pr-4 text-text-primary dark:text-slate-100 bg-slate-50 dark:bg-slate-700 border border-border dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Buscar clientes, pedidos..."
                     aria-label="Busca global"
                 />

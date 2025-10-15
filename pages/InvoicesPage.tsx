@@ -101,7 +101,7 @@ const InvoiceForm: React.FC<{
                             id="order-select"
                             value={invoice.orderId}
                             onChange={(e) => handleOrderSelection(e.target.value)}
-                            className="p-2 border border-border dark:border-slate-600 rounded w-full bg-surface dark:bg-slate-700"
+                            className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
                             aria-label="Selecionar Pedido"
                         >
                             <option value="">Selecione um pedido</option>

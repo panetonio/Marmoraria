@@ -1,4 +1,4 @@
-import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction } from '../types';
+import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional } from '../types';
 
 export const mockUsers: User[] = [
     { id: 'user-1', name: 'Admin', role: 'admin' },
@@ -7,6 +7,15 @@ export const mockUsers: User[] = [
     { id: 'user-4', name: 'Carlos (Admin. Aux.)', role: 'aux_administrativo' },
     { id: 'user-5', name: 'Pedro (Produção)', role: 'producao' },
     { id: 'user-6', name: 'Ana (Produção)', role: 'producao' },
+];
+
+export const mockProductionProfessionals: ProductionProfessional[] = [
+    { id: 'prof-1', name: 'Marcos Silva', role: 'cortador' },
+    { id: 'prof-2', name: 'Paulo Costa', role: 'cortador' },
+    { id: 'prof-3', name: 'Ricardo Alves', role: 'acabador' },
+    { id: 'prof-4', name: 'Sérgio Lima', role: 'acabador' },
+    { id: 'prof-5', name: 'Luiz Pereira', role: 'montador' },
+    { id: 'prof-6', name: 'Fernando Souza', role: 'entregador' },
 ];
 
 export const mockClients: Client[] = [
@@ -150,7 +159,7 @@ export const mockQuotes: Quote[] = [
     ],
     subtotal: 376,
     total: 376,
-    createdAt: '2024-07-29T14:30:00Z',
+    createdAt: '2024-02-29T14:30:00Z',
     salespersonId: 'user-2',
   },
   {
@@ -201,7 +210,7 @@ export const mockServiceOrders: ServiceOrder[] = [
         items: mockOrders[0].items,
         total: 2164,
         deliveryDate: '2024-08-15T17:00:00Z',
-        assignedToIds: ['user-3'],
+        assignedToIds: ['prof-1'],
         status: 'cutting'
     },
     {

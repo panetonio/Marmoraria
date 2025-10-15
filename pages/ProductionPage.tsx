@@ -1,7 +1,7 @@
 import React, { useState, useMemo, FC, DragEvent } from 'react';
-import { mockUsers } from '../data/mockData';
-import type { ServiceOrder, ProductionStatus, User } from '../types';
-import Card, { CardContent } from '../components/ui/Card';
+import { mockProductionProfessionals } from '../data/mockData';
+import type { ServiceOrder, ProductionStatus, ProductionProfessional } from '../types';
+import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 
@@ -12,10 +12,114 @@ const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] =
   { id: 'delivered', title: 'Entregue', color: 'bg-green-800' },
 ];
 
+const ProductionStatusBadge: FC<{ status: ProductionStatus }> = ({ status }) => {
+    const statusInfo = KANBAN_COLUMNS.find(c => c.id === status);
+    if (!statusInfo) return null;
+    
+    return <span className={`px-2 py-1 text-xs font-semibold rounded-full text-white ${statusInfo.color}`}>{statusInfo.title}</span>;
+};
+
+const ServiceOrderDetailModal: FC<{
+  isOpen: boolean;
+  order: ServiceOrder;
+  onClose: () => void;
+}> = ({ isOpen, order, onClose }) => {
+  const assignedProfessionals = mockProductionProfessionals.filter(p => order.assignedToIds.includes(p.id));
+
+  const professionalRoles: Record<ProductionProfessional['role'], string> = {
+      cortador: "Cortador",
+      acabador: "Acabador",
+      montador: "Montador",
+      entregador: "Entregador"
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Detalhes da OS: ${order.id}`} className="max-w-4xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+          <Card className="p-0">
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm text-text-secondary dark:text-slate-400">Cliente</h4>
+                  <p className="font-semibold text-text-primary dark:text-slate-100">{order.clientName}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-text-secondary dark:text-slate-400">Pedido de Origem</h4>
+                  <p className="font-semibold font-mono text-text-primary dark:text-slate-100">{order.orderId}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-text-secondary dark:text-slate-400">Data de Entrega</h4>
+                  <p className="font-semibold text-text-primary dark:text-slate-100">{new Date(order.deliveryDate).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm text-text-secondary dark:text-slate-400">Status Atual</h4>
+                  <ProductionStatusBadge status={order.status} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="p-0">
+            <CardHeader>Itens na Ordem de Serviço</CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-border dark:border-slate-700">
+                      <th className="p-2">Descrição</th>
+                      <th className="p-2 text-center">Qtd.</th>
+                      <th className="p-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {order.items.map(item => (
+                      <tr key={item.id} className="border-b border-border dark:border-slate-700 last:border-b-0">
+                        <td className="p-2">{item.description}</td>
+                        <td className="p-2 text-center">{item.quantity.toFixed(2)}</td>
+                        <td className="p-2 text-right font-mono">{item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div className="md:col-span-1">
+          <Card className="p-0">
+            <CardHeader>Equipe Alocada</CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {assignedProfessionals.length > 0 ? (
+                  assignedProfessionals.map(prof => (
+                    <li key={prof.id} className="flex items-center">
+                      <div className="w-8 h-8 rounded-full bg-slate-600 text-white flex items-center justify-center text-sm font-bold ring-2 ring-white mr-3">
+                        {prof.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-text-primary dark:text-slate-100">{prof.name}</p>
+                        <p className="text-xs text-text-secondary dark:text-slate-400 capitalize">{professionalRoles[prof.role]}</p>
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <p className="text-sm text-text-secondary dark:text-slate-400 text-center py-4">Nenhum profissional alocado.</p>
+                )}
+              </ul>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const ResourceAllocationModal: FC<{
   isOpen: boolean;
   order: ServiceOrder;
-  productionTeam: User[];
+  productionTeam: ProductionProfessional[];
   onClose: () => void;
   onSave: (orderId: string, assignedToIds: string[]) => void;
 }> = ({ isOpen, order, productionTeam, onClose, onSave }) => {
@@ -27,18 +131,25 @@ const ResourceAllocationModal: FC<{
     );
   };
 
+  const professionalRoles: Record<ProductionProfessional['role'], string> = {
+      cortador: "Cortador",
+      acabador: "Acabador",
+      montador: "Montador",
+      entregador: "Entregador"
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Alocar Recursos para: ${order.id}`} className="max-w-md">
         <div className="space-y-2">
-          {productionTeam.map(user => (
-            <label key={user.id} className="flex items-center p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
+          {productionTeam.map(professional => (
+            <label key={professional.id} className="flex items-center p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                checked={selectedUserIds.includes(user.id)}
-                onChange={() => handleCheckboxChange(user.id)}
+                checked={selectedUserIds.includes(professional.id)}
+                onChange={() => handleCheckboxChange(professional.id)}
               />
-              <span className="ml-3 text-text-primary dark:text-slate-100">{user.name}</span>
+              <span className="ml-3 text-text-primary dark:text-slate-100">{professional.name} <span className="text-xs text-text-secondary dark:text-slate-400 capitalize">({professionalRoles[professional.role]})</span></span>
             </label>
           ))}
         </div>
@@ -52,16 +163,17 @@ const ResourceAllocationModal: FC<{
 
 const KanbanCard: FC<{
   order: ServiceOrder;
-  // FIX: Change DragEvent type from HTMLDivElement to HTMLElement to match what the Card component provides.
   onDragStart: (e: DragEvent<HTMLElement>, orderId: string) => void;
   onAssign: (order: ServiceOrder) => void;
-}> = ({ order, onDragStart, onAssign }) => {
-  const assignedUsers = mockUsers.filter(u => order.assignedToIds.includes(u.id));
+  onView: (order: ServiceOrder) => void;
+}> = ({ order, onDragStart, onAssign, onView }) => {
+  const assignedProfessionals = mockProductionProfessionals.filter(p => order.assignedToIds.includes(p.id));
   return (
     <Card
       draggable
       onDragStart={(e) => onDragStart(e, order.id)}
-      className="p-4 mt-4 shadow-sm border border-border dark:border-slate-700 cursor-grab active:cursor-grabbing"
+      onClick={() => onView(order)}
+      className="p-4 mt-4 shadow-sm border border-border dark:border-slate-700 cursor-pointer hover:shadow-lg hover:border-primary/50 transition-shadow duration-200"
     >
       <div className="flex justify-between items-center">
         <p className="font-bold text-sm font-mono">{order.id}</p>
@@ -71,17 +183,20 @@ const KanbanCard: FC<{
       <div className="mt-3 pt-3 border-t border-border dark:border-slate-700">
         <div className="flex justify-between items-center">
           <div className="flex -space-x-2">
-            {assignedUsers.length > 0 ? (
-              assignedUsers.map(user => (
-                <div key={user.id} title={user.name} className="w-6 h-6 rounded-full bg-slate-600 text-white flex items-center justify-center text-xs font-bold ring-2 ring-white">
-                  {user.name.charAt(0)}
+            {assignedProfessionals.length > 0 ? (
+              assignedProfessionals.map(professional => (
+                <div key={professional.id} title={professional.name} className="w-6 h-6 rounded-full bg-slate-600 text-white flex items-center justify-center text-xs font-bold ring-2 ring-white">
+                  {professional.name.charAt(0)}
                 </div>
               ))
             ) : (
               <span className="text-xs text-slate-400 dark:text-slate-500">Não alocado</span>
             )}
           </div>
-          <Button variant="ghost" size="sm" onClick={() => onAssign(order)}>Alocar</Button>
+          <Button variant="ghost" size="sm" onClick={(e) => {
+              e.stopPropagation();
+              onAssign(order);
+            }}>Alocar</Button>
         </div>
       </div>
     </Card>
@@ -94,8 +209,9 @@ const ProductionPage: FC<{
 }> = ({ serviceOrders, setServiceOrders }) => {
   const [viewMode, setViewMode] = useState<'kanban' | 'timeline'>('kanban');
   const [modalOrder, setModalOrder] = useState<ServiceOrder | null>(null);
+  const [viewingOrder, setViewingOrder] = useState<ServiceOrder | null>(null);
 
-  const productionTeam = useMemo(() => mockUsers.filter(u => u.role === 'producao'), []);
+  const productionTeam = useMemo(() => mockProductionProfessionals, []);
   
   const handleDragStart = (e: DragEvent<HTMLElement>, orderId: string) => {
     e.dataTransfer.setData("orderId", orderId);
@@ -135,6 +251,13 @@ const ProductionPage: FC<{
             onSave={handleAssignSave}
         />
       )}
+      {viewingOrder && (
+        <ServiceOrderDetailModal
+            isOpen={!!viewingOrder}
+            order={viewingOrder}
+            onClose={() => setViewingOrder(null)}
+        />
+      )}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Painel de Produção</h1>
@@ -163,7 +286,7 @@ const ProductionPage: FC<{
                 {serviceOrders
                   .filter(order => order.status === column.id)
                   .map(order => (
-                    <KanbanCard key={order.id} order={order} onDragStart={handleDragStart} onAssign={setModalOrder} />
+                    <KanbanCard key={order.id} order={order} onDragStart={handleDragStart} onAssign={setModalOrder} onView={setViewingOrder} />
                   ))}
               </div>
             </div>
@@ -186,14 +309,12 @@ const ProductionPage: FC<{
                     </thead>
                     <tbody>
                         {sortedTimelineOrders.map(order => (
-                            <tr key={order.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                            <tr key={order.id} onClick={() => setViewingOrder(order)} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer">
                                 <td className="p-3 font-semibold">{new Date(order.deliveryDate).toLocaleDateString()}</td>
                                 <td className="p-3 font-mono text-sm">{order.id}</td>
                                 <td className="p-3">{order.clientName}</td>
                                 <td className="p-3">
-                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full text-white ${KANBAN_COLUMNS.find(c => c.id === order.status)?.color}`}>
-                                        {KANBAN_COLUMNS.find(c => c.id === order.status)?.title}
-                                    </span>
+                                    <ProductionStatusBadge status={order.status} />
                                 </td>
                                 <td className="p-3 text-right">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             </tr>

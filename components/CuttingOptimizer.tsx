@@ -128,7 +128,7 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ items, onClose, onC
                                 id="material-select"
                                 value={selectedMaterialId || ''}
                                 onChange={(e) => setSelectedMaterialId(e.target.value)}
-                                className="p-2 border rounded w-full bg-surface dark:bg-slate-700 border-border dark:border-slate-600"
+                                className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600"
                             >
                                 {uniqueMaterialIds.map(matId => {
                                     const mat = mockMaterials.find(m => m.id === matId);

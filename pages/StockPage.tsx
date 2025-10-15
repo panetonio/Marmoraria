@@ -167,7 +167,7 @@ const StockPage: React.FC = () => {
                 id="material-filter"
                 value={materialFilter}
                 onChange={(e) => setMaterialFilter(e.target.value)}
-                className="p-2 border border-border dark:border-slate-600 rounded w-full max-w-xs bg-surface dark:bg-slate-700"
+                className="p-2 border border-border dark:border-slate-600 rounded w-full max-w-xs bg-slate-50 dark:bg-slate-700"
                 aria-label="Filtrar por material"
             >
                 <option value="">Todos os Materiais</option>

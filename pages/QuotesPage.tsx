@@ -16,8 +16,9 @@ const QuoteStatusBadge: React.FC<{ status: QuoteStatus }> = ({ status }) => {
         sent: { label: "Enviado", variant: "primary" },
         approved: { label: "Aprovado", variant: "success" },
         rejected: { label: "Rejeitado", variant: "error" },
+        archived: { label: "Arquivado", variant: "default" },
     };
-    return <Badge variant={statusMap[status].variant}>{statusMap[status].label}</Badge>;
+    return <Badge variant={statusMap[status]?.variant || 'default'}>{statusMap[status]?.label || status}</Badge>;
 };
 
 
@@ -33,12 +34,15 @@ const QuoteList: React.FC<{
     onStatusFilterChange: (value: QuoteStatus | '') => void;
     salespersonFilter: string;
     onSalespersonFilterChange: (value: string) => void;
+    showArchived: boolean;
+    onShowArchivedChange: (show: boolean) => void;
 }> = ({ 
     quotes, onNew, onEdit, 
     clientFilter, onClientFilterChange, 
     dateFilter, onDateFilterChange, 
     statusFilter, onStatusFilterChange,
-    salespersonFilter, onSalespersonFilterChange
+    salespersonFilter, onSalespersonFilterChange,
+    showArchived, onShowArchivedChange
  }) => {
     
     const statusLabels = {
@@ -46,6 +50,7 @@ const QuoteList: React.FC<{
         sent: "Enviado",
         approved: "Aprovado",
         rejected: "Rejeitado",
+        archived: "Arquivado",
     };
 
     const salespeople = useMemo(() => mockUsers.filter(u => u.role === 'vendedor'), []);
@@ -54,42 +59,44 @@ const QuoteList: React.FC<{
         <Card>
             <CardHeader>
                 <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-semibold text-text-primary dark:text-slate-100">Orçamentos</h2>
+                    <h2 className="text-2xl font-semibold text-text-primary dark:text-slate-100">{showArchived ? 'Orçamentos Arquivados' : 'Orçamentos'}</h2>
                     <Button onClick={onNew}>Novo Orçamento</Button>
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
                      <input
                         type="text"
                         placeholder="Filtrar por Cliente..."
                         value={clientFilter}
                         onChange={(e) => onClientFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-surface dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
                         aria-label="Filtrar por nome do cliente"
                     />
                     <input
                         type="date"
                         value={dateFilter}
                         onChange={(e) => onDateFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-surface dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
                         aria-label="Filtrar por data"
                     />
                     <select
                         value={statusFilter}
                         onChange={(e) => onStatusFilterChange(e.target.value as QuoteStatus | '')}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-surface dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
                         aria-label="Filtrar por status"
                     >
                         <option value="">Todos os Status</option>
-                        {Object.entries(statusLabels).map(([value, label]) => (
+                        {Object.entries(statusLabels)
+                            .filter(([value]) => showArchived ? value === 'archived' : value !== 'archived')
+                            .map(([value, label]) => (
                             <option key={value} value={value}>{label}</option>
                         ))}
                     </select>
                     <select
                         value={salespersonFilter}
                         onChange={(e) => onSalespersonFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-surface dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
                         aria-label="Filtrar por vendedor"
                     >
                         <option value="">Todos os Vendedores</option>
@@ -97,6 +104,11 @@ const QuoteList: React.FC<{
                             <option key={user.id} value={user.id}>{user.name}</option>
                         ))}
                     </select>
+                    <div className="flex items-center justify-start md:justify-end">
+                         <Button variant={showArchived ? 'primary' : 'ghost'} onClick={() => onShowArchivedChange(!showArchived)}>
+                            {showArchived ? 'Ver Ativos' : 'Ver Arquivados'}
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -360,7 +372,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     };
     
     const renderItemForm = () => {
-        const baseInputClasses = "w-full p-2 border rounded bg-surface dark:bg-slate-700";
+        const baseInputClasses = "w-full p-2 border rounded bg-slate-50 dark:bg-slate-700";
         const getInputClasses = (field: string) => `${baseInputClasses} ${itemErrors[field] ? 'border-error' : 'border-border dark:border-slate-600'}`;
         const hasCustomShape = itemFormData.shapePoints && itemFormData.shapePoints.length > 0;
 
@@ -503,7 +515,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                         <select
                             id="client-select"
                             onChange={(e) => handleClientSelect(e.target.value)}
-                            className="p-2 border rounded w-full bg-surface dark:bg-slate-700 border-border dark:border-slate-600"
+                            className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600"
                         >
                             <option value="">-- Digitar novo cliente --</option>
                             {mockClients.map(client => (
@@ -515,19 +527,19 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                     </div>
 
                     <div>
-                        <input type="text" placeholder="Nome do Cliente" value={quote.clientName} onChange={e => setQuote({...quote, clientName: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientName ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="text" placeholder="Nome do Cliente" value={quote.clientName} onChange={e => setQuote({...quote, clientName: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.clientName ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.clientName} />
                     </div>
                     <div>
-                        <input type="email" placeholder="Email do Cliente" value={quote.clientEmail} onChange={e => setQuote({...quote, clientEmail: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientEmail ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="email" placeholder="Email do Cliente" value={quote.clientEmail} onChange={e => setQuote({...quote, clientEmail: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.clientEmail ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.clientEmail} />
                     </div>
                     <div>
-                         <input type="text" placeholder="Telefone do Cliente" value={quote.clientPhone} onChange={e => setQuote({...quote, clientPhone: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientPhone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                         <input type="text" placeholder="Telefone do Cliente" value={quote.clientPhone} onChange={e => setQuote({...quote, clientPhone: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.clientPhone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                          <FieldError message={errors.clientPhone} />
                     </div>
                     <div className="md:col-span-2">
-                        <textarea placeholder="Endereço de Entrega" value={quote.deliveryAddress} onChange={e => setQuote({...quote, deliveryAddress: e.target.value})} className="p-2 border rounded w-full dark:bg-slate-700 border-border dark:border-slate-600" rows={2}></textarea>
+                        <textarea placeholder="Endereço de Entrega" value={quote.deliveryAddress} onChange={e => setQuote({...quote, deliveryAddress: e.target.value})} className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600" rows={2}></textarea>
                     </div>
                 </div>
             
@@ -618,9 +630,30 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
     const [dateFilter, setDateFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<QuoteStatus | ''>('');
     const [salespersonFilter, setSalespersonFilter] = useState('');
+    const [showArchived, setShowArchived] = useState(false);
+
+    const processedQuotes = useMemo(() => {
+        const now = new Date();
+        const archiveLimit = 120 * 24 * 60 * 60 * 1000; // 120 days in milliseconds
+
+        return quotes.map(quote => {
+            const isOld = now.getTime() - new Date(quote.createdAt).getTime() > archiveLimit;
+            if ((quote.status === 'draft' || quote.status === 'sent') && isOld) {
+                return { ...quote, status: 'archived' as QuoteStatus };
+            }
+            return quote;
+        });
+    }, [quotes]);
+
 
     const filteredQuotes = useMemo(() => {
-        return quotes.filter(quote => {
+        return processedQuotes.filter(quote => {
+             if (showArchived) {
+                if (quote.status !== 'archived') return false;
+            } else {
+                if (quote.status === 'archived') return false;
+            }
+
             const clientMatch = clientFilter 
                 ? quote.clientName.toLowerCase().includes(clientFilter.toLowerCase()) 
                 : true;
@@ -639,7 +672,7 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
 
             return clientMatch && dateMatch && statusMatch && salespersonMatch;
         });
-    }, [quotes, clientFilter, dateFilter, statusFilter, salespersonFilter]);
+    }, [processedQuotes, clientFilter, dateFilter, statusFilter, salespersonFilter, showArchived]);
 
     const handleNew = () => {
         setSelectedQuote({
@@ -652,7 +685,8 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
     };
 
     const handleEdit = (quote: Quote) => {
-        setSelectedQuote(JSON.parse(JSON.stringify(quote))); // Deep copy to avoid mutation issues
+        const originalQuote = quotes.find(q => q.id === quote.id) || quote;
+        setSelectedQuote(JSON.parse(JSON.stringify(originalQuote))); // Deep copy to avoid mutation issues
         setCurrentView('form');
     };
 
@@ -704,6 +738,8 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
                     onStatusFilterChange={setStatusFilter}
                     salespersonFilter={salespersonFilter}
                     onSalespersonFilterChange={setSalespersonFilter}
+                    showArchived={showArchived}
+                    onShowArchivedChange={setShowArchived}
                 />
             )}
             {currentView === 'form' && selectedQuote && <QuoteForm quote={selectedQuote} onSave={handleSave} onCancel={handleCancel} />}

@@ -42,7 +42,7 @@ const UserSwitcher: React.FC<{
           id="user-select"
           value={currentUser.id}
           onChange={handleSelectChange}
-          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-border dark:border-slate-600 dark:bg-slate-700 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-border bg-slate-50 dark:border-slate-600 dark:bg-slate-700 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
         >
           {mockUsers.map(user => (
             <option key={user.id} value={user.id}>

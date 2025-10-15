@@ -1,26 +1,3 @@
-export type ProductionStatus = 'cutting' | 'finishing' | 'ready_for_delivery' | 'delivered';
-
-export interface Order {
-  id: string; // PED-
-  originalQuoteId: string; // ORC-
-  clientName: string;
-  items: QuoteItem[];
-  total: number;
-  approvalDate: string;
-  serviceOrderIds: string[];
-  salespersonId?: string;
-}
-
-export interface ServiceOrder {
-  id: string; // OS-
-  orderId: string; // PED-
-  clientName: string;
-  items: QuoteItem[];
-  total: number;
-  deliveryDate: string;
-  assignedToIds: string[];
-  status: ProductionStatus;
-}
 import { ROLES } from './roles';
 
 export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices';
@@ -30,6 +7,14 @@ export interface User {
   id: string;
   name: string;
   role: Role;
+}
+
+export type ProductionProfessionalRole = 'cortador' | 'acabador' | 'montador' | 'entregador';
+
+export interface ProductionProfessional {
+  id: string;
+  name: string;
+  role: ProductionProfessionalRole;
 }
 
 export interface Client {
@@ -127,7 +112,7 @@ export interface QuoteItem {
   shapePoints?: { x: number; y: number }[];
 }
 
-export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected';
+export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'archived';
 
 export interface Quote {
   id: string;
@@ -141,6 +126,30 @@ export interface Quote {
   total: number;
   createdAt: string;
   salespersonId?: string;
+}
+
+export type ProductionStatus = 'cutting' | 'finishing' | 'ready_for_delivery' | 'delivered';
+
+export interface Order {
+  id: string; // PED-
+  originalQuoteId: string; // ORC-
+  clientName: string;
+  items: QuoteItem[];
+  total: number;
+  approvalDate: string;
+  serviceOrderIds: string[];
+  salespersonId?: string;
+}
+
+export interface ServiceOrder {
+  id: string; // OS-
+  orderId: string; // PED-
+  clientName: string;
+  items: QuoteItem[];
+  total: number;
+  deliveryDate: string;
+  assignedToIds: string[];
+  status: ProductionStatus;
 }
 
 export type InvoiceStatus = 'pending' | 'issued' | 'canceled';

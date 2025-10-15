@@ -112,15 +112,15 @@ const SupplierForm: React.FC<{
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <input type="text" placeholder="Nome da Empresa" value={supplier.name} onChange={e => setSupplier({...supplier, name: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.name ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="text" placeholder="Nome da Empresa" value={supplier.name} onChange={e => setSupplier({...supplier, name: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.name ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.name} />
                     </div>
                     <div>
-                        <input type="text" placeholder="Nome do Contato" value={supplier.contactPerson} onChange={e => setSupplier({...supplier, contactPerson: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.contactPerson ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="text" placeholder="Nome do Contato" value={supplier.contactPerson} onChange={e => setSupplier({...supplier, contactPerson: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.contactPerson ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.contactPerson} />
                     </div>
                     <div className="relative">
-                        <input type="text" placeholder="Telefone" value={supplier.phone} onChange={e => setSupplier({...supplier, phone: e.target.value})} className={`p-2 border rounded w-full pr-10 dark:bg-slate-700 ${errors.phone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="text" placeholder="Telefone" value={supplier.phone} onChange={e => setSupplier({...supplier, phone: e.target.value})} className={`p-2 border rounded w-full pr-10 bg-slate-50 dark:bg-slate-700 ${errors.phone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                          {supplier.phone && (
                             <a href={generateWhatsAppLink(supplier.phone)} target="_blank" rel="noopener noreferrer" title="Abrir no WhatsApp" className="absolute inset-y-0 right-0 flex items-center pr-3 text-green-500 hover:text-green-700">
                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 4.315 1.919 6.066l-1.472 5.378 5.441-1.421zM11.999 4.521c.212 0 .416.03.612.088.225-.045.458-.068.696-.068h.001c.138 0 .274.01.409.029.164.023.324.057.48.102.18.053.352.12.518.2.148.071.29.155.425.25.158.114.306.242.441.381.119.123.23.255.335.395.122.161.233.332.336.512.092.158.175.324.248.499.063.149.117.302.162.458.042.145.074.293.097.444.02.127.031.255.031.385v.001c0 .093-.005.185-.014.276-.025.245-.084.482-.175.709-.131.325-.316.626-.55.895-.252.287-.556.533-.898.729-.281.16-.583.284-.901.372-.258.072-.524.12-.796.143-.332.028-.671.028-.999 0-.272-.023-.538-.071-.796-.143-.318-.088-.62-.212-.901-.372-.342-.196-.646-.442-.898-.729-.234-.269-.419-.57-.55-.895-.091-.227-.15-.464-.175-.709-.009-.091-.014-.183-.014-.276v-.001c0-.13.011-.258.031-.385.023-.151.055-.299.097-.444.045-.156.099-.309.162-.458.073-.175.156-.341.248-.499.103-.18.214-.351.336-.512.105-.14.216-.272.335.395.135-.139.283-.267.441-.381.135-.095.277-.179.425-.25.166-.08.338-.147.518-.2.156-.045.316-.079.48-.102.135-.019.271-.029.409-.029h.001z"/></svg>
@@ -129,15 +129,15 @@ const SupplierForm: React.FC<{
                          <FieldError message={errors.phone} />
                     </div>
                     <div>
-                        <input type="email" placeholder="Email" value={supplier.email} onChange={e => setSupplier({...supplier, email: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.email ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="email" placeholder="Email" value={supplier.email} onChange={e => setSupplier({...supplier, email: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.email ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                          <FieldError message={errors.email} />
                     </div>
                     <div>
-                        <input type="text" placeholder="CPF/CNPJ" value={supplier.cpfCnpj} onChange={e => setSupplier({...supplier, cpfCnpj: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.cpfCnpj ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="text" placeholder="CPF/CNPJ" value={supplier.cpfCnpj} onChange={e => setSupplier({...supplier, cpfCnpj: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.cpfCnpj ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.cpfCnpj} />
                     </div>
                     <div className="md:col-span-2">
-                        <textarea placeholder="Endereço" value={supplier.address} onChange={e => setSupplier({...supplier, address: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.address ? 'border-error' : 'border-border dark:border-slate-600'}`} rows={3}></textarea>
+                        <textarea placeholder="Endereço" value={supplier.address} onChange={e => setSupplier({...supplier, address: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.address ? 'border-error' : 'border-border dark:border-slate-600'}`} rows={3}></textarea>
                         <FieldError message={errors.address} />
                     </div>
                 </div>

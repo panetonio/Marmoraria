@@ -1,5 +1,5 @@
 import React, { useState, useMemo, FC, DragEvent, useEffect } from 'react';
-import type { Client, Opportunity, OpportunityStatus, AgendaEvent, Note, Page } from '../types';
+import type { Client, Opportunity, OpportunityStatus, AgendaEvent, Note, Page, QuoteStatus } from '../types';
 import { mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockUsers, mockQuotes, mockOrders } from '../data/mockData';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -36,8 +36,24 @@ const ClientDetailModal: FC<{
     const [newNoteContent, setNewNoteContent] = useState('');
 
     const interactionHistory = useMemo(() => {
-        const clientQuotes = mockQuotes.filter(q => q.clientName === client.name && q.status !== 'approved')
+        const now = new Date();
+        const archiveLimit = 120 * 24 * 60 * 60 * 1000; // 120 days in milliseconds
+
+        const processedQuotes = mockQuotes.map(quote => {
+            const isOld = now.getTime() - new Date(quote.createdAt).getTime() > archiveLimit;
+            if ((quote.status === 'draft' || quote.status === 'sent') && isOld) {
+                return { ...quote, status: 'archived' as QuoteStatus };
+            }
+            return quote;
+        });
+
+        const clientQuotes = processedQuotes.filter(q => 
+                q.clientName === client.name && 
+                q.status !== 'approved' &&
+                q.status !== 'archived'
+            )
             .map(q => ({ ...q, type: 'Orçamento' }));
+        
         const clientOrders = mockOrders.filter(o => o.clientName === client.name)
             .map(o => ({ ...o, type: 'Pedido', createdAt: o.approvalDate, total: o.total, id: o.id }));
         const clientNotes = notes.filter(n => n.clientId === client.id)
@@ -102,7 +118,7 @@ const ClientDetailModal: FC<{
                     </div>
                      <div className="mt-4">
                         <textarea 
-                            className="w-full p-2 border border-border dark:border-slate-600 rounded bg-surface dark:bg-slate-700" 
+                            className="w-full p-2 border border-border dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700" 
                             placeholder="Adicionar nova anotação..."
                             value={newNoteContent}
                             onChange={(e) => setNewNoteContent(e.target.value)}
@@ -162,29 +178,29 @@ const ClientForm: React.FC<{
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <input type="text" placeholder="Nome Completo / Razão Social" value={client.name} onChange={e => setClient({...client, name: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.name ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="text" placeholder="Nome Completo / Razão Social" value={client.name} onChange={e => setClient({...client, name: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.name ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.name} />
                     </div>
                     <div>
-                        <select value={client.type} onChange={e => setClient({...client, type: e.target.value as 'pessoa_fisica' | 'empresa'})} className="p-2 border rounded w-full dark:bg-slate-700 border-border dark:border-slate-600">
+                        <select value={client.type} onChange={e => setClient({...client, type: e.target.value as 'pessoa_fisica' | 'empresa'})} className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600">
                             <option value="pessoa_fisica">Pessoa Física</option>
                             <option value="empresa">Empresa</option>
                         </select>
                     </div>
                      <div>
-                        <input type="text" placeholder="CPF / CNPJ" value={client.cpfCnpj} onChange={e => setClient({...client, cpfCnpj: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.cpfCnpj ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="text" placeholder="CPF / CNPJ" value={client.cpfCnpj} onChange={e => setClient({...client, cpfCnpj: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.cpfCnpj ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.cpfCnpj} />
                     </div>
                     <div>
-                        <input type="email" placeholder="Email" value={client.email} onChange={e => setClient({...client, email: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.email ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="email" placeholder="Email" value={client.email} onChange={e => setClient({...client, email: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.email ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                          <FieldError message={errors.email} />
                     </div>
                      <div>
-                        <input type="text" placeholder="Telefone" value={client.phone} onChange={e => setClient({...client, phone: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.phone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
+                        <input type="text" placeholder="Telefone" value={client.phone} onChange={e => setClient({...client, phone: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.phone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.phone} />
                     </div>
                     <div className="md:col-span-2">
-                        <textarea placeholder="Endereço" value={client.address} onChange={e => setClient({...client, address: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.address ? 'border-error' : 'border-border dark:border-slate-600'}`} rows={3}></textarea>
+                        <textarea placeholder="Endereço" value={client.address} onChange={e => setClient({...client, address: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.address ? 'border-error' : 'border-border dark:border-slate-600'}`} rows={3}></textarea>
                         <FieldError message={errors.address} />
                     </div>
                 </div>
