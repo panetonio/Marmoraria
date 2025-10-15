@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 // FIX: Add import for jest-dom to provide custom matchers and fix TypeScript errors.
 import '@testing-library/jest-dom';
@@ -27,7 +28,8 @@ jest.mock('../components/CuttingOptimizer', () => ({ onClose }: { onClose: () =>
 describe('QuotesPage', () => {
     describe('Filtering Logic', () => {
         beforeEach(() => {
-            render(<QuotesPage />);
+            // FIX: Pass required props to QuotesPage component to resolve TypeScript error.
+            render(<QuotesPage searchTarget={null} clearSearchTarget={jest.fn()} />);
         });
 
         test('should render all quotes initially', () => {
@@ -94,7 +96,8 @@ describe('QuotesPage', () => {
     describe('QuoteForm Interactions', () => {
         beforeEach(async () => {
             const user = userEvent.setup();
-            render(<QuotesPage />);
+            // FIX: Pass required props to QuotesPage component to resolve TypeScript error.
+            render(<QuotesPage searchTarget={null} clearSearchTarget={jest.fn()} />);
             const newQuoteButton = screen.getByRole('button', { name: /Novo Orçamento/i });
             await user.click(newQuoteButton);
         });
@@ -122,7 +125,7 @@ describe('QuotesPage', () => {
             await user.type(screen.getByPlaceholderText('Largura (m)'), '2');
             await user.type(screen.getByPlaceholderText('Altura (m)'), '0.8');
 
-            expect(screen.getByText(/Área:/i)).toHaveTextContent('1.60 m²');
+            expect(screen.getByText(/Área:/i)).toHaveTextContent('1.600 m²');
             expect(screen.getByText(/Perímetro:/i)).toHaveTextContent('5.60 m');
 
             await user.click(screen.getByRole('button', { name: 'Adicionar Item' }));

@@ -1,5 +1,5 @@
-import React, { useState, useMemo, FC } from 'react';
-import type { Invoice, InvoiceStatus, Order } from '../types';
+import React, { useState, useMemo, FC, useEffect } from 'react';
+import type { Invoice, InvoiceStatus, Order, Page } from '../types';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -142,12 +142,15 @@ const InvoiceForm: React.FC<{
     );
 };
 
-
-const InvoicesPage: FC<{
+interface InvoicesPageProps {
     orders: Order[];
     invoices: Invoice[];
     setInvoices: (update: Invoice[] | ((prev: Invoice[]) => Invoice[])) => void;
-}> = ({ orders, invoices, setInvoices }) => {
+    searchTarget: { page: Page; id: string } | null;
+    clearSearchTarget: () => void;
+}
+
+const InvoicesPage: FC<InvoicesPageProps> = ({ orders, invoices, setInvoices, searchTarget, clearSearchTarget }) => {
     const [currentView, setCurrentView] = useState<'list' | 'form'>('list');
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
@@ -174,6 +177,16 @@ const InvoicesPage: FC<{
         setCurrentView('form');
     };
     
+    useEffect(() => {
+        if (searchTarget && searchTarget.page === 'invoices') {
+            const invoice = invoices.find(i => i.id === searchTarget.id);
+            if (invoice) {
+                handleView(invoice);
+            }
+            clearSearchTarget();
+        }
+    }, [searchTarget, invoices, clearSearchTarget]);
+
     const handleSave = (invoiceToSave: Invoice) => {
         setInvoices(prev => [...prev, { ...invoiceToSave, id: `NF-${(invoices.length + 1).toString().padStart(3, '0')}`}]);
         setCurrentView('list');

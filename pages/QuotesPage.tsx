@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client } from '../types';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client, Page } from '../types';
 import { mockQuotes, mockMaterials, mockServices, mockProducts, mockUsers, mockClients } from '../data/mockData';
 import QuotePreview from '../components/QuotePreview';
 import CuttingOptimizer from '../components/CuttingOptimizer';
@@ -604,8 +604,12 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     );
 };
 
+interface QuotesPageProps {
+    searchTarget: { page: Page; id: string } | null;
+    clearSearchTarget: () => void;
+}
 
-const QuotesPage: React.FC = () => {
+const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget }) => {
     const [quotes, setQuotes] = useState<Quote[]>(mockQuotes);
     const [currentView, setCurrentView] = useState<'list' | 'form'>('list');
     const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -651,6 +655,16 @@ const QuotesPage: React.FC = () => {
         setSelectedQuote(JSON.parse(JSON.stringify(quote))); // Deep copy to avoid mutation issues
         setCurrentView('form');
     };
+
+    useEffect(() => {
+        if (searchTarget && searchTarget.page === 'quotes') {
+            const quote = quotes.find(q => q.id === searchTarget.id);
+            if (quote) {
+                handleEdit(quote);
+            }
+            clearSearchTarget();
+        }
+    }, [searchTarget, quotes, clearSearchTarget]);
 
     const handleSave = (quoteToSave: Quote) => {
         // FIX: 'totals' was used before it was declared.

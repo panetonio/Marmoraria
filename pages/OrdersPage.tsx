@@ -1,6 +1,6 @@
-import React, { useState, useMemo, FC } from 'react';
+import React, { useState, useMemo, FC, useEffect } from 'react';
 import { mockUsers } from '../data/mockData';
-import type { Order, QuoteItem, ServiceOrder } from '../types';
+import type { Order, QuoteItem, ServiceOrder, Page } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
@@ -99,13 +99,16 @@ const CreateServiceOrderModal: FC<{
     );
 };
 
-
-const OrdersPage: FC<{
+interface OrdersPageProps {
     orders: Order[];
     serviceOrders: ServiceOrder[];
     setOrders: (update: (prev: Order[]) => Order[]) => void;
     setServiceOrders: (update: (prev: ServiceOrder[]) => ServiceOrder[]) => void;
-}> = ({ orders, serviceOrders, setOrders, setServiceOrders }) => {
+    searchTarget: { page: Page; id: string } | null;
+    clearSearchTarget: () => void;
+}
+
+const OrdersPage: FC<OrdersPageProps> = ({ orders, serviceOrders, setOrders, setServiceOrders, searchTarget, clearSearchTarget }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
@@ -120,6 +123,16 @@ const OrdersPage: FC<{
         setSelectedOrder(order);
         setIsModalOpen(true);
     };
+    
+    useEffect(() => {
+        if (searchTarget && searchTarget.page === 'orders') {
+            const order = orders.find(o => o.id === searchTarget.id);
+            if (order) {
+                handleOpenModal(order);
+            }
+            clearSearchTarget();
+        }
+    }, [searchTarget, orders, clearSearchTarget]);
 
     const handleCloseModal = () => {
         setSelectedOrder(null);

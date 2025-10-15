@@ -15,6 +15,7 @@ import { mockUsers, mockOrders, mockServiceOrders, mockInvoices } from './data/m
 import { ROLES, PERMISSIONS } from './roles';
 import Card from './components/ui/Card';
 import ThemeToggle from './components/ThemeToggle';
+import GlobalSearch from './components/GlobalSearch';
 
 const UserSwitcher: React.FC<{
   currentUser: User;
@@ -83,7 +84,8 @@ const App: React.FC = () => {
   
   const [currentUser, setCurrentUser] = useState<User>(mockUsers[0]);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
-  
+  const [searchTarget, setSearchTarget] = useState<{ page: Page; id: string } | null>(null);
+
   // Lifted state for shared data
   const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(mockServiceOrders);
@@ -102,15 +104,21 @@ const App: React.FC = () => {
     }
   }, [currentUser, currentPage]);
 
+  const handleSearchNavigate = (page: Page, id: string) => {
+    setCurrentPage(page);
+    setSearchTarget({ page, id });
+  };
+  
+  const clearSearchTarget = () => setSearchTarget(null);
 
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
       case 'quotes':
-        return <QuotesPage />;
+        return <QuotesPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'orders':
-        return <OrdersPage orders={orders} setOrders={setOrders} serviceOrders={serviceOrders} setServiceOrders={setServiceOrders} />;
+        return <OrdersPage orders={orders} setOrders={setOrders} serviceOrders={serviceOrders} setServiceOrders={setServiceOrders} searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'production':
         return <ProductionPage serviceOrders={serviceOrders} setServiceOrders={setServiceOrders} />;
       case 'stock':
@@ -118,9 +126,9 @@ const App: React.FC = () => {
       case 'suppliers':
         return <SuppliersPage />;
       case 'crm':
-        return <CrmPage />;
+        return <CrmPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'invoices':
-        return <InvoicesPage orders={orders} invoices={invoices} setInvoices={setInvoices} />;
+        return <InvoicesPage orders={orders} invoices={invoices} setInvoices={setInvoices} searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'finance':
         return <FinancePage />;
       default:
@@ -132,7 +140,8 @@ const App: React.FC = () => {
     <div className="flex h-screen font-sans">
       <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={currentUser} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-background dark:bg-slate-900 p-4 flex justify-end items-center space-x-4">
+        <header className="bg-background dark:bg-slate-900 p-4 flex justify-end items-center space-x-4 border-b border-border dark:border-slate-700">
+            <GlobalSearch onNavigate={handleSearchNavigate} />
             <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
             <UserSwitcher currentUser={currentUser} onUserChange={setCurrentUser} />
         </header>

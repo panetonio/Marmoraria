@@ -1,5 +1,5 @@
-import React, { useState, useMemo, FC, DragEvent } from 'react';
-import type { Client, Opportunity, OpportunityStatus, AgendaEvent, Note } from '../types';
+import React, { useState, useMemo, FC, DragEvent, useEffect } from 'react';
+import type { Client, Opportunity, OpportunityStatus, AgendaEvent, Note, Page } from '../types';
 import { mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockUsers, mockQuotes, mockOrders } from '../data/mockData';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -197,8 +197,12 @@ const ClientForm: React.FC<{
     );
 };
 
+interface CrmPageProps {
+    searchTarget: { page: Page; id: string } | null;
+    clearSearchTarget: () => void;
+}
 
-const CrmPage: FC = () => {
+const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
     const [view, setView] = useState<CrmView>('clientes');
     const [clients, setClients] = useState<Client[]>(mockClients);
     const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities);
@@ -207,6 +211,16 @@ const CrmPage: FC = () => {
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [clientView, setClientView] = useState<'list' | 'form'>('list');
     const [editingClient, setEditingClient] = useState<Client | null>(null);
+
+    useEffect(() => {
+        if (searchTarget && searchTarget.page === 'crm') {
+            const client = clients.find(c => c.id === searchTarget.id);
+            if (client) {
+                setSelectedClient(client);
+            }
+            clearSearchTarget();
+        }
+    }, [searchTarget, clients, clearSearchTarget]);
 
     const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: OpportunityStatus) => {
         const oppId = e.dataTransfer.getData("oppId");
