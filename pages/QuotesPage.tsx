@@ -3,6 +3,7 @@ import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Clie
 import { mockQuotes, mockMaterials, mockServices, mockProducts, mockUsers, mockClients } from '../data/mockData';
 import QuotePreview from '../components/QuotePreview';
 import CuttingOptimizer from '../components/CuttingOptimizer';
+import ShapeDesigner from '../components/ShapeDesigner';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -173,6 +174,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     const [isCatalogOpen, setIsCatalogOpen] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
+    const [isDesignerOpen, setIsDesignerOpen] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
     
@@ -181,15 +183,18 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         return { subtotal, total: subtotal }; // Can add discounts, taxes here later
     }, [quote.items]);
 
-    const validateQuote = (): boolean => {
+    const validateQuote = (isDraft: boolean): boolean => {
         const newErrors: Record<string, string> = {};
         if (!quote.clientName.trim()) newErrors.clientName = "Nome do cliente é obrigatório.";
-        if (!quote.clientEmail.trim()) {
-            newErrors.clientEmail = "Email do cliente é obrigatório.";
-        } else if (!/\S+@\S+\.\S+/.test(quote.clientEmail)) {
-            newErrors.clientEmail = "Formato de email inválido.";
+        
+        if (!isDraft) {
+            if (!quote.clientEmail.trim()) {
+                newErrors.clientEmail = "Email do cliente é obrigatório.";
+            } else if (!/\S+@\S+\.\S+/.test(quote.clientEmail)) {
+                newErrors.clientEmail = "Formato de email inválido.";
+            }
+            if (!quote.clientPhone.trim()) newErrors.clientPhone = "Telefone do cliente é obrigatório.";
         }
-        if (!quote.clientPhone.trim()) newErrors.clientPhone = "Telefone do cliente é obrigatório.";
         
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -211,6 +216,10 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     };
 
     const updateItemCalculations = useCallback((data: Partial<QuoteItem>) => {
+        if (data.shapePoints && data.shapePoints.length > 0) {
+            const totalPrice = (data.quantity || 0) * (data.unitPrice || 0);
+            return { ...data, totalPrice };
+        }
         if (data.type === 'material' && data.width && data.height) {
             const width = parseFloat(data.width.toString());
             const height = parseFloat(data.height.toString());
@@ -231,6 +240,23 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
             setItemErrors(newItemErrors);
         }
     };
+    
+    const handleShapeComplete = (data: { area: number, points: { x: number, y: number }[] }) => {
+        setItemFormData(prev => {
+            const totalPrice = data.area * (prev.unitPrice || 0);
+            return {
+                ...prev,
+                quantity: data.area,
+                area: data.area,
+                shapePoints: data.points,
+                width: undefined,
+                height: undefined,
+                perimeter: undefined,
+                totalPrice: totalPrice
+            }
+        });
+        setIsDesignerOpen(false);
+    };
 
     const validateItem = (): boolean => {
         const newItemErrors: Record<string, string> = {};
@@ -238,8 +264,10 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         if (itemType === 'material') {
             if (!itemFormData.materialId) { newItemErrors.materialId = "Selecione um material."; }
             if (!itemFormData.description?.trim()) { newItemErrors.description = "A descrição da peça é obrigatória."; }
-            if (!itemFormData.width || itemFormData.width <= 0) { newItemErrors.width = "Largura deve ser > 0."; }
-            if (!itemFormData.height || itemFormData.height <= 0) { newItemErrors.height = "Altura deve ser > 0."; }
+            if (!(itemFormData.shapePoints && itemFormData.shapePoints.length > 0)) {
+                if (!itemFormData.width || itemFormData.width <= 0) { newItemErrors.width = "Largura deve ser > 0."; }
+                if (!itemFormData.height || itemFormData.height <= 0) { newItemErrors.height = "Altura deve ser > 0."; }
+            }
         } else if (itemType === 'service') {
             const serviceExists = mockServices.some(s => s.id === itemFormData.id);
             if (!itemFormData.id || !serviceExists) {
@@ -269,19 +297,32 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         const baseId = `item-${Date.now()}`;
 
         if (itemType === 'material') {
-             if (!itemFormData.width || !itemFormData.height || !itemFormData.description) return;
-            newItem = {
-                id: baseId,
-                type: 'material',
-                description: `${itemFormData.description} - ${itemFormData.materialName}`,
-                quantity: itemFormData.quantity!,
-                unitPrice: itemFormData.unitPrice!,
-                totalPrice: itemFormData.totalPrice!,
-                width: itemFormData.width,
-                height: itemFormData.height,
-                perimeter: itemFormData.perimeter,
-                materialId: itemFormData.materialId
-            };
+             if (itemFormData.shapePoints && itemFormData.shapePoints.length > 0) {
+                newItem = {
+                    id: baseId,
+                    type: 'material',
+                    description: `${itemFormData.description} (Custom) - ${itemFormData.materialName}`,
+                    quantity: itemFormData.quantity!,
+                    unitPrice: itemFormData.unitPrice!,
+                    totalPrice: itemFormData.totalPrice!,
+                    materialId: itemFormData.materialId,
+                    shapePoints: itemFormData.shapePoints,
+                };
+             } else {
+                 if (!itemFormData.width || !itemFormData.height || !itemFormData.description) return;
+                newItem = {
+                    id: baseId,
+                    type: 'material',
+                    description: `${itemFormData.description} - ${itemFormData.materialName}`,
+                    quantity: itemFormData.quantity!,
+                    unitPrice: itemFormData.unitPrice!,
+                    totalPrice: itemFormData.totalPrice!,
+                    width: itemFormData.width,
+                    height: itemFormData.height,
+                    perimeter: itemFormData.perimeter,
+                    materialId: itemFormData.materialId
+                };
+             }
         } else if (itemType === 'service') {
             const service = mockServices.find(s => s.id === itemFormData.id);
             if (!service || !itemFormData.quantity) return;
@@ -321,6 +362,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     const renderItemForm = () => {
         const baseInputClasses = "w-full p-2 border rounded bg-surface dark:bg-slate-700";
         const getInputClasses = (field: string) => `${baseInputClasses} ${itemErrors[field] ? 'border-error' : 'border-border dark:border-slate-600'}`;
+        const hasCustomShape = itemFormData.shapePoints && itemFormData.shapePoints.length > 0;
 
         switch (itemType) {
             case 'material':
@@ -341,17 +383,21 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-2">
                         <div>
-                            <input type="number" placeholder="Largura (m)" value={itemFormData.width || ''} onChange={e => handleItemFormChange('width', parseFloat(e.target.value) || 0)} className={getInputClasses('width')}/>
+                            <input type="number" placeholder="Largura (m)" value={itemFormData.width || ''} onChange={e => handleItemFormChange('width', parseFloat(e.target.value) || 0)} className={getInputClasses('width')} disabled={hasCustomShape}/>
                             <FieldError message={itemErrors.width} />
                         </div>
                         <div>
-                            <input type="number" placeholder="Altura (m)" value={itemFormData.height || ''} onChange={e => handleItemFormChange('height', parseFloat(e.target.value) || 0)} className={getInputClasses('height')}/>
+                            <input type="number" placeholder="Altura (m)" value={itemFormData.height || ''} onChange={e => handleItemFormChange('height', parseFloat(e.target.value) || 0)} className={getInputClasses('height')} disabled={hasCustomShape}/>
                             <FieldError message={itemErrors.height} />
                         </div>
                     </div>
+                     <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => setIsDesignerOpen(true)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" /></svg>
+                        {hasCustomShape ? 'Editar Forma Customizada' : 'Usar Designer Visual'}
+                    </Button>
                      <div className="grid grid-cols-2 gap-2 mt-2 text-sm bg-slate-100 dark:bg-slate-800/50 p-2 rounded">
-                        <div>Área: <span className="font-semibold">{itemFormData.area?.toFixed(2) || '0.00'} m²</span></div>
-                        <div>Perímetro: <span className="font-semibold">{itemFormData.perimeter?.toFixed(2) || '0.00'} m</span></div>
+                        <div>Área: <span className="font-semibold">{itemFormData.area?.toFixed(3) || '0.000'} m²</span></div>
+                        {!hasCustomShape && <div>Perímetro: <span className="font-semibold">{itemFormData.perimeter?.toFixed(2) || '0.00'} m</span></div>}
                     </div>
                 </>;
             case 'service':
@@ -398,13 +444,24 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     };
 
     const handleAttemptSave = (status: QuoteStatus) => {
-        if (!validateQuote()) {
+        const isDraft = status === 'draft';
+        
+        // Clear previous 'items' error if it exists
+        setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.items;
+            return newErrors;
+        });
+    
+        if (!validateQuote(isDraft)) {
             return;
         }
-        if (quote.items.length === 0) {
-            setErrors(prev => ({ ...prev, items: "O orçamento deve ter pelo menos um item." }));
+    
+        if (!isDraft && quote.items.length === 0) {
+            setErrors(prev => ({ ...prev, items: "O orçamento deve ter pelo menos um item para ser enviado ou aprovado." }));
             return;
         }
+        
         onSave({ ...quote, status: status, ...totals });
     };
 
@@ -426,6 +483,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
 
     return (
         <Card>
+            <ShapeDesigner isOpen={isDesignerOpen} onClose={() => setIsDesignerOpen(false)} onComplete={handleShapeComplete} />
             <MaterialCatalogModal isOpen={isCatalogOpen} onClose={() => setIsCatalogOpen(false)} onSelect={handleMaterialSelect} />
             {isPreviewOpen && <QuotePreview quote={{...quote, ...totals}} onClose={() => setIsPreviewOpen(false)} />}
             {isOptimizerOpen && <CuttingOptimizer 
@@ -457,15 +515,15 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                     </div>
 
                     <div>
-                        <input type="text" placeholder="Nome do Cliente" value={quote.clientName} onChange={e => setQuote({...quote, clientName: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientName ? 'border-error' : 'border-border dark:border-slate-600'}`} onBlur={validateQuote} />
+                        <input type="text" placeholder="Nome do Cliente" value={quote.clientName} onChange={e => setQuote({...quote, clientName: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientName ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.clientName} />
                     </div>
                     <div>
-                        <input type="email" placeholder="Email do Cliente" value={quote.clientEmail} onChange={e => setQuote({...quote, clientEmail: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientEmail ? 'border-error' : 'border-border dark:border-slate-600'}`} onBlur={validateQuote} />
+                        <input type="email" placeholder="Email do Cliente" value={quote.clientEmail} onChange={e => setQuote({...quote, clientEmail: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientEmail ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                         <FieldError message={errors.clientEmail} />
                     </div>
                     <div>
-                         <input type="text" placeholder="Telefone do Cliente" value={quote.clientPhone} onChange={e => setQuote({...quote, clientPhone: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientPhone ? 'border-error' : 'border-border dark:border-slate-600'}`} onBlur={validateQuote} />
+                         <input type="text" placeholder="Telefone do Cliente" value={quote.clientPhone} onChange={e => setQuote({...quote, clientPhone: e.target.value})} className={`p-2 border rounded w-full dark:bg-slate-700 ${errors.clientPhone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
                          <FieldError message={errors.clientPhone} />
                     </div>
                     <div className="md:col-span-2">
@@ -537,7 +595,8 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 </div>
                 <div className="space-x-4">
                     <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-                    <Button variant="secondary" onClick={() => handleAttemptSave('sent')}>Salvar e Enviar</Button>
+                    <Button variant="secondary" onClick={() => handleAttemptSave('draft')}>Salvar Rascunho</Button>
+                    <Button variant="primary" onClick={() => handleAttemptSave('sent')}>Salvar e Enviar</Button>
                     <Button variant="primary" className="bg-success hover:bg-green-700" onClick={() => handleAttemptSave('approved')}>Aprovar e Converter em Pedido</Button>
                 </div>
             </CardFooter>

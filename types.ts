@@ -124,6 +124,7 @@ export interface QuoteItem {
   wastePercentage?: number;
   materialId?: string;
   placement?: { x: number; y: number; fit: boolean };
+  shapePoints?: { x: number; y: number }[];
 }
 
 export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected';
