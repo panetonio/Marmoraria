@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
   { id: 'cutting', title: 'Em Corte', color: 'bg-orange-800' },
   { id: 'finishing', title: 'Em Acabamento', color: 'bg-blue-700' },
+  { id: 'assembly', title: 'Em Montagem', color: 'bg-indigo-700' },
   { id: 'ready_for_delivery', title: 'Pronto para Entrega', color: 'bg-purple-700' },
   { id: 'delivered', title: 'Entregue', color: 'bg-green-800' },
 ];
@@ -161,6 +162,23 @@ const ResourceAllocationModal: FC<{
   );
 };
 
+const ConfirmationModal: FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  message: string;
+}> = ({ isOpen, onClose, onConfirm, message }) => {
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Confirmar Ação">
+            <p className="text-text-primary dark:text-slate-200">{message}</p>
+            <div className="flex justify-end mt-6 space-x-3">
+                <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                <Button variant="primary" onClick={onConfirm}>Confirmar</Button>
+            </div>
+        </Modal>
+    );
+};
+
 const KanbanCard: FC<{
   order: ServiceOrder;
   onDragStart: (e: DragEvent<HTMLElement>, orderId: string) => void;
@@ -211,17 +229,18 @@ const ProductionPage: FC<{
   const [modalOrder, setModalOrder] = useState<ServiceOrder | null>(null);
   const [viewingOrder, setViewingOrder] = useState<ServiceOrder | null>(null);
   const [professionalFilter, setProfessionalFilter] = useState<string>('');
+  const [orderIdFilter, setOrderIdFilter] = useState<string>('');
+  const [confirmationData, setConfirmationData] = useState<{ orderId: string; newStatus: ProductionStatus } | null>(null);
 
   const productionTeam = useMemo(() => mockProductionProfessionals, []);
 
   const filteredServiceOrders = useMemo(() => {
-    if (!professionalFilter) {
-      return serviceOrders;
-    }
-    return serviceOrders.filter(order =>
-      order.assignedToIds.includes(professionalFilter)
-    );
-  }, [serviceOrders, professionalFilter]);
+    return serviceOrders.filter(order => {
+      const professionalMatch = professionalFilter ? order.assignedToIds.includes(professionalFilter) : true;
+      const orderIdMatch = orderIdFilter ? order.orderId.toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
+      return professionalMatch && orderIdMatch;
+    });
+  }, [serviceOrders, professionalFilter, orderIdFilter]);
   
   const handleDragStart = (e: DragEvent<HTMLElement>, orderId: string) => {
     e.dataTransfer.setData("orderId", orderId);
@@ -233,11 +252,10 @@ const ProductionPage: FC<{
   
   const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: ProductionStatus) => {
     const orderId = e.dataTransfer.getData("orderId");
-    setServiceOrders(prevOrders =>
-      prevOrders.map(order =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
+    const order = serviceOrders.find(o => o.id === orderId);
+    if (order && order.status !== newStatus) {
+        setConfirmationData({ orderId, newStatus });
+    }
   };
 
   const handleAssignSave = (orderId: string, assignedToIds: string[]) => {
@@ -245,9 +263,26 @@ const ProductionPage: FC<{
       setModalOrder(null);
   }
 
+  const handleConfirmStatusChange = () => {
+    if (!confirmationData) return;
+    const { orderId, newStatus } = confirmationData;
+    setServiceOrders(prevOrders =>
+      prevOrders.map(order =>
+        order.id === orderId ? { ...order, status: newStatus } : order
+      )
+    );
+    setConfirmationData(null);
+  };
+
   const sortedTimelineOrders = useMemo(() => {
     return [...filteredServiceOrders].sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
   }, [filteredServiceOrders]);
+
+  const columnTitles = useMemo(() => 
+    KANBAN_COLUMNS.reduce((acc, col) => {
+        acc[col.id] = col.title;
+        return acc;
+    }, {} as Record<ProductionStatus, string>), []);
 
 
   return (
@@ -268,12 +303,32 @@ const ProductionPage: FC<{
             onClose={() => setViewingOrder(null)}
         />
       )}
+      {confirmationData && (
+          <ConfirmationModal
+            isOpen={!!confirmationData}
+            onClose={() => setConfirmationData(null)}
+            onConfirm={handleConfirmStatusChange}
+            message={`Tem certeza que deseja mover a OS ${confirmationData.orderId} para o status "${columnTitles[confirmationData.newStatus]}"?`}
+          />
+      )}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Painel de Produção</h1>
           <p className="mt-2 text-text-secondary dark:text-slate-400">Acompanhe e gerencie as Ordens de Serviço (OS).</p>
         </div>
         <div className="flex items-center space-x-4">
+             <div className="flex-shrink-0">
+                <label htmlFor="order-id-filter" className="sr-only">Filtrar por ID do Pedido</label>
+                <input
+                    id="order-id-filter"
+                    type="text"
+                    placeholder="Filtrar por Pedido (PED-...)"
+                    value={orderIdFilter}
+                    onChange={(e) => setOrderIdFilter(e.target.value)}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-border bg-slate-50 dark:border-slate-600 dark:bg-slate-700 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+                    aria-label="Filtrar por ID do Pedido"
+                />
+            </div>
              <div className="flex-shrink-0">
                 <label htmlFor="professional-filter" className="sr-only">Filtrar por Profissional</label>
                 <select
@@ -297,7 +352,7 @@ const ProductionPage: FC<{
       </div>
       
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-4 gap-5 mt-6 h-[75vh]">
+        <div className="grid grid-cols-5 gap-5 mt-6 h-[75vh]">
           {KANBAN_COLUMNS.map(column => (
             <div 
                 key={column.id} 
@@ -348,7 +403,7 @@ const ProductionPage: FC<{
                         ))}
                          {sortedTimelineOrders.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhuma Ordem de Serviço encontrada para o profissional selecionado.</td>
+                                <td colSpan={5} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhuma Ordem de Serviço encontrada com os filtros aplicados.</td>
                             </tr>
                         )}
                     </tbody>

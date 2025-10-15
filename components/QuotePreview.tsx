@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Quote } from '../types';
+import type { Quote, Order } from '../types';
 import { mockUsers } from '../data/mockData';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -8,16 +8,17 @@ import Button from './ui/Button';
 declare const html2canvas: any;
 declare const jspdf: any;
 
-interface QuotePreviewProps {
-    quote: Quote;
+interface DocumentPreviewProps {
+    document: Quote | Order;
     onClose: () => void;
 }
 
-const QuotePreview: React.FC<QuotePreviewProps> = ({ quote, onClose }) => {
+const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     
     const handleGeneratePdf = async () => {
-        const printableArea = document.getElementById('printable-area');
+        // FIX: Explicitly use `window.document` to avoid conflict with the component's `document` prop.
+        const printableArea = window.document.getElementById('printable-area');
         if (!printableArea || isGenerating) return;
     
         setIsGenerating(true);
@@ -51,8 +52,9 @@ const QuotePreview: React.FC<QuotePreviewProps> = ({ quote, onClose }) => {
                 pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
                 heightLeft -= pdfHeight;
             }
-    
-            pdf.save(`orcamento-${quote.id}.pdf`);
+            
+            const docType = 'originalQuoteId' in document ? 'pedido' : 'orcamento';
+            pdf.save(`${docType}-${document.id}.pdf`);
         } catch (error) {
             console.error("Error generating PDF:", error);
             alert("Ocorreu um erro ao gerar o PDF. Tente novamente.");
@@ -60,9 +62,19 @@ const QuotePreview: React.FC<QuotePreviewProps> = ({ quote, onClose }) => {
             setIsGenerating(false);
         }
     };
+
+    const isOrder = 'originalQuoteId' in document;
+    const docTypeLabel = isOrder ? 'PEDIDO' : 'ORÇAMENTO';
+    const docDate = isOrder ? (document as Order).approvalDate : document.createdAt;
+    const clientInfo = {
+        name: document.clientName,
+        email: 'clientEmail' in document ? document.clientEmail : 'N/A',
+        phone: 'clientPhone' in document ? document.clientPhone : 'N/A',
+        deliveryAddress: 'deliveryAddress' in document ? document.deliveryAddress : 'N/A',
+    };
     
     return (
-        <Modal isOpen={true} onClose={onClose} title="Pré-visualização do Orçamento" className="max-w-4xl">
+        <Modal isOpen={true} onClose={onClose} title={`Pré-visualização do ${docTypeLabel}`} className="max-w-4xl">
              <div className="flex justify-end mb-4">
                 <Button 
                     onClick={handleGeneratePdf} 
@@ -79,31 +91,34 @@ const QuotePreview: React.FC<QuotePreviewProps> = ({ quote, onClose }) => {
                         <p className="text-text-secondary">contato@marmorariaerp.com | (11) 5555-4444</p>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-2xl font-semibold text-gray-700">ORÇAMENTO</h2>
-                        <p className="font-mono text-primary">{quote.id}</p>
-                        <p className="text-text-secondary">Data: {new Date(quote.createdAt).toLocaleDateString()}</p>
+                        <h2 className="text-2xl font-semibold text-gray-700">{docTypeLabel}</h2>
+                        <p className="font-mono text-primary">{document.id}</p>
+                        <p className="text-text-secondary">Data: {new Date(docDate).toLocaleDateString()}</p>
+                        {isOrder && <p className="text-text-secondary text-xs">Orçamento Original: {(document as Order).originalQuoteId}</p>}
                     </div>
                 </header>
                 
                 <section className="mt-8 grid grid-cols-2 gap-4">
                     <div className="bg-slate-50 p-4 rounded-lg">
                         <h3 className="font-semibold text-text-secondary mb-2">CLIENTE:</h3>
-                        <p className="font-bold text-dark">{quote.clientName}</p>
-                        <p className="text-slate-800">{quote.clientEmail}</p>
-                        <p className="text-slate-800">{quote.clientPhone}</p>
+                        <p className="font-bold text-dark">{clientInfo.name}</p>
+                        <p className="text-slate-800">{clientInfo.email}</p>
+                        <p className="text-slate-800">{clientInfo.phone}</p>
                     </div>
                      <div className="bg-slate-50 p-4 rounded-lg">
                         <h3 className="font-semibold text-text-secondary mb-2">VENDEDOR:</h3>
-                        <p className="font-bold text-dark">{mockUsers.find(u => u.id === quote.salespersonId)?.name || 'N/A'}</p>
+                        <p className="font-bold text-dark">{mockUsers.find(u => u.id === document.salespersonId)?.name || 'N/A'}</p>
                     </div>
-                    <div className="bg-slate-50 p-4 rounded-lg col-span-2">
-                        <h3 className="font-semibold text-text-secondary mb-2">ENDEREÇO DE ENTREGA:</h3>
-                        <p className="font-bold text-dark">{quote.deliveryAddress || 'A ser definido'}</p>
-                    </div>
+                    {clientInfo.deliveryAddress && (
+                        <div className="bg-slate-50 p-4 rounded-lg col-span-2">
+                            <h3 className="font-semibold text-text-secondary mb-2">ENDEREÇO DE ENTREGA:</h3>
+                            <p className="font-bold text-dark">{clientInfo.deliveryAddress || 'A ser definido'}</p>
+                        </div>
+                    )}
                 </section>
                 
                 <section className="mt-8">
-                    <h3 className="text-xl font-semibold text-dark mb-4 border-b border-border pb-2">Itens do Orçamento</h3>
+                    <h3 className="text-xl font-semibold text-dark mb-4 border-b border-border pb-2">Itens do {docTypeLabel}</h3>
                     <table className="w-full text-left text-sm">
                         <thead>
                             <tr className="bg-slate-100">
@@ -114,7 +129,7 @@ const QuotePreview: React.FC<QuotePreviewProps> = ({ quote, onClose }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {quote.items.map(item => (
+                            {document.items.map(item => (
                                 <tr key={item.id} className="border-b border-border">
                                     <td className="p-2 text-slate-800">{item.description}</td>
                                     <td className="p-2 text-center text-slate-800">{item.quantity.toFixed(2)}</td>
@@ -128,13 +143,15 @@ const QuotePreview: React.FC<QuotePreviewProps> = ({ quote, onClose }) => {
                 
                 <section className="mt-8 flex justify-end">
                     <div className="w-full max-w-xs">
-                        <div className="flex justify-between text-text-secondary">
-                            <span>Subtotal:</span>
-                            <span>{quote.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                        </div>
+                        {'subtotal' in document && (
+                            <div className="flex justify-between text-text-secondary">
+                                <span>Subtotal:</span>
+                                <span>{document.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between font-bold text-xl mt-2 pt-2 border-t border-border text-dark">
                             <span>TOTAL:</span>
-                            <span className="text-primary">{quote.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            <span className="text-primary">{document.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                         </div>
                     </div>
                 </section>
@@ -148,4 +165,4 @@ const QuotePreview: React.FC<QuotePreviewProps> = ({ quote, onClose }) => {
     );
 };
 
-export default QuotePreview;
+export default DocumentPreview;

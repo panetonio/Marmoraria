@@ -128,7 +128,7 @@ export interface Quote {
   salespersonId?: string;
 }
 
-export type ProductionStatus = 'cutting' | 'finishing' | 'ready_for_delivery' | 'delivered';
+export type ProductionStatus = 'cutting' | 'finishing' | 'assembly' | 'ready_for_delivery' | 'delivered';
 
 export interface Order {
   id: string; // PED-

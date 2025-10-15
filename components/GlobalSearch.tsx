@@ -88,7 +88,9 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
         };
         
         setResults(newResults);
-        setIsOpen(Object.values(newResults).some(arr => arr.length > 0));
+        // FIX: Use a type assertion to inform TypeScript that `arr` is an array and has a `length` property.
+        // This resolves an issue where TypeScript might infer `arr` as `unknown` from `Object.values`.
+        setIsOpen(Object.values(newResults).some(arr => (arr as unknown[]).length > 0));
     }, []);
 
     useEffect(() => {
@@ -128,7 +130,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
         setIsOpen(false);
     };
 
-    const hasResults = Object.values(results).some(arr => arr.length > 0);
+    const hasResults = Object.values(results).some(arr => (arr as unknown[]).length > 0);
 
     return (
         <div className="relative" ref={searchRef}>

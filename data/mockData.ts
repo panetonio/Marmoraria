@@ -221,7 +221,7 @@ export const mockServiceOrders: ServiceOrder[] = [
         total: 1020,
         deliveryDate: '2024-08-20T17:00:00Z',
         assignedToIds: [],
-        status: 'finishing'
+        status: 'assembly'
     }
 ];
 

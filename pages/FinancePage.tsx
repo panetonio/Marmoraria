@@ -1,12 +1,13 @@
 import React, { useState, useMemo, FC } from 'react';
 import { mockFinancialTransactions } from '../data/mockData';
 import type { FinancialTransaction, TransactionStatus, TransactionType } from '../types';
-import Card, { CardContent } from '../components/ui/Card';
+import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Tabs from '../components/ui/Tabs';
 
 type FinanceView = 'contas' | 'fluxo_caixa' | 'relatorios';
+type ReportPeriod = 'day' | 'week' | 'month';
 
 const TransactionStatusBadge: FC<{ status: TransactionStatus }> = ({ status }) => {
     const map = {
@@ -25,9 +26,51 @@ const KPICard: FC<{ title: string; value: string; colorClass?: string }> = ({ ti
     </Card>
 );
 
+const ReportTable: FC<{ title: string, transactions: FinancialTransaction[], total: number }> = ({ title, transactions, total }) => (
+    <Card className="p-0 flex flex-col">
+        <CardHeader>{title}</CardHeader>
+        <CardContent className="flex-grow">
+            {transactions.length > 0 ? (
+                <div className="overflow-auto h-full">
+                    <table className="w-full text-left text-sm">
+                        <thead>
+                            <tr className="border-b border-border dark:border-slate-700">
+                                <th className="p-2">Data</th>
+                                <th className="p-2">Descrição</th>
+                                <th className="p-2 text-right">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {transactions.map(t => (
+                                <tr key={t.id} className="border-b border-border dark:border-slate-700 last:border-b-0">
+                                    <td className="p-2 whitespace-nowrap">{t.paymentDate ? new Date(t.paymentDate).toLocaleDateString() : '-'}</td>
+                                    <td className="p-2">{t.description}</td>
+                                    <td className="p-2 text-right font-mono">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <div className="flex items-center justify-center h-full">
+                     <p className="text-text-secondary dark:text-slate-400">Nenhuma transação no período.</p>
+                </div>
+            )}
+        </CardContent>
+        <div className="p-4 border-t border-border dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
+            <div className="flex justify-between items-center font-bold">
+                <span>Total no Período</span>
+                <span>{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+            </div>
+        </div>
+    </Card>
+);
+
+
 const FinancePage: FC = () => {
     const [transactions, setTransactions] = useState<FinancialTransaction[]>(mockFinancialTransactions);
     const [view, setView] = useState<FinanceView>('contas');
+    const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('month');
 
     const handleMarkAsPaid = (transactionId: string) => {
         setTransactions(prev =>
@@ -64,6 +107,37 @@ const FinancePage: FC = () => {
             aPagar
         };
     }, [transactions]);
+
+    const filteredReportTransactions = useMemo(() => {
+        const now = new Date();
+        let startDate = new Date();
+
+        switch(reportPeriod) {
+            case 'day':
+                startDate.setHours(0, 0, 0, 0);
+                break;
+            case 'week':
+                startDate.setDate(now.getDate() - 7);
+                break;
+            case 'month':
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                break;
+        }
+
+        const filtered = transactions.filter(t => {
+            if (t.status !== 'pago' || !t.paymentDate) return false;
+            const paymentDate = new Date(t.paymentDate);
+            return paymentDate >= startDate && paymentDate <= now;
+        });
+
+        const entradas = filtered.filter(t => t.type === 'receita').sort((a,b) => new Date(b.paymentDate!).getTime() - new Date(a.paymentDate!).getTime());
+        const saidas = filtered.filter(t => t.type === 'despesa').sort((a,b) => new Date(b.paymentDate!).getTime() - new Date(a.paymentDate!).getTime());
+        const totalEntradas = entradas.reduce((sum, t) => sum + t.amount, 0);
+        const totalSaidas = saidas.reduce((sum, t) => sum + t.amount, 0);
+
+        return { entradas, saidas, totalEntradas, totalSaidas };
+    }, [transactions, reportPeriod]);
+
 
     const cashFlowProjection = useMemo(() => {
         const projection: { date: Date; receitas: number; despesas: number }[] = [];
@@ -161,13 +235,31 @@ const FinancePage: FC = () => {
                 );
             case 'relatorios':
                 return (
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <KPICard title="Total Recebido (Mês)" value={monthlyReport.totalRecebido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass="text-green-600 dark:text-green-400" />
-                        <KPICard title="Total Pago (Mês)" value={monthlyReport.totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass="text-red-600 dark:text-red-400" />
-                        <KPICard title="Saldo (Mês)" value={monthlyReport.saldoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass={monthlyReport.saldoMes >= 0 ? 'text-blue-700 dark:text-blue-400' : 'text-red-700 dark:text-red-400'} />
-                        <KPICard title="Pendente a Receber" value={monthlyReport.aReceber.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass="text-yellow-600 dark:text-yellow-400" />
-                        <KPICard title="Pendente a Pagar" value={monthlyReport.aPagar.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass="text-orange-600 dark:text-orange-400" />
-                     </div>
+                    <div className="space-y-6">
+                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                            <KPICard title="Total Recebido (Mês)" value={monthlyReport.totalRecebido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass="text-green-600 dark:text-green-400" />
+                            <KPICard title="Total Pago (Mês)" value={monthlyReport.totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass="text-red-600 dark:text-red-400" />
+                            <KPICard title="Saldo (Mês)" value={monthlyReport.saldoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass={monthlyReport.saldoMes >= 0 ? 'text-blue-700 dark:text-blue-400' : 'text-red-700 dark:text-red-400'} />
+                            <KPICard title="Pendente a Receber" value={monthlyReport.aReceber.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass="text-yellow-600 dark:text-yellow-400" />
+                            <KPICard title="Pendente a Pagar" value={monthlyReport.aPagar.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} colorClass="text-orange-600 dark:text-orange-400" />
+                         </div>
+                         <Card>
+                            <CardContent>
+                                <div className="flex items-center space-x-4">
+                                    <h3 className="text-lg font-semibold">Relatório Detalhado de Transações Pagas</h3>
+                                    <div className="flex items-center space-x-2 p-1 bg-slate-200 dark:bg-slate-800 rounded-lg">
+                                        <Button size="sm" variant={reportPeriod === 'day' ? 'primary' : 'ghost'} onClick={() => setReportPeriod('day')}>Hoje</Button>
+                                        <Button size="sm" variant={reportPeriod === 'week' ? 'primary' : 'ghost'} onClick={() => setReportPeriod('week')}>7 dias</Button>
+                                        <Button size="sm" variant={reportPeriod === 'month' ? 'primary' : 'ghost'} onClick={() => setReportPeriod('month')}>Mês</Button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                         </Card>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[400px]">
+                            <ReportTable title="Relatório de Entradas (Receitas Pagas)" transactions={filteredReportTransactions.entradas} total={filteredReportTransactions.totalEntradas} />
+                            <ReportTable title="Relatório de Saídas (Despesas Pagas)" transactions={filteredReportTransactions.saidas} total={filteredReportTransactions.totalSaidas} />
+                         </div>
+                    </div>
                 );
         }
     };
@@ -184,8 +276,7 @@ const FinancePage: FC = () => {
                     { id: 'relatorios', label: 'Relatórios' },
                 ]}
                 activeTab={view}
-                // FIX: Pass an arrow function to satisfy the onTabClick prop type.
-                onTabClick={(tabId) => setView(tabId)}
+                onTabClick={(tabId) => setView(tabId as FinanceView)}
             />
             
             {renderView()}

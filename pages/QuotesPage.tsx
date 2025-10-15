@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client, Page } from '../types';
 import { mockQuotes, mockMaterials, mockServices, mockProducts, mockUsers, mockClients } from '../data/mockData';
-import QuotePreview from '../components/QuotePreview';
+import DocumentPreview from '../components/QuotePreview';
 import CuttingOptimizer from '../components/CuttingOptimizer';
 import ShapeDesigner from '../components/ShapeDesigner';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
@@ -370,6 +370,13 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         setItemFormData({});
         setItemErrors({});
     };
+
+    const handleDeleteItem = (itemId: string) => {
+        setQuote(prev => ({
+            ...prev,
+            items: prev.items.filter(item => item.id !== itemId)
+        }));
+    };
     
     const renderItemForm = () => {
         const baseInputClasses = "w-full p-2 border rounded bg-slate-50 dark:bg-slate-700";
@@ -497,7 +504,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         <Card>
             <ShapeDesigner isOpen={isDesignerOpen} onClose={() => setIsDesignerOpen(false)} onComplete={handleShapeComplete} />
             <MaterialCatalogModal isOpen={isCatalogOpen} onClose={() => setIsCatalogOpen(false)} onSelect={handleMaterialSelect} />
-            {isPreviewOpen && <QuotePreview quote={{...quote, ...totals}} onClose={() => setIsPreviewOpen(false)} />}
+            {isPreviewOpen && <DocumentPreview document={{...quote, ...totals}} onClose={() => setIsPreviewOpen(false)} />}
             {isOptimizerOpen && <CuttingOptimizer 
                 items={quote.items.filter(i => i.type === 'material')}
                 onClose={() => setIsOptimizerOpen(false)} 
@@ -574,7 +581,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                             </div>
                             <div className="overflow-x-auto border border-border dark:border-slate-700 rounded-lg max-h-80">
                                 <table className="w-full text-left text-sm">
-                                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0"><tr className="border-b border-border dark:border-slate-700"><th className="p-2">Descrição</th><th className="p-2">Qtd.</th><th className="p-2">Preço Unit.</th><th className="p-2">Total</th></tr></thead>
+                                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0"><tr className="border-b border-border dark:border-slate-700"><th className="p-2">Descrição</th><th className="p-2">Qtd.</th><th className="p-2">Preço Unit.</th><th className="p-2">Total</th><th className="p-2 text-center">Ações</th></tr></thead>
                                     <tbody>
                                         {quote.items.map(item => (
                                             <tr key={item.id} className="border-b border-border dark:border-slate-700">
@@ -582,10 +589,19 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                                                 <td className="p-2">{item.quantity.toFixed(2)}</td>
                                                 <td className="p-2">{item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                                 <td className="p-2">{item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                                <td className="p-2 text-center">
+                                                    <button 
+                                                        onClick={() => handleDeleteItem(item.id)}
+                                                        className="text-error hover:text-red-700 p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                                                        aria-label={`Remover item ${item.description}`}
+                                                    >
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))}
                                         {quote.items.length === 0 && (
-                                            <tr><td colSpan={4} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhum item adicionado.</td></tr>
+                                            <tr><td colSpan={5} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhum item adicionado.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
