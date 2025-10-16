@@ -6,6 +6,7 @@ import QuotesPage from './pages/QuotesPage';
 import OrdersPage from './pages/OrdersPage';
 import ProductionPage from './pages/ProductionPage';
 import StockPage from './pages/StockPage';
+import CatalogPage from './pages/CatalogPage';
 import SuppliersPage from './pages/SuppliersPage';
 import CrmPage from './pages/CrmPage';
 import FinancePage from './pages/FinancePage';
@@ -118,6 +119,8 @@ const App: React.FC = () => {
         return <ProductionPage />;
       case 'stock':
         return <StockPage />;
+      case 'catalog':
+        return <CatalogPage />;
       case 'suppliers':
         return <SuppliersPage />;
       case 'crm':

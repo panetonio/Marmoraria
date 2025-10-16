@@ -17,6 +17,7 @@ const PAGE_LABELS: Record<Page, string> = {
   finance: 'Financeiro',
   invoices: 'Faturamento',
   receipts: 'Recibos',
+  catalog: 'Catálogo',
 };
 
 const Breadcrumbs: React.FC<BreadcrumbProps> = ({ currentPage, setCurrentPage }) => {

@@ -54,6 +54,12 @@ interface DataContextType {
     addEvent: (event: Omit<AgendaEvent, 'id'>) => void;
     markTransactionAsPaid: (transactionId: string) => void;
     addReceipt: (receiptData: Omit<Receipt, 'id' | 'createdAt'>) => void;
+    saveMaterial: (material: Material) => void;
+    deleteMaterial: (materialId: string) => void;
+    saveService: (service: Service) => void;
+    deleteService: (serviceId: string) => void;
+    saveProduct: (product: Product) => void;
+    deleteProduct: (productId: string) => void;
 }
 
 // Create the context
@@ -67,9 +73,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>(mockAgendaEvents);
     const [notes, setNotes] = useState<Note[]>(mockNotes);
     const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-    const [materials] = useState<Material[]>(mockMaterials);
-    const [services] = useState<Service[]>(mockServices);
-    const [products] = useState<Product[]>(mockProducts);
+    const [materials, setMaterials] = useState<Material[]>(mockMaterials);
+    const [services, setServices] = useState<Service[]>(mockServices);
+    const [products, setProducts] = useState<Product[]>(mockProducts);
     const [stockItems, setStockItems] = useState<StockItem[]>(mockStockItems);
     const [quotes, setQuotes] = useState<Quote[]>(mockQuotes);
     const [orders, setOrders] = useState<Order[]>(mockOrders);
@@ -255,6 +261,36 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setReceipts(prev => [...prev, newReceipt]);
     };
 
+    const saveMaterial = (material: Material) => {
+        if (material.id.startsWith('new-')) {
+            const newId = `mat-${(mockMaterials.length + materials.length + 1).toString().padStart(3, '0')}`;
+            setMaterials(prev => [...prev, { ...material, id: newId }]);
+        } else {
+            setMaterials(prev => prev.map(m => m.id === material.id ? material : m));
+        }
+    };
+    const deleteMaterial = (materialId: string) => setMaterials(prev => prev.filter(m => m.id !== materialId));
+
+    const saveService = (service: Service) => {
+        if (service.id.startsWith('new-')) {
+            const newId = `srv-${(mockServices.length + services.length + 1).toString().padStart(3, '0')}`;
+            setServices(prev => [...prev, { ...service, id: newId }]);
+        } else {
+            setServices(prev => prev.map(s => s.id === service.id ? service : s));
+        }
+    };
+    const deleteService = (serviceId: string) => setServices(prev => prev.filter(s => s.id !== serviceId));
+
+    const saveProduct = (product: Product) => {
+        if (product.id.startsWith('new-')) {
+            const newId = `prd-${(mockProducts.length + products.length + 1).toString().padStart(3, '0')}`;
+            setProducts(prev => [...prev, { ...product, id: newId }]);
+        } else {
+            setProducts(prev => prev.map(p => p.id === product.id ? product : p));
+        }
+    };
+    const deleteProduct = (productId: string) => setProducts(prev => prev.filter(p => p.id !== productId));
+
 
     const value = {
         clients, setClients,
@@ -285,6 +321,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addEvent,
         markTransactionAsPaid,
         addReceipt,
+        saveMaterial,
+        deleteMaterial,
+        saveService,
+        deleteService,
+        saveProduct,
+        deleteProduct,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

@@ -11,6 +11,7 @@ export const PERMISSIONS: Record<Page, string> = {
   finance: 'manage_finance',
   invoices: 'manage_invoices',
   receipts: 'view_receipts',
+  catalog: 'manage_catalog',
 };
 
 export const ROLES = {
@@ -50,6 +51,7 @@ export const ROLES = {
       PERMISSIONS.finance,
       PERMISSIONS.invoices,
       PERMISSIONS.receipts,
+      PERMISSIONS.catalog,
     ],
   },
 };
