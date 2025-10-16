@@ -66,13 +66,15 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
     const isOrder = 'originalQuoteId' in document;
     const docTypeLabel = isOrder ? 'PEDIDO' : 'ORÇAMENTO';
     const docDate = isOrder ? (document as Order).approvalDate : document.createdAt;
+    
     const clientInfo = {
         name: document.clientName,
         email: 'clientEmail' in document ? document.clientEmail : 'N/A',
         phone: 'clientPhone' in document ? document.clientPhone : 'N/A',
-        deliveryAddress: 'deliveryAddress' in document ? document.deliveryAddress : 'N/A',
-        deliveryCep: 'deliveryCep' in document ? document.deliveryCep : 'N/A',
     };
+    
+    const deliveryAddressLine1 = `${document.deliveryAddress}, ${document.deliveryNumber}${document.deliveryComplement ? ` - ${document.deliveryComplement}` : ''}`;
+    const deliveryAddressLine2 = `${document.deliveryNeighborhood} - ${document.deliveryCity}, ${document.deliveryUf}`;
     
     const itemSubtotal = document.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const itemDiscounts = document.items.reduce((sum, item) => sum + (item.discount || 0), 0);
@@ -113,11 +115,12 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                         <h3 className="font-semibold text-text-secondary mb-2">VENDEDOR:</h3>
                         <p className="font-bold text-dark">{mockUsers.find(u => u.id === document.salespersonId)?.name || 'N/A'}</p>
                     </div>
-                    {clientInfo.deliveryAddress && (
+                    {document.deliveryAddress && (
                         <div className="bg-slate-50 p-4 rounded-lg col-span-2">
                             <h3 className="font-semibold text-text-secondary mb-2">ENDEREÇO DE ENTREGA:</h3>
-                            <p className="font-bold text-dark">{clientInfo.deliveryAddress || 'A ser definido'}</p>
-                            {clientInfo.deliveryCep && <p className="text-dark">CEP: {clientInfo.deliveryCep}</p>}
+                            <p className="font-bold text-dark">{deliveryAddressLine1}</p>
+                            <p className="text-dark">{deliveryAddressLine2}</p>
+                            {document.deliveryCep && <p className="text-dark">CEP: {document.deliveryCep}</p>}
                         </div>
                     )}
                 </section>

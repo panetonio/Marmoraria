@@ -14,6 +14,7 @@ import { quoteStatusMap } from '../config/statusMaps';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
 import FreightCalculator from '../components/FreightCalculator';
+import { calculateQuoteItem, validateQuoteItem } from '../utils/helpers';
 
 
 const QuoteList: React.FC<{
@@ -246,7 +247,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
             unitPrice: material.costPerSqM,
             materialName: material.name,
         };
-        setItemFormData(updateItemCalculations(updatedData));
+        setItemFormData(calculateQuoteItem(updatedData));
         if (itemErrors.materialId) {
             const newItemErrors = { ...itemErrors };
             delete newItemErrors.materialId;
@@ -254,33 +255,6 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         }
         setIsCatalogOpen(false);
     };
-
-    // FIX: Update function signature to allow 'area' property, matching the form state.
-    const updateItemCalculations = useCallback((data: Partial<QuoteItem & { area?: number }>): Partial<QuoteItem & { area?: number }> => {
-        let quantity = data.quantity || 0;
-        const unitPrice = data.unitPrice || 0;
-        const discount = data.discount || 0;
-        let calculatedData = { ...data };
-
-        if (data.type === 'material') {
-            if (data.shapePoints && data.shapePoints.length > 0) {
-                // Area is the quantity for custom shapes
-            } else if (data.width && data.height) {
-                const width = parseFloat(data.width.toString());
-                const height = parseFloat(data.height.toString());
-                const area = width * height;
-                const perimeter = 2 * (width + height);
-                quantity = area;
-                // FIX: Add 'area' property to calculatedData to align with form state expectations for display.
-                calculatedData = { ...calculatedData, area, perimeter };
-            }
-        }
-        
-        const basePrice = quantity * unitPrice;
-        const totalPrice = basePrice - discount;
-
-        return { ...calculatedData, quantity, totalPrice };
-    }, []);
 
     const handleItemFormChange = (field: keyof QuoteItem, value: any) => {
         let baseData = { ...itemFormData, type: itemType, [field]: value };
@@ -295,7 +269,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
             }
         }
 
-        const updatedData = updateItemCalculations(baseData);
+        const updatedData = calculateQuoteItem(baseData);
         setItemFormData(updatedData);
         if (itemErrors[field as string]) {
             const newItemErrors = { ...itemErrors };
@@ -306,7 +280,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     
     const handleShapeComplete = (data: { area: number, points: { x: number, y: number }[] }) => {
         setItemFormData(prev => {
-             const updatedData = updateItemCalculations({
+             const updatedData = calculateQuoteItem({
                 ...prev,
                 quantity: data.area,
                 area: data.area,
@@ -321,33 +295,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     };
 
     const validateItem = (): boolean => {
-        const newItemErrors: Record<string, string> = {};
-
-        if (itemType === 'material') {
-            if (!itemFormData.materialId) { newItemErrors.materialId = "Selecione um material."; }
-            if (!itemFormData.description?.trim()) { newItemErrors.description = "A descrição da peça é obrigatória."; }
-            if (!(itemFormData.shapePoints && itemFormData.shapePoints.length > 0)) {
-                if (!itemFormData.width || itemFormData.width <= 0) { newItemErrors.width = "Largura deve ser > 0."; }
-                if (!itemFormData.height || itemFormData.height <= 0) { newItemErrors.height = "Altura deve ser > 0."; }
-            }
-        } else if (itemType === 'service') {
-            const serviceExists = services.some(s => s.id === itemFormData.id);
-            if (!itemFormData.id || !serviceExists) {
-                newItemErrors.id = "Selecione um serviço válido.";
-            }
-            if (!itemFormData.quantity || itemFormData.quantity <= 0) {
-                newItemErrors.quantity = "Quantidade deve ser > 0.";
-            }
-        } else if (itemType === 'product') {
-            const productExists = products.some(p => p.id === itemFormData.id);
-            if (!itemFormData.id || !productExists) {
-                newItemErrors.id = "Selecione um produto válido.";
-            }
-            if (!itemFormData.quantity || itemFormData.quantity <= 0) {
-                newItemErrors.quantity = "Quantidade deve ser > 0.";
-            }
-        }
-
+        const newItemErrors = validateQuoteItem(itemFormData, itemType, services, products);
         setItemErrors(newItemErrors);
         return Object.keys(newItemErrors).length === 0;
     };
@@ -570,7 +518,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
 
     const handleClientSelect = (clientId: string) => {
         if (!clientId) {
-            setQuote(prev => ({ ...prev, clientName: '', clientEmail: '', clientPhone: '', deliveryAddress: '', deliveryCep: '' }));
+            setQuote(prev => ({ ...prev, clientName: '', clientEmail: '', clientPhone: '', deliveryCep: '', deliveryUf: '', deliveryCity: '', deliveryNeighborhood: '', deliveryAddress: '', deliveryNumber: '', deliveryComplement: '' }));
             return;
         }
         const selectedClient = clients.find(c => c.id === clientId);
@@ -580,8 +528,13 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 clientName: selectedClient.name,
                 clientEmail: selectedClient.email,
                 clientPhone: selectedClient.phone,
-                deliveryAddress: selectedClient.address,
                 deliveryCep: selectedClient.cep,
+                deliveryUf: selectedClient.uf,
+                deliveryCity: selectedClient.city,
+                deliveryNeighborhood: selectedClient.neighborhood,
+                deliveryAddress: selectedClient.address,
+                deliveryNumber: selectedClient.number,
+                deliveryComplement: selectedClient.complement,
             }));
         }
     };
@@ -610,8 +563,9 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
 
             <CardHeader>{quote.id.startsWith('ORC') ? `Editando Orçamento ${quote.id}` : 'Novo Orçamento'}</CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="md:col-span-2">
+                <div className="space-y-4 mb-6">
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 border-b border-border dark:border-slate-700 pb-2">Dados do Cliente</h3>
+                     <div className="md:col-span-2">
                          <label htmlFor="client-select" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">
                             Selecionar Cliente Existente (Opcional)
                         </label>
@@ -629,43 +583,90 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                         </select>
                     </div>
 
-                    <Input
-                        placeholder="Nome do Cliente"
-                        value={quote.clientName}
-                        onChange={e => setQuote({...quote, clientName: e.target.value})}
-                        error={errors.clientName}
-                    />
-                    <Input
-                        type="email"
-                        placeholder="Email do Cliente"
-                        value={quote.clientEmail}
-                        onChange={e => setQuote({...quote, clientEmail: e.target.value})}
-                        error={errors.clientEmail}
-                    />
-                    <Input
-                         placeholder="Telefone do Cliente"
-                         value={quote.clientPhone}
-                         onChange={e => setQuote({...quote, clientPhone: e.target.value})}
-                         error={errors.clientPhone}
-                    />
-                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input
+                            label="Nome do Cliente"
+                            id="client-name"
+                            value={quote.clientName}
+                            onChange={e => setQuote({...quote, clientName: e.target.value})}
+                            error={errors.clientName}
+                        />
+                        <Input
+                            label="Email do Cliente"
+                            id="client-email"
+                            type="email"
+                            value={quote.clientEmail}
+                            onChange={e => setQuote({...quote, clientEmail: e.target.value})}
+                            error={errors.clientEmail}
+                        />
+                        <Input
+                             label="Telefone do Cliente"
+                             id="client-phone"
+                             value={quote.clientPhone}
+                             onChange={e => setQuote({...quote, clientPhone: e.target.value})}
+                             error={errors.clientPhone}
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-4 mb-6">
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 border-b border-border dark:border-slate-700 pb-2">Endereço de Entrega</h3>
+                     <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                         <div className="md:col-span-2">
-                            <Textarea
-                                label="Endereço de Entrega"
-                                id="delivery-address"
-                                placeholder="Rua, Número, Bairro, Cidade, Estado"
-                                value={quote.deliveryAddress}
-                                onChange={e => setQuote({...quote, deliveryAddress: e.target.value})}
-                                rows={2}
-                            />
-                        </div>
-                        <div>
-                            <Input
+                             <Input
                                 label="CEP"
                                 id="delivery-cep"
-                                placeholder="00000-000"
                                 value={quote.deliveryCep}
                                 onChange={e => setQuote({...quote, deliveryCep: e.target.value})}
+                            />
+                        </div>
+                         <div className="md:col-span-4">
+                             <Input
+                                label="Logradouro (Rua, Av.)"
+                                id="delivery-address"
+                                value={quote.deliveryAddress}
+                                onChange={e => setQuote({...quote, deliveryAddress: e.target.value})}
+                            />
+                        </div>
+                         <div className="md:col-span-2">
+                             <Input
+                                label="Número"
+                                id="delivery-number"
+                                value={quote.deliveryNumber}
+                                onChange={e => setQuote({...quote, deliveryNumber: e.target.value})}
+                            />
+                        </div>
+                        <div className="md:col-span-4">
+                           <Input
+                                label="Complemento"
+                                id="delivery-complement"
+                                value={quote.deliveryComplement || ''}
+                                onChange={e => setQuote({...quote, deliveryComplement: e.target.value})}
+                            />
+                        </div>
+                         <div className="md:col-span-2">
+                            <Input
+                                label="Bairro"
+                                id="delivery-neighborhood"
+                                value={quote.deliveryNeighborhood}
+                                onChange={e => setQuote({...quote, deliveryNeighborhood: e.target.value})}
+                            />
+                        </div>
+                        <div className="md:col-span-3">
+                            <Input
+                                label="Cidade"
+                                id="delivery-city"
+                                value={quote.deliveryCity}
+                                onChange={e => setQuote({...quote, deliveryCity: e.target.value})}
+                            />
+                        </div>
+                        <div className="md:col-span-1">
+                            <Input
+                                label="UF"
+                                id="delivery-uf"
+                                value={quote.deliveryUf}
+                                maxLength={2}
+                                onChange={e => setQuote({...quote, deliveryUf: e.target.value.toUpperCase()})}
                             />
                         </div>
                     </div>
@@ -889,7 +890,8 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
     const handleNew = () => {
         setSelectedQuote({
             id: `new-${Date.now()}`,
-            clientName: '', clientEmail: '', clientPhone: '', deliveryAddress: '', deliveryCep: '',
+            clientName: '', clientEmail: '', clientPhone: '', 
+            deliveryCep: '', deliveryUf: '', deliveryCity: '', deliveryNeighborhood: '', deliveryAddress: '', deliveryNumber: '', deliveryComplement: '',
             status: 'draft', items: [], subtotal: 0, total: 0,
             discount: 0,
             freight: 0,

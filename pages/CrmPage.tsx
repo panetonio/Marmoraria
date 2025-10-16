@@ -71,6 +71,8 @@ const ClientDetailModal: FC<{
             default: return null;
         }
     }
+    
+    const formattedAddress = `${client.address}, ${client.number}${client.complement ? ` - ${client.complement}` : ''} - ${client.neighborhood}, ${client.city} - ${client.uf}`;
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Detalhes do Cliente" className="max-w-4xl">
@@ -88,7 +90,7 @@ const ClientDetailModal: FC<{
                                 </a>
                             )}
                         </div>
-                       <p><strong>Endereço:</strong> {client.address}</p>
+                       <p><strong>Endereço:</strong> {formattedAddress}</p>
                        <p><strong>CEP:</strong> {client.cep}</p>
                        {client.cpfCnpj && <p><strong>CPF/CNPJ:</strong> {client.cpfCnpj}</p>}
                        <p><strong>Cliente desde:</strong> {new Date(client.createdAt).toLocaleDateString()}</p>
@@ -145,7 +147,12 @@ const ClientForm: React.FC<{
         if (!client.name.trim()) newErrors.name = "Nome é obrigatório.";
         if (!client.cpfCnpj.trim()) newErrors.cpfCnpj = "CPF/CNPJ é obrigatório.";
         if (!client.phone.trim()) newErrors.phone = "Telefone é obrigatório.";
-        if (!client.address.trim()) newErrors.address = "Endereço é obrigatório.";
+        if (!client.address.trim()) newErrors.address = "Logradouro é obrigatório.";
+        if (!client.number.trim()) newErrors.number = "Número é obrigatório.";
+        if (!client.neighborhood.trim()) newErrors.neighborhood = "Bairro é obrigatório.";
+        if (!client.city.trim()) newErrors.city = "Cidade é obrigatória.";
+        if (!client.uf.trim() || client.uf.length !== 2) newErrors.uf = "UF inválido.";
+        if (!client.cep.trim()) newErrors.cep = "CEP é obrigatório.";
         if (!client.email.trim()) {
             newErrors.email = "Email é obrigatório.";
         } else if (!/\S+@\S+\.\S+/.test(client.email)) {
@@ -165,54 +172,112 @@ const ClientForm: React.FC<{
         <Card>
             <CardHeader>{client.id.startsWith('new-') ? 'Novo Cliente' : `Editando ${client.name}`}</CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                        placeholder="Nome Completo / Razão Social"
-                        value={client.name}
-                        onChange={e => setClient({...client, name: e.target.value})}
-                        error={errors.name}
-                    />
-                    <div>
-                        <select value={client.type} onChange={e => setClient({...client, type: e.target.value as 'pessoa_fisica' | 'empresa'})} className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600 h-[42px]">
-                            <option value="pessoa_fisica">Pessoa Física</option>
-                            <option value="empresa">Empresa</option>
-                        </select>
-                    </div>
-                     <Input
-                        placeholder="CPF / CNPJ"
-                        value={client.cpfCnpj}
-                        onChange={e => setClient({...client, cpfCnpj: e.target.value})}
-                        error={errors.cpfCnpj}
-                    />
-                    <Input
-                        type="email"
-                        placeholder="Email"
-                        value={client.email}
-                        onChange={e => setClient({...client, email: e.target.value})}
-                        error={errors.email}
-                    />
-                     <Input
-                        placeholder="Telefone"
-                        value={client.phone}
-                        onChange={e => setClient({...client, phone: e.target.value})}
-                        error={errors.phone}
-                    />
-                    <div className="md:col-span-2">
-                        <Textarea
-                            placeholder="Endereço"
-                            value={client.address}
-                            onChange={e => setClient({...client, address: e.target.value})}
-                            error={errors.address}
-                            rows={3}
+                <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 border-b border-border dark:border-slate-700 pb-2">Dados Pessoais / Empresa</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input
+                            label="Nome Completo / Razão Social"
+                            id="client-name"
+                            value={client.name}
+                            onChange={e => setClient({...client, name: e.target.value})}
+                            error={errors.name}
+                        />
+                        <div>
+                            <label htmlFor="client-type" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Tipo</label>
+                            <select id="client-type" value={client.type} onChange={e => setClient({...client, type: e.target.value as 'pessoa_fisica' | 'empresa'})} className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600 h-[42px]">
+                                <option value="pessoa_fisica">Pessoa Física</option>
+                                <option value="empresa">Empresa</option>
+                            </select>
+                        </div>
+                         <Input
+                            label="CPF / CNPJ"
+                            id="client-cpfCnpj"
+                            value={client.cpfCnpj}
+                            onChange={e => setClient({...client, cpfCnpj: e.target.value})}
+                            error={errors.cpfCnpj}
+                        />
+                        <Input
+                            label="Email"
+                            id="client-email"
+                            type="email"
+                            value={client.email}
+                            onChange={e => setClient({...client, email: e.target.value})}
+                            error={errors.email}
+                        />
+                         <Input
+                            label="Telefone"
+                            id="client-phone"
+                            value={client.phone}
+                            onChange={e => setClient({...client, phone: e.target.value})}
+                            error={errors.phone}
                         />
                     </div>
-                    <Input
-                        placeholder="CEP"
-                        value={client.cep || ''}
-                        onChange={e => setClient({...client, cep: e.target.value})}
-                        error={errors.cep}
-                        className="md:col-span-2"
-                    />
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 border-b border-border dark:border-slate-700 pb-2 pt-4">Endereço</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                        <div className="md:col-span-2">
+                            <Input
+                                label="CEP"
+                                id="client-cep"
+                                value={client.cep || ''}
+                                onChange={e => setClient({...client, cep: e.target.value})}
+                                error={errors.cep}
+                            />
+                        </div>
+                         <div className="md:col-span-4">
+                             <Input
+                                label="Logradouro (Rua, Av.)"
+                                id="client-address"
+                                value={client.address}
+                                onChange={e => setClient({...client, address: e.target.value})}
+                                error={errors.address}
+                            />
+                        </div>
+                         <div className="md:col-span-2">
+                             <Input
+                                label="Número"
+                                id="client-number"
+                                value={client.number}
+                                onChange={e => setClient({...client, number: e.target.value})}
+                                error={errors.number}
+                            />
+                        </div>
+                        <div className="md:col-span-4">
+                           <Input
+                                label="Complemento"
+                                id="client-complement"
+                                value={client.complement || ''}
+                                onChange={e => setClient({...client, complement: e.target.value})}
+                            />
+                        </div>
+                         <div className="md:col-span-2">
+                            <Input
+                                label="Bairro"
+                                id="client-neighborhood"
+                                value={client.neighborhood}
+                                onChange={e => setClient({...client, neighborhood: e.target.value})}
+                                error={errors.neighborhood}
+                            />
+                        </div>
+                        <div className="md:col-span-3">
+                            <Input
+                                label="Cidade"
+                                id="client-city"
+                                value={client.city}
+                                onChange={e => setClient({...client, city: e.target.value})}
+                                error={errors.city}
+                            />
+                        </div>
+                        <div className="md:col-span-1">
+                            <Input
+                                label="UF"
+                                id="client-uf"
+                                value={client.uf}
+                                maxLength={2}
+                                onChange={e => setClient({...client, uf: e.target.value.toUpperCase()})}
+                                error={errors.uf}
+                            />
+                        </div>
+                    </div>
                 </div>
             </CardContent>
             <CardFooter className="flex justify-end space-x-4">
@@ -385,8 +450,12 @@ const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
             type: 'pessoa_fisica',
             email: '',
             phone: '',
-            address: '',
             cep: '',
+            uf: '',
+            city: '',
+            neighborhood: '',
+            address: '',
+            number: '',
             cpfCnpj: '',
             createdAt: new Date().toISOString()
         });

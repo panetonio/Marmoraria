@@ -19,10 +19,10 @@ export const mockProductionProfessionals: ProductionProfessional[] = [
 ];
 
 export const mockClients: Client[] = [
-    { id: 'cli-1', name: 'João da Silva', type: 'pessoa_fisica', email: 'joao.silva@example.com', phone: '(11) 98765-4321', address: 'Rua das Flores, 123, São Paulo, SP', cep: '01234-567', cpfCnpj: '111.222.333-44', createdAt: '2023-11-10T10:00:00Z' },
-    { id: 'cli-2', name: 'Maria Oliveira', type: 'pessoa_fisica', email: 'maria.oliveira@example.com', phone: '(21) 91234-5678', address: 'Avenida Copacabana, 456, Rio de Janeiro, RJ', cep: '22020-001', cpfCnpj: '222.333.444-55', createdAt: '2024-01-15T14:30:00Z' },
-    { id: 'cli-3', name: 'Carlos Souza', type: 'pessoa_fisica', email: 'carlos.souza@example.com', phone: '(31) 99999-8888', address: 'Praça da Liberdade, 789, Belo Horizonte, MG', cep: '30140-010', cpfCnpj: '333.444.555-66', createdAt: '2024-03-20T11:00:00Z' },
-    { id: 'cli-4', name: 'Construtora Alfa', type: 'empresa', email: 'contato@alfa.com', phone: '(11) 3333-4444', address: 'Av. Paulista, 1000, São Paulo, SP', cep: '01310-100', cpfCnpj: '12.345.678/0001-99', createdAt: '2023-09-01T09:00:00Z' },
+    { id: 'cli-1', name: 'João da Silva', type: 'pessoa_fisica', email: 'joao.silva@example.com', phone: '(11) 98765-4321', address: 'Rua das Flores', number: '123', complement: 'Apto 10', neighborhood: 'Jardins', city: 'São Paulo', uf: 'SP', cep: '01234-567', cpfCnpj: '111.222.333-44', createdAt: '2023-11-10T10:00:00Z' },
+    { id: 'cli-2', name: 'Maria Oliveira', type: 'pessoa_fisica', email: 'maria.oliveira@example.com', phone: '(21) 91234-5678', address: 'Avenida Copacabana', number: '456', complement: '', neighborhood: 'Copacabana', city: 'Rio de Janeiro', uf: 'RJ', cep: '22020-001', cpfCnpj: '222.333.444-55', createdAt: '2024-01-15T14:30:00Z' },
+    { id: 'cli-3', name: 'Carlos Souza', type: 'pessoa_fisica', email: 'carlos.souza@example.com', phone: '(31) 99999-8888', address: 'Praça da Liberdade', number: '789', complement: '', neighborhood: 'Savassi', city: 'Belo Horizonte', uf: 'MG', cep: '30140-010', cpfCnpj: '333.444.555-66', createdAt: '2024-03-20T11:00:00Z' },
+    { id: 'cli-4', name: 'Construtora Alfa', type: 'empresa', email: 'contato@alfa.com', phone: '(11) 3333-4444', address: 'Avenida Paulista', number: '1000', complement: '15º Andar', neighborhood: 'Bela Vista', city: 'São Paulo', uf: 'SP', cep: '01310-100', cpfCnpj: '12.345.678/0001-99', createdAt: '2023-09-01T09:00:00Z' },
 ];
 
 export const mockOpportunities: Opportunity[] = [
@@ -46,9 +46,9 @@ export const mockNotes: Note[] = [
 ];
 
 export const mockSuppliers: Supplier[] = [
-    { id: 'sup-1', name: 'Fornecedor A', contactPerson: 'Carlos Pereira', phone: '(11) 2222-3333', email: 'contato@fornecedora.com', address: 'Rua das Pedras, 123, São Paulo, SP', cep: '01234-000', cpfCnpj: '11.222.333/0001-44' },
-    { id: 'sup-2', name: 'Fornecedor B', contactPerson: 'Ana Souza', phone: '(21) 4444-5555', email: 'vendas@fornecedorb.com.br', address: 'Avenida do Granito, 456, Rio de Janeiro, RJ', cep: '22071-000', cpfCnpj: '22.333.444/0001-55' },
-    { id: 'sup-3', name: 'Fornecedor C', contactPerson: 'Mariana Lima', phone: '(31) 7777-8888', email: 'comercial@fornecedorc.com', address: 'Praça do Quartzo, 789, Belo Horizonte, MG', cep: '30130-141', cpfCnpj: '33.444.555/0001-66' },
+    { id: 'sup-1', name: 'Fornecedor A', contactPerson: 'Carlos Pereira', phone: '(11) 2222-3333', email: 'contato@fornecedora.com', address: 'Rua das Pedras', number: '123', neighborhood: 'Centro', city: 'São Paulo', uf: 'SP', cep: '01234-000', cpfCnpj: '11.222.333/0001-44' },
+    { id: 'sup-2', name: 'Fornecedor B', contactPerson: 'Ana Souza', phone: '(21) 4444-5555', email: 'vendas@fornecedorb.com.br', address: 'Avenida do Granito', number: '456', neighborhood: 'Lapa', city: 'Rio de Janeiro', uf: 'RJ', cep: '22071-000', cpfCnpj: '22.333.444/0001-55' },
+    { id: 'sup-3', name: 'Fornecedor C', contactPerson: 'Mariana Lima', phone: '(31) 7777-8888', email: 'comercial@fornecedorc.com', address: 'Praça do Quartzo', number: '789', neighborhood: 'Centro', city: 'Belo Horizonte', uf: 'MG', cep: '30130-141', cpfCnpj: '33.444.555/0001-66' },
 ];
 
 export const mockMaterials: Material[] = [
@@ -134,8 +134,7 @@ export const mockQuotes: Quote[] = [
     clientName: 'João da Silva',
     clientEmail: 'joao.silva@example.com',
     clientPhone: '(11) 98765-4321',
-    deliveryAddress: 'Rua das Flores, 123, São Paulo, SP',
-    deliveryCep: '01234-567',
+    deliveryAddress: 'Rua das Flores', deliveryNumber: '123', deliveryComplement: 'Apto 10', deliveryNeighborhood: 'Jardins', deliveryCity: 'São Paulo', deliveryUf: 'SP', deliveryCep: '01234-567',
     status: 'approved',
     items: [
       { id: 'item-1', type: 'material', description: 'Bancada Cozinha - Granito Preto Absoluto', quantity: 1.44, unitPrice: 600, totalPrice: 800, discount: 64, width: 2.4, height: 0.6, materialId: 'mat-002', perimeter: 6 },
@@ -153,8 +152,7 @@ export const mockQuotes: Quote[] = [
     clientName: 'Maria Oliveira',
     clientEmail: 'maria.oliveira@example.com',
     clientPhone: '(21) 91234-5678',
-    deliveryAddress: 'Avenida Copacabana, 456, Rio de Janeiro, RJ',
-    deliveryCep: '22020-001',
+    deliveryAddress: 'Avenida Copacabana', deliveryNumber: '456', deliveryNeighborhood: 'Copacabana', deliveryCity: 'Rio de Janeiro', deliveryUf: 'RJ', deliveryCep: '22020-001',
     status: 'sent',
     items: [
       { id: 'item-4', type: 'material', description: 'Lavatório Banheiro - Mármore Carrara', quantity: 0.48, unitPrice: 450, totalPrice: 216, width: 1.2, height: 0.4, materialId: 'mat-001', perimeter: 3.2 },
@@ -170,8 +168,7 @@ export const mockQuotes: Quote[] = [
     clientName: 'Carlos Souza',
     clientEmail: 'carlos.souza@example.com',
     clientPhone: '(31) 99999-8888',
-    deliveryAddress: 'Praça da Liberdade, 789, Belo Horizonte, MG',
-    deliveryCep: '30140-010',
+    deliveryAddress: 'Praça da Liberdade', deliveryNumber: '789', deliveryNeighborhood: 'Savassi', deliveryCity: 'Belo Horizonte', deliveryUf: 'MG', deliveryCep: '30140-010',
     status: 'approved',
     items: [
       { id: 'item-6', type: 'material', description: 'Soleira Quartzo Branco', quantity: 1.2, unitPrice: 850, totalPrice: 1020, width: 2.0, height: 0.6, materialId: 'mat-003', perimeter: 5.2 },
@@ -189,8 +186,7 @@ export const mockOrders: Order[] = [
         id: 'PED-2024-001',
         originalQuoteId: 'ORC-2024-001',
         clientName: 'João da Silva',
-        deliveryAddress: 'Rua das Flores, 123, São Paulo, SP',
-        deliveryCep: '01234-567',
+        deliveryAddress: 'Rua das Flores', deliveryNumber: '123', deliveryComplement: 'Apto 10', deliveryNeighborhood: 'Jardins', deliveryCity: 'São Paulo', deliveryUf: 'SP', deliveryCep: '01234-567',
         items: mockQuotes[0].items,
         subtotal: 2100,
         freight: 150,
@@ -203,8 +199,7 @@ export const mockOrders: Order[] = [
         id: 'PED-2024-002',
         originalQuoteId: 'ORC-2024-003',
         clientName: 'Carlos Souza',
-        deliveryAddress: 'Praça da Liberdade, 789, Belo Horizonte, MG',
-        deliveryCep: '30140-010',
+        deliveryAddress: 'Praça da Liberdade', deliveryNumber: '789', deliveryNeighborhood: 'Savassi', deliveryCity: 'Belo Horizonte', deliveryUf: 'MG', deliveryCep: '30140-010',
         items: mockQuotes[2].items,
         subtotal: 1020,
         discount: 100,

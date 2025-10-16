@@ -24,8 +24,15 @@ export interface Client {
   type: 'pessoa_fisica' | 'empresa';
   email: string;
   phone: string;
-  address: string;
+  // Address fields
   cep: string;
+  uf: string;
+  city: string;
+  neighborhood: string;
+  address: string;
+  number: string;
+  complement?: string;
+  
   cpfCnpj: string;
   createdAt: string;
 }
@@ -64,8 +71,15 @@ export interface Supplier {
   contactPerson: string;
   phone: string;
   email: string;
-  address: string;
+  // Address fields
   cep: string;
+  uf: string;
+  city: string;
+  neighborhood: string;
+  address: string;
+  number: string;
+  complement?: string;
+
   cpfCnpj: string;
 }
 
@@ -128,8 +142,15 @@ export interface Quote {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
-  deliveryAddress: string;
+  // Delivery Address fields
   deliveryCep: string;
+  deliveryUf: string;
+  deliveryCity: string;
+  deliveryNeighborhood: string;
+  deliveryAddress: string;
+  deliveryNumber: string;
+  deliveryComplement?: string;
+
   status: QuoteStatus;
   items: QuoteItem[];
   subtotal: number;
@@ -146,8 +167,15 @@ export interface Order {
   id: string; // PED-
   originalQuoteId: string; // ORC-
   clientName: string;
-  deliveryAddress: string;
+  // Delivery Address fields
   deliveryCep: string;
+  deliveryUf: string;
+  deliveryCity: string;
+  deliveryNeighborhood: string;
+  deliveryAddress: string;
+  deliveryNumber: string;
+  deliveryComplement?: string;
+
   items: QuoteItem[];
   subtotal: number;
   discount?: number;
