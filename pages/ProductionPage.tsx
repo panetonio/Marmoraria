@@ -4,6 +4,9 @@ import type { ServiceOrder, ProductionStatus, ProductionProfessional } from '../
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
+import { useData } from '../context/DataContext';
+import StatusBadge from '../components/ui/StatusBadge';
+import { productionStatusMap } from '../config/statusMaps';
 
 const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
   { id: 'cutting', title: 'Em Corte', color: 'bg-orange-800' },
@@ -12,13 +15,6 @@ const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] =
   { id: 'ready_for_delivery', title: 'Pronto para Entrega', color: 'bg-purple-700' },
   { id: 'delivered', title: 'Entregue', color: 'bg-green-800' },
 ];
-
-const ProductionStatusBadge: FC<{ status: ProductionStatus }> = ({ status }) => {
-    const statusInfo = KANBAN_COLUMNS.find(c => c.id === status);
-    if (!statusInfo) return null;
-    
-    return <span className={`px-2 py-1 text-xs font-semibold rounded-full text-white ${statusInfo.color}`}>{statusInfo.title}</span>;
-};
 
 const ServiceOrderDetailModal: FC<{
   isOpen: boolean;
@@ -55,7 +51,7 @@ const ServiceOrderDetailModal: FC<{
                 </div>
                 <div>
                   <h4 className="text-sm text-text-secondary dark:text-slate-400">Status Atual</h4>
-                  <ProductionStatusBadge status={order.status} />
+                  <StatusBadge status={order.status} statusMap={productionStatusMap} />
                 </div>
               </div>
             </CardContent>
@@ -181,17 +177,20 @@ const ConfirmationModal: FC<{
 
 const KanbanCard: FC<{
   order: ServiceOrder;
+  isDragging: boolean;
   onDragStart: (e: DragEvent<HTMLElement>, orderId: string) => void;
+  onDragEnd: (e: DragEvent<HTMLElement>) => void;
   onAssign: (order: ServiceOrder) => void;
   onView: (order: ServiceOrder) => void;
-}> = ({ order, onDragStart, onAssign, onView }) => {
+}> = ({ order, isDragging, onDragStart, onDragEnd, onAssign, onView }) => {
   const assignedProfessionals = mockProductionProfessionals.filter(p => order.assignedToIds.includes(p.id));
   return (
     <Card
       draggable
       onDragStart={(e) => onDragStart(e, order.id)}
+      onDragEnd={onDragEnd}
       onClick={() => onView(order)}
-      className="p-4 mt-4 shadow-sm border border-border dark:border-slate-700 cursor-pointer hover:shadow-lg hover:border-primary/50 transition-shadow duration-200"
+      className={`p-4 mt-4 shadow-sm border border-border dark:border-slate-700 cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-200 ${isDragging ? 'opacity-40 scale-95 bg-slate-200 dark:bg-slate-700' : ''}`}
     >
       <div className="flex justify-between items-center">
         <p className="font-bold text-sm font-mono">{order.id}</p>
@@ -221,16 +220,16 @@ const KanbanCard: FC<{
   );
 };
 
-const ProductionPage: FC<{
-    serviceOrders: ServiceOrder[];
-    setServiceOrders: (update: ServiceOrder[] | ((prev: ServiceOrder[]) => ServiceOrder[])) => void;
-}> = ({ serviceOrders, setServiceOrders }) => {
+const ProductionPage: FC = () => {
+  const { serviceOrders, setServiceOrders } = useData();
   const [viewMode, setViewMode] = useState<'kanban' | 'timeline'>('kanban');
   const [modalOrder, setModalOrder] = useState<ServiceOrder | null>(null);
   const [viewingOrder, setViewingOrder] = useState<ServiceOrder | null>(null);
   const [professionalFilter, setProfessionalFilter] = useState<string>('');
   const [orderIdFilter, setOrderIdFilter] = useState<string>('');
   const [confirmationData, setConfirmationData] = useState<{ orderId: string; newStatus: ProductionStatus } | null>(null);
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+  const [draggedOverColumn, setDraggedOverColumn] = useState<ProductionStatus | null>(null);
 
   const productionTeam = useMemo(() => mockProductionProfessionals, []);
 
@@ -244,13 +243,30 @@ const ProductionPage: FC<{
   
   const handleDragStart = (e: DragEvent<HTMLElement>, orderId: string) => {
     e.dataTransfer.setData("orderId", orderId);
+    setDraggedItemId(orderId);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItemId(null);
   };
   
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
   };
   
+  const handleDragEnter = (e: DragEvent<HTMLDivElement>, status: ProductionStatus) => {
+    e.preventDefault();
+    setDraggedOverColumn(status);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDraggedOverColumn(null);
+  };
+  
   const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: ProductionStatus) => {
+    e.preventDefault();
+    setDraggedOverColumn(null);
     const orderId = e.dataTransfer.getData("orderId");
     const order = serviceOrders.find(o => o.id === orderId);
     if (order && order.status !== newStatus) {
@@ -356,9 +372,11 @@ const ProductionPage: FC<{
           {KANBAN_COLUMNS.map(column => (
             <div 
                 key={column.id} 
-                className="bg-slate-100 dark:bg-slate-800/50 rounded-lg p-3 flex flex-col"
+                className={`bg-slate-100 dark:bg-slate-800/50 rounded-lg p-3 flex flex-col transition-colors duration-200 ${draggedOverColumn === column.id ? 'bg-primary/10 dark:bg-primary/20' : ''}`}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, column.id)}
+                onDragEnter={(e) => handleDragEnter(e, column.id)}
+                onDragLeave={handleDragLeave}
             >
               <div className={`flex items-center mb-4 border-l-4 pl-2 ${column.color.replace('bg-', 'border-')}`}>
                 <div className={`w-3 h-3 rounded-full mr-2 ${column.color}`}></div>
@@ -368,7 +386,14 @@ const ProductionPage: FC<{
                 {filteredServiceOrders
                   .filter(order => order.status === column.id)
                   .map(order => (
-                    <KanbanCard key={order.id} order={order} onDragStart={handleDragStart} onAssign={setModalOrder} onView={setViewingOrder} />
+                    <KanbanCard
+                        key={order.id}
+                        order={order}
+                        isDragging={draggedItemId === order.id}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onAssign={setModalOrder}
+                        onView={setViewingOrder} />
                   ))}
               </div>
             </div>
@@ -396,7 +421,7 @@ const ProductionPage: FC<{
                                 <td className="p-3 font-mono text-sm">{order.id}</td>
                                 <td className="p-3">{order.clientName}</td>
                                 <td className="p-3">
-                                    <ProductionStatusBadge status={order.status} />
+                                    <StatusBadge status={order.status} statusMap={productionStatusMap} />
                                 </td>
                                 <td className="p-3 text-right">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             </tr>

@@ -10,12 +10,14 @@ import SuppliersPage from './pages/SuppliersPage';
 import CrmPage from './pages/CrmPage';
 import FinancePage from './pages/FinancePage';
 import InvoicesPage from './pages/InvoicesPage';
-import type { Page, User, Order, ServiceOrder, Invoice } from './types';
-import { mockUsers, mockOrders, mockServiceOrders, mockInvoices } from './data/mockData';
+import ReceiptsPage from './pages/ReceiptsPage';
+import type { Page, User } from './types';
+import { mockUsers } from './data/mockData';
 import { ROLES, PERMISSIONS } from './roles';
 import Card from './components/ui/Card';
 import ThemeToggle from './components/ThemeToggle';
 import GlobalSearch from './components/GlobalSearch';
+import { DataProvider } from './context/DataContext';
 
 const UserSwitcher: React.FC<{
   currentUser: User;
@@ -86,11 +88,6 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [searchTarget, setSearchTarget] = useState<{ page: Page; id: string } | null>(null);
 
-  // Lifted state for shared data
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
-  const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(mockServiceOrders);
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
-
 
   useEffect(() => {
     // When user changes, check if they can still view the current page.
@@ -118,9 +115,9 @@ const App: React.FC = () => {
       case 'quotes':
         return <QuotesPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'orders':
-        return <OrdersPage orders={orders} setOrders={setOrders} serviceOrders={serviceOrders} setServiceOrders={setServiceOrders} searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
+        return <OrdersPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'production':
-        return <ProductionPage serviceOrders={serviceOrders} setServiceOrders={setServiceOrders} />;
+        return <ProductionPage />;
       case 'stock':
         return <StockPage />;
       case 'suppliers':
@@ -128,31 +125,35 @@ const App: React.FC = () => {
       case 'crm':
         return <CrmPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'invoices':
-        return <InvoicesPage orders={orders} invoices={invoices} setInvoices={setInvoices} searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
+        return <InvoicesPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'finance':
         return <FinancePage />;
+      case 'receipts':
+        return <ReceiptsPage />;
       default:
         return <Dashboard />;
     }
   };
 
   return (
-    <div className="flex h-screen font-sans">
-      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={currentUser} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-background dark:bg-slate-900 p-4 flex justify-end items-center space-x-4 border-b border-border dark:border-slate-700">
-            <GlobalSearch onNavigate={handleSearchNavigate} />
-            <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-            <UserSwitcher currentUser={currentUser} onUserChange={setCurrentUser} />
-        </header>
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background dark:bg-slate-900">
-          <div className="container mx-auto px-6 py-8">
-            <Breadcrumbs currentPage={currentPage} setCurrentPage={setCurrentPage} />
-            {renderPage()}
-          </div>
-        </main>
+    <DataProvider>
+      <div className="flex h-screen font-sans">
+        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={currentUser} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <header className="bg-background dark:bg-slate-900 p-4 flex justify-end items-center space-x-4 border-b border-border dark:border-slate-700">
+              <GlobalSearch onNavigate={handleSearchNavigate} />
+              <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+              <UserSwitcher currentUser={currentUser} onUserChange={setCurrentUser} />
+          </header>
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background dark:bg-slate-900">
+            <div className="container mx-auto px-6 py-8">
+              <Breadcrumbs currentPage={currentPage} setCurrentPage={setCurrentPage} />
+              {renderPage()}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </DataProvider>
   );
 };
 

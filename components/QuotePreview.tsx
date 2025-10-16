@@ -71,8 +71,12 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
         email: 'clientEmail' in document ? document.clientEmail : 'N/A',
         phone: 'clientPhone' in document ? document.clientPhone : 'N/A',
         deliveryAddress: 'deliveryAddress' in document ? document.deliveryAddress : 'N/A',
+        deliveryCep: 'deliveryCep' in document ? document.deliveryCep : 'N/A',
     };
     
+    const itemSubtotal = document.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    const itemDiscounts = document.items.reduce((sum, item) => sum + (item.discount || 0), 0);
+
     return (
         <Modal isOpen={true} onClose={onClose} title={`Pré-visualização do ${docTypeLabel}`} className="max-w-4xl">
              <div className="flex justify-end mb-4">
@@ -113,6 +117,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                         <div className="bg-slate-50 p-4 rounded-lg col-span-2">
                             <h3 className="font-semibold text-text-secondary mb-2">ENDEREÇO DE ENTREGA:</h3>
                             <p className="font-bold text-dark">{clientInfo.deliveryAddress || 'A ser definido'}</p>
+                            {clientInfo.deliveryCep && <p className="text-dark">CEP: {clientInfo.deliveryCep}</p>}
                         </div>
                     )}
                 </section>
@@ -125,6 +130,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                                 <th className="p-2 text-slate-800">Descrição</th>
                                 <th className="p-2 text-center text-slate-800">Qtd.</th>
                                 <th className="p-2 text-right text-slate-800">Preço Unit.</th>
+                                <th className="p-2 text-right text-slate-800">Desconto</th>
                                 <th className="p-2 text-right text-slate-800">Subtotal</th>
                             </tr>
                         </thead>
@@ -134,6 +140,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                                     <td className="p-2 text-slate-800">{item.description}</td>
                                     <td className="p-2 text-center text-slate-800">{item.quantity.toFixed(2)}</td>
                                     <td className="p-2 text-right text-slate-800">{item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                    <td className="p-2 text-right text-red-600">{item.discount ? `- ${item.discount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : '-'}</td>
                                     <td className="p-2 text-right font-semibold text-slate-800">{item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                 </tr>
                             ))}
@@ -142,14 +149,34 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                 </section>
                 
                 <section className="mt-8 flex justify-end">
-                    <div className="w-full max-w-xs">
-                        {'subtotal' in document && (
-                            <div className="flex justify-between text-text-secondary">
-                                <span>Subtotal:</span>
-                                <span>{document.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    <div className="w-full max-w-sm text-slate-800 space-y-1">
+                        <div className="flex justify-between">
+                            <span>Subtotal dos Itens:</span>
+                            <span>{itemSubtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                        {itemDiscounts > 0 && (
+                             <div className="flex justify-between text-red-600">
+                                <span>Descontos nos Itens:</span>
+                                <span>- {itemDiscounts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                             </div>
                         )}
-                        <div className="flex justify-between font-bold text-xl mt-2 pt-2 border-t border-border text-dark">
+                        <div className="flex justify-between font-semibold border-t border-border pt-1">
+                            <span>Subtotal:</span>
+                            <span>{document.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                        {document.discount && document.discount > 0 && (
+                            <div className="flex justify-between text-red-600">
+                                <span>Desconto Geral:</span>
+                                <span>- {document.discount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            </div>
+                        )}
+                        {document.freight && document.freight > 0 && (
+                            <div className="flex justify-between">
+                                <span>Frete:</span>
+                                <span>+ {document.freight.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between font-bold text-xl mt-2 pt-2 border-t-2 border-black text-dark">
                             <span>TOTAL:</span>
                             <span className="text-primary">{document.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                         </div>

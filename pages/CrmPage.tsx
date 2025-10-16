@@ -1,10 +1,14 @@
 import React, { useState, useMemo, FC, DragEvent, useEffect } from 'react';
-import type { Client, Opportunity, OpportunityStatus, AgendaEvent, Note, Page, QuoteStatus } from '../types';
-import { mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockUsers, mockQuotes, mockOrders } from '../data/mockData';
+import type { Client, Opportunity, OpportunityStatus, AgendaEvent, Note, Page, QuoteStatus, User } from '../types';
+import { mockUsers, mockQuotes, mockOrders } from '../data/mockData';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Tabs from '../components/ui/Tabs';
+import { useData } from '../context/DataContext';
+import { generateWhatsAppLink } from '../../utils/helpers';
+import Input from '../components/ui/Input';
+import Textarea from '../components/ui/Textarea';
 
 type CrmView = 'clientes' | 'pipeline' | 'agenda';
 
@@ -17,22 +21,12 @@ const KANBAN_COLUMNS: { id: OpportunityStatus; title: string; color: string }[] 
   { id: 'perdido', title: 'Perdido', color: 'bg-red-500' },
 ];
 
-const generateWhatsAppLink = (phone: string) => {
-    if (!phone) return '';
-    const cleanedPhone = phone.replace(/\D/g, '');
-    if (cleanedPhone.length <= 11) {
-        return `https://wa.me/55${cleanedPhone}`;
-    }
-    return `https://wa.me/${cleanedPhone}`;
-};
-
 const ClientDetailModal: FC<{ 
     client: Client;
     isOpen: boolean;
-    notes: Note[];
     onClose: () => void;
-    onAddNote: (clientId: string, content: string) => void;
-}> = ({ client, isOpen, notes, onClose, onAddNote }) => {
+}> = ({ client, isOpen, onClose }) => {
+    const { notes, addNote } = useData();
     const [newNoteContent, setNewNoteContent] = useState('');
 
     const interactionHistory = useMemo(() => {
@@ -65,7 +59,7 @@ const ClientDetailModal: FC<{
 
     const handleSaveNote = () => {
         if (!newNoteContent.trim()) return;
-        onAddNote(client.id, newNoteContent);
+        addNote(client.id, newNoteContent);
         setNewNoteContent('');
     };
 
@@ -90,11 +84,12 @@ const ClientDetailModal: FC<{
                             <p><strong>Telefone:</strong> {client.phone}</p>
                             {client.phone && (
                                 <a href={generateWhatsAppLink(client.phone)} target="_blank" rel="noopener noreferrer" title="Abrir no WhatsApp" className="text-green-500 hover:text-green-700">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 4.315 1.919 6.066l-1.472 5.378 5.441-1.421zM11.999 4.521c.212 0 .416.03.612.088.225-.045.458-.068.696-.068h.001c.138 0 .274.01.409.029.164.023.324.057.48.102.18.053.352.12.518.2.148.071.29.155.425.25.158.114.306.242.441.381.119.123.23.255.335.395.122.161.233.332.336.512.092.158.175.324.248.499.063.149.117.302.162.458.042.145.074.293.097.444.02.127.031.255.031.385v.001c0 .093-.005.185-.014.276-.025.245-.084.482-.175.709-.131.325-.316.626-.55.895-.252.287-.556.533-.898.729-.281.16-.583.284-.901.372-.258.072-.524.12-.796.143-.332.028-.671.028-.999 0-.272-.023-.538-.071-.796-.143-.318-.088-.62-.212-.901-.372-.342-.196-.646-.442-.898-.729-.234-.269-.419-.57-.55-.895-.091-.227-.15-.464-.175-.709-.009-.091-.014-.183-.014-.276v-.001c0-.13.011-.258.031-.385.023-.151.055-.299.097-.444.045-.156.099-.309.162-.458.073-.175.156-.341.248-.499.103-.18.214-.351.336-.512.105-.14.216-.272.335.395.135-.139.283-.267.441-.381.135-.095.277-.179.425-.25.166-.08.338-.147.518-.2.156-.045.316-.079.48-.102.135-.019.271-.029.409-.029h.001z"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.487 5.235 3.487 8.413 0 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 4.315 1.919 6.066l-1.472 5.378 5.441-1.421zM11.999 4.521c.212 0 .416.03.612.088.225-.045.458-.068.696-.068h.001c.138 0 .274.01.409.029.164.023.324.057.48.102.18.053.352.12.518.2.148.071.29.155.425.25.158.114.306.242.441.381.119.123.23.255.335.395.122.161.233.332.336.512.092.158.175.324.248.499.063.149.117.302.162.458.042.145.074.293.097.444.02.127.031.255.031.385v.001c0 .093-.005.185-.014.276-.025.245-.084.482-.175.709-.131.325-.316.626-.55.895-.252.287-.556.533-.898.729-.281.16-.583.284-.901.372-.258.072-.524.12-.796.143-.332.028-.671.028-.999 0-.272-.023-.538-.071-.796-.143-.318-.088-.62-.212-.901-.372-.342-.196-.646-.442-.898-.729-.234-.269-.419-.57-.55-.895-.091-.227-.15-.464-.175-.709-.009-.091-.014-.183-.014-.276v-.001c0-.13.011-.258.031-.385.023-.151.055-.299.097-.444.045-.156.099-.309.162-.458.073-.175.156-.341.248-.499.103-.18.214-.351.336-.512.105-.14.216-.272.335.395.135-.139.283-.267.441.381.135-.095.277-.179.425-.25.166-.08.338-.147.518.2.156-.045.316-.079.48-.102.135-.019.271-.029.409-.029h.001z"/></svg>
                                 </a>
                             )}
                         </div>
                        <p><strong>Endereço:</strong> {client.address}</p>
+                       <p><strong>CEP:</strong> {client.cep}</p>
                        {client.cpfCnpj && <p><strong>CPF/CNPJ:</strong> {client.cpfCnpj}</p>}
                        <p><strong>Cliente desde:</strong> {new Date(client.createdAt).toLocaleDateString()}</p>
                     </div>
@@ -117,13 +112,12 @@ const ClientDetailModal: FC<{
                         </ul>
                     </div>
                      <div className="mt-4">
-                        <textarea 
-                            className="w-full p-2 border border-border dark:border-slate-600 rounded bg-slate-50 dark:bg-slate-700" 
+                        <Textarea 
                             placeholder="Adicionar nova anotação..."
                             value={newNoteContent}
                             onChange={(e) => setNewNoteContent(e.target.value)}
                             rows={3}
-                        ></textarea>
+                        />
                         <Button 
                             onClick={handleSaveNote}
                             disabled={!newNoteContent.trim()}
@@ -136,11 +130,6 @@ const ClientDetailModal: FC<{
             </div>
         </Modal>
     );
-};
-
-const FieldError: React.FC<{ message?: string }> = ({ message }) => {
-    if (!message) return null;
-    return <p className="text-error text-xs mt-1">{message}</p>;
 };
 
 const ClientForm: React.FC<{
@@ -177,32 +166,53 @@ const ClientForm: React.FC<{
             <CardHeader>{client.id.startsWith('new-') ? 'Novo Cliente' : `Editando ${client.name}`}</CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                        placeholder="Nome Completo / Razão Social"
+                        value={client.name}
+                        onChange={e => setClient({...client, name: e.target.value})}
+                        error={errors.name}
+                    />
                     <div>
-                        <input type="text" placeholder="Nome Completo / Razão Social" value={client.name} onChange={e => setClient({...client, name: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.name ? 'border-error' : 'border-border dark:border-slate-600'}`} />
-                        <FieldError message={errors.name} />
-                    </div>
-                    <div>
-                        <select value={client.type} onChange={e => setClient({...client, type: e.target.value as 'pessoa_fisica' | 'empresa'})} className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600">
+                        <select value={client.type} onChange={e => setClient({...client, type: e.target.value as 'pessoa_fisica' | 'empresa'})} className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600 h-[42px]">
                             <option value="pessoa_fisica">Pessoa Física</option>
                             <option value="empresa">Empresa</option>
                         </select>
                     </div>
-                     <div>
-                        <input type="text" placeholder="CPF / CNPJ" value={client.cpfCnpj} onChange={e => setClient({...client, cpfCnpj: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.cpfCnpj ? 'border-error' : 'border-border dark:border-slate-600'}`} />
-                        <FieldError message={errors.cpfCnpj} />
-                    </div>
-                    <div>
-                        <input type="email" placeholder="Email" value={client.email} onChange={e => setClient({...client, email: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.email ? 'border-error' : 'border-border dark:border-slate-600'}`} />
-                         <FieldError message={errors.email} />
-                    </div>
-                     <div>
-                        <input type="text" placeholder="Telefone" value={client.phone} onChange={e => setClient({...client, phone: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.phone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
-                        <FieldError message={errors.phone} />
-                    </div>
+                     <Input
+                        placeholder="CPF / CNPJ"
+                        value={client.cpfCnpj}
+                        onChange={e => setClient({...client, cpfCnpj: e.target.value})}
+                        error={errors.cpfCnpj}
+                    />
+                    <Input
+                        type="email"
+                        placeholder="Email"
+                        value={client.email}
+                        onChange={e => setClient({...client, email: e.target.value})}
+                        error={errors.email}
+                    />
+                     <Input
+                        placeholder="Telefone"
+                        value={client.phone}
+                        onChange={e => setClient({...client, phone: e.target.value})}
+                        error={errors.phone}
+                    />
                     <div className="md:col-span-2">
-                        <textarea placeholder="Endereço" value={client.address} onChange={e => setClient({...client, address: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.address ? 'border-error' : 'border-border dark:border-slate-600'}`} rows={3}></textarea>
-                        <FieldError message={errors.address} />
+                        <Textarea
+                            placeholder="Endereço"
+                            value={client.address}
+                            onChange={e => setClient({...client, address: e.target.value})}
+                            error={errors.address}
+                            rows={3}
+                        />
                     </div>
+                    <Input
+                        placeholder="CEP"
+                        value={client.cep || ''}
+                        onChange={e => setClient({...client, cep: e.target.value})}
+                        error={errors.cep}
+                        className="md:col-span-2"
+                    />
                 </div>
             </CardContent>
             <CardFooter className="flex justify-end space-x-4">
@@ -213,20 +223,136 @@ const ClientForm: React.FC<{
     );
 };
 
+const EventFormModal: FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (event: Omit<AgendaEvent, 'id'>) => void;
+    clients: Client[];
+    users: User[];
+}> = ({ isOpen, onClose, onSave, clients, users }) => {
+    const [title, setTitle] = useState('');
+    const [date, setDate] = useState('');
+    const [time, setTime] = useState('');
+    const [clientId, setClientId] = useState('');
+    const [userId, setUserId] = useState('');
+    const [description, setDescription] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const validate = (): boolean => {
+        const newErrors: Record<string, string> = {};
+        if (!title.trim()) newErrors.title = "O título é obrigatório.";
+        if (!date) newErrors.date = "A data é obrigatória.";
+        if (!time) newErrors.time = "A hora é obrigatória.";
+        if (!clientId) newErrors.clientId = "Selecione um cliente.";
+        if (!userId) newErrors.userId = "Selecione um responsável.";
+
+        if (date && time) {
+            const eventDateTime = new Date(`${date}T${time}`);
+            const now = new Date();
+            // Allow events for today, but not in the past
+            now.setHours(0,0,0,0);
+            if (new Date(date) < now) {
+                 newErrors.date = "A data não pode ser no passado.";
+            }
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleSave = () => {
+        if (!validate()) return;
+        
+        const eventDateTime = new Date(`${date}T${time}`).toISOString();
+
+        onSave({
+            title,
+            date: eventDateTime,
+            clientId,
+            description,
+            userId
+        });
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Agendar Novo Evento">
+            <div className="space-y-4">
+                <Input
+                    label="Título do Evento"
+                    id="event-title"
+                    type="text"
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
+                    error={errors.title}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                     <Input
+                        label="Data"
+                        id="event-date"
+                        type="date"
+                        value={date}
+                        onChange={e => setDate(e.target.value)}
+                        error={errors.date}
+                    />
+                    <Input
+                        label="Hora"
+                        id="event-time"
+                        type="time"
+                        value={time}
+                        onChange={e => setTime(e.target.value)}
+                        error={errors.time}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="event-client" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Cliente</label>
+                    <select id="event-client" value={clientId} onChange={e => setClientId(e.target.value)} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.clientId ? 'border-error' : 'border-border dark:border-slate-600'} h-[42px]`}>
+                        <option value="">-- Selecione --</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                </div>
+                 <div>
+                    <label htmlFor="event-user" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Responsável</label>
+                    <select id="event-user" value={userId} onChange={e => setUserId(e.target.value)} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.userId ? 'border-error' : 'border-border dark:border-slate-600'} h-[42px]`}>
+                        <option value="">-- Selecione --</option>
+                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                </div>
+                <Textarea
+                    label="Descrição"
+                    id="event-description"
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    rows={3}
+                />
+            </div>
+            <div className="flex justify-end mt-6 space-x-3">
+                <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                <Button onClick={handleSave}>Salvar Evento</Button>
+            </div>
+        </Modal>
+    );
+};
+
+
 interface CrmPageProps {
     searchTarget: { page: Page; id: string } | null;
     clearSearchTarget: () => void;
 }
 
 const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
+    const { 
+        clients,
+        opportunities, setOpportunities,
+        agendaEvents,
+        addClient,
+        updateClient,
+        addEvent,
+    } = useData();
     const [view, setView] = useState<CrmView>('clientes');
-    const [clients, setClients] = useState<Client[]>(mockClients);
-    const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities);
-    const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>(mockAgendaEvents);
-    const [notes, setNotes] = useState<Note[]>(mockNotes);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [clientView, setClientView] = useState<'list' | 'form'>('list');
     const [editingClient, setEditingClient] = useState<Client | null>(null);
+    const [isEventModalOpen, setIsEventModalOpen] = useState(false);
 
     useEffect(() => {
         if (searchTarget && searchTarget.page === 'crm') {
@@ -251,17 +377,6 @@ const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
     const handleDragStart = (e: DragEvent<HTMLElement>, oppId: string) => {
         e.dataTransfer.setData("oppId", oppId);
     };
-
-    const handleAddNote = (clientId: string, content: string) => {
-        const newNote: Note = {
-            id: `note-${Date.now()}`,
-            clientId,
-            content,
-            userId: 'user-1', // Assuming a logged in user
-            createdAt: new Date().toISOString()
-        };
-        setNotes(prevNotes => [...prevNotes, newNote]);
-    };
     
     const handleNewClient = () => {
         setEditingClient({
@@ -271,6 +386,7 @@ const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
             email: '',
             phone: '',
             address: '',
+            cep: '',
             cpfCnpj: '',
             createdAt: new Date().toISOString()
         });
@@ -284,9 +400,9 @@ const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
 
     const handleSaveClient = (clientToSave: Client) => {
         if (clientToSave.id.startsWith('new-')) {
-            setClients(prev => [...prev, { ...clientToSave, id: `cli-${prev.length + 1}` }]);
+            addClient(clientToSave);
         } else {
-            setClients(prev => prev.map(c => c.id === clientToSave.id ? clientToSave : c));
+            updateClient(clientToSave);
         }
         setClientView('list');
         setEditingClient(null);
@@ -295,6 +411,11 @@ const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
     const handleCancelClient = () => {
         setClientView('list');
         setEditingClient(null);
+    };
+
+    const handleSaveEvent = (eventData: Omit<AgendaEvent, 'id'>) => {
+        addEvent(eventData);
+        setIsEventModalOpen(false);
     };
 
 
@@ -360,7 +481,7 @@ const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
                         <CardHeader>
                             <div className="flex justify-between items-center">
                                 <h2 className="text-2xl font-semibold text-text-primary dark:text-slate-100">Agenda de Compromissos</h2>
-                                <Button>Agendar Evento</Button>
+                                <Button onClick={() => setIsEventModalOpen(true)}>Agendar Evento</Button>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -395,10 +516,18 @@ const CrmPage: FC<CrmPageProps> = ({ searchTarget, clearSearchTarget }) => {
             {selectedClient && <ClientDetailModal 
                 client={selectedClient} 
                 isOpen={!!selectedClient}
-                notes={notes}
                 onClose={() => setSelectedClient(null)} 
-                onAddNote={handleAddNote}
             />}
+
+             {isEventModalOpen && (
+                <EventFormModal
+                    isOpen={isEventModalOpen}
+                    onClose={() => setIsEventModalOpen(false)}
+                    onSave={handleSaveEvent}
+                    clients={clients}
+                    users={mockUsers}
+                />
+            )}
 
             <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">CRM - Gestão de Relacionamento</h1>
             <p className="mt-2 text-text-secondary dark:text-slate-400 mb-6">Centralize informações de clientes, oportunidades e agendamentos.</p>

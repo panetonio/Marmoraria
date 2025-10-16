@@ -1,19 +1,20 @@
 import React, { useState, useMemo, FC, useEffect } from 'react';
 import { mockUsers } from '../data/mockData';
-import type { Order, QuoteItem, ServiceOrder, Page } from '../types';
+import type { Order, QuoteItem, ServiceOrder, Page, SortDirection } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import DocumentPreview from '../components/QuotePreview';
+import { useData } from '../context/DataContext';
 
 
 const CreateServiceOrderModal: FC<{
     isOpen: boolean;
     order: Order;
-    serviceOrders: ServiceOrder[];
     onClose: () => void;
     onCreate: (newOs: Omit<ServiceOrder, 'id'>) => void;
-}> = ({ isOpen, order, serviceOrders, onClose, onCreate }) => {
+}> = ({ isOpen, order, onClose, onCreate }) => {
+    const { serviceOrders } = useData();
     const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
     const [deliveryDate, setDeliveryDate] = useState('');
     const [error, setError] = useState<string>('');
@@ -26,6 +27,14 @@ const CreateServiceOrderModal: FC<{
         );
         return order.items.filter(item => !assignedItemIds.has(item.id));
     }, [order, serviceOrders]);
+
+    const selectedItems = useMemo(() => {
+        return order.items.filter(item => selectedItemIds.includes(item.id));
+    }, [selectedItemIds, order.items]);
+
+    const selectedItemsTotal = useMemo(() => {
+        return selectedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    }, [selectedItems]);
 
     const handleToggleItem = (itemId: string) => {
         setSelectedItemIds(prev => 
@@ -50,12 +59,11 @@ const CreateServiceOrderModal: FC<{
             return;
         }
 
-        const itemsForNewOs = order.items.filter(item => selectedItemIds.includes(item.id));
         const newOsData: Omit<ServiceOrder, 'id'> = {
             orderId: order.id,
             clientName: order.clientName,
-            items: itemsForNewOs,
-            total: itemsForNewOs.reduce((sum, item) => sum + item.totalPrice, 0),
+            items: selectedItems,
+            total: selectedItemsTotal,
             deliveryDate: new Date(deliveryDate).toISOString(),
             assignedToIds: [],
             status: 'cutting'
@@ -81,6 +89,20 @@ const CreateServiceOrderModal: FC<{
                     )) : <p className="text-sm text-text-secondary dark:text-slate-400 p-4 text-center">Todos os itens deste pedido já foram alocados em Ordens de Serviço.</p>}
                 </div>
             </div>
+             {selectedItems.length > 0 && (
+                <div className="my-4 p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-border dark:border-slate-700">
+                    <h4 className="font-semibold mb-2 text-text-primary dark:text-slate-100">Resumo da Nova OS</h4>
+                    <ul className="list-disc list-inside text-sm text-text-secondary dark:text-slate-300 space-y-1 mb-3">
+                        {selectedItems.map(item => (
+                            <li key={item.id}>{item.description}</li>
+                        ))}
+                    </ul>
+                    <div className="flex justify-between items-center text-lg font-bold border-t border-border dark:border-slate-600 pt-2">
+                        <span className="text-text-primary dark:text-slate-100">Total da OS:</span>
+                        <span className="text-primary">{selectedItemsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    </div>
+                </div>
+            )}
             <div className="mb-6">
                 <label htmlFor="delivery-date" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Data de Entrega para esta OS</label>
                 <input
@@ -101,22 +123,21 @@ const CreateServiceOrderModal: FC<{
 };
 
 interface OrdersPageProps {
-    orders: Order[];
-    serviceOrders: ServiceOrder[];
-    setOrders: (update: (prev: Order[]) => Order[]) => void;
-    setServiceOrders: (update: (prev: ServiceOrder[]) => ServiceOrder[]) => void;
     searchTarget: { page: Page; id: string } | null;
     clearSearchTarget: () => void;
 }
 
-const OrdersPage: FC<OrdersPageProps> = ({ orders, serviceOrders, setOrders, setServiceOrders, searchTarget, clearSearchTarget }) => {
+const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) => {
+    const { orders, serviceOrders, createServiceOrder } = useData();
     const [isOsModalOpen, setIsOsModalOpen] = useState(false);
     const [selectedOrderForOs, setSelectedOrderForOs] = useState<Order | null>(null);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
     const [orderIdFilter, setOrderIdFilter] = useState('');
     const [clientFilter, setClientFilter] = useState('');
-    const [dateFilter, setDateFilter] = useState('');
+    const [startDateFilter, setStartDateFilter] = useState('');
+    const [endDateFilter, setEndDateFilter] = useState('');
     const [salespersonFilter, setSalespersonFilter] = useState('');
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Order | null; direction: SortDirection }>({ key: 'approvalDate', direction: 'descending' });
 
     const salespeople = useMemo(() => mockUsers.filter(u => u.role === 'vendedor'), []);
 
@@ -127,15 +148,49 @@ const OrdersPage: FC<OrdersPageProps> = ({ orders, serviceOrders, setOrders, set
         }, {} as Record<string, string>);
     }, [salespeople]);
 
+    const handleSort = (key: keyof Order) => {
+        let direction: SortDirection = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
     const filteredOrders = useMemo(() => {
-        return orders.filter(order => {
+        let filtered = orders.filter(order => {
             const orderIdMatch = orderIdFilter ? order.id.toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
             const clientMatch = clientFilter ? order.clientName.toLowerCase().includes(clientFilter.toLowerCase()) : true;
-            const dateMatch = dateFilter ? new Date(order.approvalDate).toISOString().split('T')[0] === dateFilter : true;
+            
+            const date = new Date(order.approvalDate);
+            const startMatch = startDateFilter ? new Date(startDateFilter) <= date : true;
+            const end = endDateFilter ? new Date(endDateFilter) : null;
+            if (end) end.setHours(23, 59, 59, 999);
+            const endMatch = end ? date <= end : true;
+            
             const salespersonMatch = salespersonFilter ? order.salespersonId === salespersonFilter : true;
-            return orderIdMatch && clientMatch && dateMatch && salespersonMatch;
+            return orderIdMatch && clientMatch && startMatch && endMatch && salespersonMatch;
         });
-    }, [orders, orderIdFilter, clientFilter, dateFilter, salespersonFilter]);
+
+        if (sortConfig.key) {
+            filtered.sort((a, b) => {
+                const aValue = a[sortConfig.key!];
+                const bValue = b[sortConfig.key!];
+
+                if (aValue === null || aValue === undefined) return 1;
+                if (bValue === null || bValue === undefined) return -1;
+    
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+
+        return filtered;
+    }, [orders, orderIdFilter, clientFilter, startDateFilter, endDateFilter, salespersonFilter, sortConfig]);
 
     const handleOpenOsModal = (order: Order) => {
         setSelectedOrderForOs(order);
@@ -158,16 +213,21 @@ const OrdersPage: FC<OrdersPageProps> = ({ orders, serviceOrders, setOrders, set
     };
 
     const handleCreateOs = (newOsData: Omit<ServiceOrder, 'id'>) => {
-        const newOsId = `OS-2024-${(serviceOrders.length + 1).toString().padStart(3, '0')}`;
-        const newOs: ServiceOrder = { ...newOsData, id: newOsId };
-        
-        setServiceOrders(prev => [...prev, newOs]);
-        setOrders(prev => prev.map(o => 
-            o.id === newOs.orderId 
-                ? { ...o, serviceOrderIds: [...o.serviceOrderIds, newOs.id] } 
-                : o
-        ));
+        createServiceOrder(newOsData);
         handleCloseOsModal();
+    };
+
+     const SortableTh: React.FC<{ children: React.ReactNode, columnKey: keyof Order }> = ({ children, columnKey }) => {
+        const isSorted = sortConfig.key === columnKey;
+        const directionIcon = sortConfig.direction === 'ascending' ? '▲' : '▼';
+        return (
+            <th className="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => handleSort(columnKey)}>
+                <div className="flex items-center space-x-1">
+                    <span>{children}</span>
+                    {isSorted && <span className="text-primary text-xs">{directionIcon}</span>}
+                </div>
+            </th>
+        );
     };
 
     return (
@@ -176,7 +236,6 @@ const OrdersPage: FC<OrdersPageProps> = ({ orders, serviceOrders, setOrders, set
                 <CreateServiceOrderModal
                     isOpen={isOsModalOpen}
                     order={selectedOrderForOs}
-                    serviceOrders={serviceOrders}
                     onClose={handleCloseOsModal}
                     onCreate={handleCreateOs}
                 />
@@ -188,7 +247,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ orders, serviceOrders, setOrders, set
             <p className="mt-2 text-text-secondary dark:text-slate-400">Gerencie os pedidos e gere as Ordens de Serviço (OS) para a produção.</p>
 
             <Card className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <input
                         type="text"
                         placeholder="Filtrar por ID do Pedido..."
@@ -207,10 +266,17 @@ const OrdersPage: FC<OrdersPageProps> = ({ orders, serviceOrders, setOrders, set
                     />
                     <input
                         type="date"
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
+                        value={startDateFilter}
+                        onChange={(e) => setStartDateFilter(e.target.value)}
                         className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
-                        aria-label="Filtrar por data"
+                        aria-label="Filtrar por data de início"
+                    />
+                     <input
+                        type="date"
+                        value={endDateFilter}
+                        onChange={(e) => setEndDateFilter(e.target.value)}
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
+                        aria-label="Filtrar por data final"
                     />
                     <select
                         value={salespersonFilter}
@@ -232,11 +298,11 @@ const OrdersPage: FC<OrdersPageProps> = ({ orders, serviceOrders, setOrders, set
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="border-b border-border dark:border-slate-700">
-                                    <th className="p-3">ID do Pedido</th>
-                                    <th className="p-3">Cliente</th>
-                                    <th className="p-3">Data de Aprovação</th>
-                                    <th className="p-3">Vendedor</th>
-                                    <th className="p-3 text-right">Total</th>
+                                    <SortableTh columnKey="id">ID do Pedido</SortableTh>
+                                    <SortableTh columnKey="clientName">Cliente</SortableTh>
+                                    <SortableTh columnKey="approvalDate">Data de Aprovação</SortableTh>
+                                    <SortableTh columnKey="salespersonId">Vendedor</SortableTh>
+                                    <SortableTh columnKey="total">Total</SortableTh>
                                     <th className="p-3">OS Geradas</th>
                                     <th className="p-3 text-center">Ações</th>
                                 </tr>

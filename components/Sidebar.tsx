@@ -53,6 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, user }) 
           {hasPermission('production') && <NavLink page="production" label="Produção" icon={ICONS.production} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasPermission('stock') && <NavLink page="stock" label="Estoque" icon={ICONS.stock} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasPermission('suppliers') && <NavLink page="suppliers" label="Fornecedores" icon={ICONS.suppliers} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasPermission('receipts') && <NavLink page="receipts" label="Recibos" icon={ICONS.receipts} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasPermission('crm') && <NavLink page="crm" label="CRM" icon={ICONS.crm} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasPermission('invoices') && <NavLink page="invoices" label="Faturamento" icon={ICONS.invoices} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasPermission('finance') && <NavLink page="finance" label="Financeiro" icon={ICONS.finance} currentPage={currentPage} setCurrentPage={setCurrentPage} />}

@@ -1,21 +1,12 @@
 import React, { useState, useMemo, FC } from 'react';
-import type { StockItem, Material, StockItemStatus } from '../types';
-import { mockStockItems, mockMaterials } from '../data/mockData';
-import Badge from '../components/ui/Badge';
-import Card from '../components/ui/Card';
+import type { StockItem, StockItemStatus } from '../types';
+import { useData } from '../context/DataContext';
+import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
-
-const StatusBadge: FC<{ status: StockItemStatus }> = ({ status }) => {
-    const statusMap: Record<StockItemStatus, { label: string; variant: 'success' | 'primary' | 'warning' | 'default' }> = {
-        disponivel: { label: "Disponível", variant: "success" },
-        reservada: { label: "Reservada", variant: "primary" },
-        em_uso: { label: "Em Uso", variant: "warning" },
-        consumida: { label: "Consumida", variant: "default" },
-    };
-    const { label, variant } = statusMap[status];
-    return <Badge variant={variant}>{label}</Badge>;
-};
+import StatusBadge from '../components/ui/StatusBadge';
+import { stockStatusMap } from '../config/statusMaps';
+import Input from '../components/ui/Input';
 
 const StockAlerts: FC<{ lowStockMaterials: {name: string, current: number, min: number}[] }> = ({ lowStockMaterials }) => {
     if (lowStockMaterials.length === 0) return null;
@@ -40,14 +31,15 @@ const StockAlerts: FC<{ lowStockMaterials: {name: string, current: number, min: 
 };
 
 const StockItemCard: FC<{ item: StockItem, onSelect: (item: StockItem) => void }> = ({ item, onSelect }) => {
-    const material = mockMaterials.find(m => m.id === item.materialId);
+    const { materials } = useData();
+    const material = materials.find(m => m.id === item.materialId);
     return (
         <Card onClick={() => onSelect(item)} className="p-0 overflow-hidden cursor-pointer hover:shadow-xl transition-shadow duration-300 flex flex-col">
             <img src={item.photoUrl} alt={material?.name} className="w-full h-32 object-cover" />
             <div className="p-4 flex flex-col flex-grow">
                 <div className="flex justify-between items-start">
                     <h4 className="font-bold text-text-primary dark:text-slate-100">{material?.name}</h4>
-                    <StatusBadge status={item.status} />
+                    <StatusBadge status={item.status} statusMap={stockStatusMap} />
                 </div>
                 <p className="font-mono text-xs text-text-secondary dark:text-slate-400 mt-1">{item.id}</p>
                 <div className="mt-2 text-sm text-gray-700 dark:text-slate-300 space-y-1">
@@ -61,7 +53,8 @@ const StockItemCard: FC<{ item: StockItem, onSelect: (item: StockItem) => void }
 };
 
 const StockDetailModal: FC<{ item: StockItem, isOpen: boolean, onClose: () => void }> = ({ item, isOpen, onClose }) => {
-     const material = mockMaterials.find(m => m.id === item.materialId);
+     const { materials } = useData();
+     const material = materials.find(m => m.id === item.materialId);
      const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(item.id)}&size=200x200&bgcolor=f1f5f9`;
 
      const handlePrint = () => {
@@ -97,7 +90,7 @@ const StockDetailModal: FC<{ item: StockItem, isOpen: boolean, onClose: () => vo
                 </div>
                 <div className="md:w-1/2 bg-slate-50 dark:bg-slate-700/50 p-6 rounded-lg">
                     <h3 className="text-2xl font-bold text-text-primary dark:text-slate-100 mb-1">{material?.name}</h3>
-                    <div className="mb-4"><StatusBadge status={item.status} /></div>
+                    <div className="mb-4"><StatusBadge status={item.status} statusMap={stockStatusMap} /></div>
                     
                     <div className="space-y-3 text-text-secondary dark:text-slate-300">
                         <p><strong>ID:</strong> <span className="font-mono text-text-primary dark:text-slate-100">{item.id}</span></p>
@@ -116,13 +109,13 @@ const StockDetailModal: FC<{ item: StockItem, isOpen: boolean, onClose: () => vo
 
 // Main page component
 const StockPage: React.FC = () => {
-  const [stockItems, setStockItems] = useState<StockItem[]>(mockStockItems);
+  const { stockItems, materials, freightCostPerKm, setFreightCostPerKm } = useData();
   const [viewingItem, setViewingItem] = useState<StockItem | null>(null);
   const [materialFilter, setMaterialFilter] = useState<string>('');
   
   const lowStockMaterials = useMemo(() => {
     const levels = new Map<string, { current: number; min: number; name: string }>();
-    mockMaterials.forEach(m => {
+    materials.forEach(m => {
         if (m.minStockSqM) {
              levels.set(m.id, { current: 0, min: m.minStockSqM, name: m.name });
         }
@@ -136,7 +129,7 @@ const StockPage: React.FC = () => {
         }
     });
     return Array.from(levels.values()).filter(l => l.current < l.min && l.min > 0);
-  }, [stockItems]);
+  }, [stockItems, materials]);
 
   const filteredItems = useMemo(() => {
     return stockItems.filter(item => {
@@ -160,21 +153,37 @@ const StockPage: React.FC = () => {
 
       <StockAlerts lowStockMaterials={lowStockMaterials} />
 
-      <Card className="p-4 mb-6">
-        <div className="flex items-center space-x-4">
-            <label htmlFor="material-filter" className="font-semibold text-text-primary dark:text-slate-100">Filtrar por Material:</label>
-            <select
-                id="material-filter"
-                value={materialFilter}
-                onChange={(e) => setMaterialFilter(e.target.value)}
-                className="p-2 border border-border dark:border-slate-600 rounded w-full max-w-xs bg-slate-50 dark:bg-slate-700"
-                aria-label="Filtrar por material"
-            >
-                <option value="">Todos os Materiais</option>
-                {mockMaterials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-        </div>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <Card className="p-4 md:col-span-2">
+            <div className="flex items-center space-x-4">
+                <label htmlFor="material-filter" className="font-semibold text-text-primary dark:text-slate-100">Filtrar por Material:</label>
+                <select
+                    id="material-filter"
+                    value={materialFilter}
+                    onChange={(e) => setMaterialFilter(e.target.value)}
+                    className="p-2 border border-border dark:border-slate-600 rounded w-full max-w-xs bg-slate-50 dark:bg-slate-700"
+                    aria-label="Filtrar por material"
+                >
+                    <option value="">Todos os Materiais</option>
+                    {materials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+            </div>
+        </Card>
+        <Card>
+            <CardHeader>
+                <h3 className="text-lg font-semibold">Configurações</h3>
+            </CardHeader>
+            <CardContent>
+                <Input
+                    label="Custo do Frete por KM (R$)"
+                    id="freight-cost"
+                    type="number"
+                    value={freightCostPerKm}
+                    onChange={(e) => setFreightCostPerKm(parseFloat(e.target.value) || 0)}
+                />
+            </CardContent>
+        </Card>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {filteredItems.map(item => (

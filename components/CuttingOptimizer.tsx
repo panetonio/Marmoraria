@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { QuoteItem, Material } from '../types';
-import { mockMaterials } from '../data/mockData';
+import { useData } from '../context/DataContext';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
@@ -56,6 +56,7 @@ const packRects = (slabWidth: number, slabHeight: number, items: QuoteItem[]) =>
 
 
 const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ items, onClose, onComplete }) => {
+    const { materials: mockMaterials } = useData();
     const materialItems = useMemo(() => items.filter(i => i.type === 'material' && i.width && i.height), [items]);
     const uniqueMaterialIds = useMemo(() => [...new Set(materialItems.map(i => i.materialId!))], [materialItems]);
     
@@ -78,7 +79,7 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ items, onClose, onC
 
         return { packedItems: packed, wastePercentage: waste, material };
 
-    }, [materialItems, selectedMaterialId]);
+    }, [materialItems, selectedMaterialId, mockMaterials]);
 
     const scale = 150; // pixels per meter
 

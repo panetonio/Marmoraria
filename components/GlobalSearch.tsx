@@ -1,27 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { mockClients, mockQuotes, mockOrders, mockInvoices } from '../data/mockData';
 import type { Page, Client, Quote, Order, Invoice, QuoteStatus, InvoiceStatus } from '../types';
-import Badge from './ui/Badge';
-
-const QuoteStatusBadge: React.FC<{ status: QuoteStatus }> = ({ status }) => {
-    const statusMap: Record<QuoteStatus, { label: string, variant: 'default' | 'primary' | 'success' | 'error' }> = {
-        draft: { label: "Rascunho", variant: "default" },
-        sent: { label: "Enviado", variant: "primary" },
-        approved: { label: "Aprovado", variant: "success" },
-        rejected: { label: "Rejeitado", variant: "error" },
-        archived: { label: "Arquivado", variant: "default" },
-    };
-    return <Badge variant={statusMap[status]?.variant || 'default'}>{statusMap[status]?.label || status}</Badge>;
-};
-
-const InvoiceStatusBadge: React.FC<{ status: InvoiceStatus }> = ({ status }) => {
-    const statusMap: Record<InvoiceStatus, { label: string, variant: 'warning' | 'success' | 'error' }> = {
-        pending: { label: "Pendente", variant: "warning" },
-        issued: { label: "Emitida", variant: "success" },
-        canceled: { label: "Cancelada", variant: "error" },
-    };
-    return <Badge variant={statusMap[status].variant}>{statusMap[status].label}</Badge>;
-};
+import StatusBadge from './ui/StatusBadge';
+import { useData } from '../context/DataContext';
+import { quoteStatusMap, invoiceStatusMap } from '../config/statusMaps';
 
 interface SearchResults {
     clients: Client[];
@@ -35,6 +16,7 @@ interface GlobalSearchProps {
 }
 
 const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
+    const { clients, quotes: allQuotes, orders, invoices } = useData();
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResults>({ clients: [], quotes: [], orders: [], invoices: [] });
     const [isOpen, setIsOpen] = useState(false);
@@ -48,7 +30,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
 
         const lowerCaseQuery = searchTerm.toLowerCase();
 
-        const filteredClients = mockClients.filter(c =>
+        const filteredClients = clients.filter(c =>
             c.name.toLowerCase().includes(lowerCaseQuery) ||
             c.cpfCnpj.toLowerCase().includes(lowerCaseQuery) ||
             c.email.toLowerCase().includes(lowerCaseQuery)
@@ -56,7 +38,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
 
         const now = new Date();
         const archiveLimit = 120 * 24 * 60 * 60 * 1000; // 120 days
-        const processedQuotes = mockQuotes.map(quote => {
+        const processedQuotes = allQuotes.map(quote => {
             const isOld = now.getTime() - new Date(quote.createdAt).getTime() > archiveLimit;
             if ((quote.status === 'draft' || quote.status === 'sent') && isOld) {
                 return { ...quote, status: 'archived' as QuoteStatus };
@@ -69,12 +51,12 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
             q.clientName.toLowerCase().includes(lowerCaseQuery)
         ).slice(0, 3);
 
-        const filteredOrders = mockOrders.filter(o =>
+        const filteredOrders = orders.filter(o =>
             o.id.toLowerCase().includes(lowerCaseQuery) ||
             o.clientName.toLowerCase().includes(lowerCaseQuery)
         ).slice(0, 3);
 
-        const filteredInvoices = mockInvoices.filter(i =>
+        const filteredInvoices = invoices.filter(i =>
             i.id.toLowerCase().includes(lowerCaseQuery) ||
             i.clientName.toLowerCase().includes(lowerCaseQuery) ||
             i.orderId.toLowerCase().includes(lowerCaseQuery)
@@ -91,7 +73,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
         // FIX: Use a type assertion to inform TypeScript that `arr` is an array and has a `length` property.
         // This resolves an issue where TypeScript might infer `arr` as `unknown` from `Object.values`.
         setIsOpen(Object.values(newResults).some(arr => (arr as unknown[]).length > 0));
-    }, []);
+    }, [clients, allQuotes, orders, invoices]);
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -171,7 +153,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
                                     <button key={quote.id} onClick={() => handleNavigate('quotes', quote.id)} className="w-full text-left px-4 py-2 text-sm text-text-primary dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
                                         <div className="flex justify-between items-center">
                                             <p className="font-medium font-mono">{quote.id}</p>
-                                            <QuoteStatusBadge status={quote.status} />
+                                            <StatusBadge status={quote.status} statusMap={quoteStatusMap} />
                                         </div>
                                         <p className="text-xs text-text-secondary dark:text-slate-400">{quote.clientName}</p>
                                     </button>
@@ -199,7 +181,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
                                     <button key={invoice.id} onClick={() => handleNavigate('invoices', invoice.id)} className="w-full text-left px-4 py-2 text-sm text-text-primary dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">
                                         <div className="flex justify-between items-center">
                                             <p className="font-medium font-mono">{invoice.id}</p>
-                                            <InvoiceStatusBadge status={invoice.status} />
+                                            <StatusBadge status={invoice.status} statusMap={invoiceStatusMap} />
                                         </div>
                                         <p className="text-xs text-text-secondary dark:text-slate-400">{invoice.clientName} (Pedido: {invoice.orderId})</p>
                                     </button>

@@ -1,48 +1,49 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client, Page } from '../types';
-import { mockQuotes, mockMaterials, mockServices, mockProducts, mockUsers, mockClients } from '../data/mockData';
+import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client, Page, SortDirection } from '../types';
+import { mockUsers } from '../data/mockData';
 import DocumentPreview from '../components/QuotePreview';
 import CuttingOptimizer from '../components/CuttingOptimizer';
 import ShapeDesigner from '../components/ShapeDesigner';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
-
-
-const QuoteStatusBadge: React.FC<{ status: QuoteStatus }> = ({ status }) => {
-    const statusMap: Record<QuoteStatus, { label: string, variant: 'default' | 'primary' | 'success' | 'error' }> = {
-        draft: { label: "Rascunho", variant: "default" },
-        sent: { label: "Enviado", variant: "primary" },
-        approved: { label: "Aprovado", variant: "success" },
-        rejected: { label: "Rejeitado", variant: "error" },
-        archived: { label: "Arquivado", variant: "default" },
-    };
-    return <Badge variant={statusMap[status]?.variant || 'default'}>{statusMap[status]?.label || status}</Badge>;
-};
+import { useData } from '../context/DataContext';
+import FieldError from '../components/ui/FieldError';
+import StatusBadge from '../components/ui/StatusBadge';
+import { quoteStatusMap } from '../config/statusMaps';
+import Input from '../components/ui/Input';
+import Textarea from '../components/ui/Textarea';
+import FreightCalculator from '../components/FreightCalculator';
 
 
 const QuoteList: React.FC<{
     quotes: Quote[];
     onNew: () => void;
     onEdit: (quote: Quote) => void;
+    onArchiveToggle: (quote: Quote) => void;
     clientFilter: string;
     onClientFilterChange: (value: string) => void;
-    dateFilter: string;
-    onDateFilterChange: (value: string) => void;
+    startDateFilter: string;
+    onStartDateFilterChange: (value: string) => void;
+    endDateFilter: string;
+    onEndDateFilterChange: (value: string) => void;
     statusFilter: QuoteStatus | '';
     onStatusFilterChange: (value: QuoteStatus | '') => void;
     salespersonFilter: string;
     onSalespersonFilterChange: (value: string) => void;
     showArchived: boolean;
     onShowArchivedChange: (show: boolean) => void;
+    sortConfig: { key: keyof Quote | null; direction: SortDirection };
+    onSort: (key: keyof Quote) => void;
 }> = ({ 
-    quotes, onNew, onEdit, 
+    quotes, onNew, onEdit, onArchiveToggle,
     clientFilter, onClientFilterChange, 
-    dateFilter, onDateFilterChange, 
+    startDateFilter, onStartDateFilterChange,
+    endDateFilter, onEndDateFilterChange,
     statusFilter, onStatusFilterChange,
     salespersonFilter, onSalespersonFilterChange,
-    showArchived, onShowArchivedChange
+    showArchived, onShowArchivedChange,
+    sortConfig, onSort,
  }) => {
     
     const statusLabels = {
@@ -54,6 +55,19 @@ const QuoteList: React.FC<{
     };
 
     const salespeople = useMemo(() => mockUsers.filter(u => u.role === 'vendedor'), []);
+
+    const SortableTh: React.FC<{ children: React.ReactNode, columnKey: keyof Quote }> = ({ children, columnKey }) => {
+        const isSorted = sortConfig.key === columnKey;
+        const directionIcon = sortConfig.direction === 'ascending' ? '▲' : '▼';
+        return (
+            <th className="p-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => onSort(columnKey)}>
+                <div className="flex items-center space-x-1">
+                    <span>{children}</span>
+                    {isSorted && <span className="text-primary text-xs">{directionIcon}</span>}
+                </div>
+            </th>
+        );
+    };
     
     return (
         <Card>
@@ -64,21 +78,28 @@ const QuoteList: React.FC<{
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
                      <input
                         type="text"
                         placeholder="Filtrar por Cliente..."
                         value={clientFilter}
                         onChange={(e) => onClientFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700 md:col-span-2"
                         aria-label="Filtrar por nome do cliente"
+                    />
+                     <input
+                        type="date"
+                        value={startDateFilter}
+                        onChange={(e) => onStartDateFilterChange(e.target.value)}
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
+                        aria-label="Filtrar por data de início"
                     />
                     <input
                         type="date"
-                        value={dateFilter}
-                        onChange={(e) => onDateFilterChange(e.target.value)}
+                        value={endDateFilter}
+                        onChange={(e) => onEndDateFilterChange(e.target.value)}
                         className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
-                        aria-label="Filtrar por data"
+                        aria-label="Filtrar por data final"
                     />
                     <select
                         value={statusFilter}
@@ -104,7 +125,7 @@ const QuoteList: React.FC<{
                             <option key={user.id} value={user.id}>{user.name}</option>
                         ))}
                     </select>
-                    <div className="flex items-center justify-start md:justify-end">
+                    <div className="flex items-center justify-start md:col-span-6 md:justify-end">
                          <Button variant={showArchived ? 'primary' : 'ghost'} onClick={() => onShowArchivedChange(!showArchived)}>
                             {showArchived ? 'Ver Ativos' : 'Ver Arquivados'}
                         </Button>
@@ -115,11 +136,11 @@ const QuoteList: React.FC<{
                     <table className="w-full text-left">
                         <thead>
                             <tr className="border-b border-border dark:border-slate-700">
-                                <th className="p-3">ID</th>
-                                <th className="p-3">Cliente</th>
-                                <th className="p-3">Data</th>
-                                <th className="p-3">Total</th>
-                                <th className="p-3">Status</th>
+                                <SortableTh columnKey="id">ID</SortableTh>
+                                <SortableTh columnKey="clientName">Cliente</SortableTh>
+                                <SortableTh columnKey="createdAt">Data</SortableTh>
+                                <SortableTh columnKey="total">Total</SortableTh>
+                                <SortableTh columnKey="status">Status</SortableTh>
                                 <th className="p-3">Ações</th>
                             </tr>
                         </thead>
@@ -130,9 +151,15 @@ const QuoteList: React.FC<{
                                     <td className="p-3">{quote.clientName}</td>
                                     <td className="p-3">{new Date(quote.createdAt).toLocaleDateString()}</td>
                                     <td className="p-3">{quote.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                    <td className="p-3"><QuoteStatusBadge status={quote.status} /></td>
-                                    <td className="p-3">
+                                    <td className="p-3"><StatusBadge status={quote.status} statusMap={quoteStatusMap} /></td>
+                                    <td className="p-3 space-x-2">
                                         <button onClick={() => onEdit(quote)} className="text-primary hover:underline font-semibold text-sm">Editar</button>
+                                         {(quote.status === 'draft' || quote.status === 'sent') && (
+                                            <button onClick={() => onArchiveToggle(quote)} className="text-secondary-hover hover:underline font-semibold text-sm">Arquivar</button>
+                                        )}
+                                        {quote.status === 'archived' && (
+                                            <button onClick={() => onArchiveToggle(quote)} className="text-green-600 hover:underline font-semibold text-sm">Restaurar</button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -154,10 +181,11 @@ const MaterialCatalogModal: React.FC<{
     onClose: () => void;
     onSelect: (material: Material) => void;
 }> = ({ isOpen, onClose, onSelect }) => {
+    const { materials } = useData();
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Catálogo de Materiais" className="max-w-4xl">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {mockMaterials.map(material => (
+                {materials.map(material => (
                     <div key={material.id} className="border border-border dark:border-slate-700 rounded-lg p-3 flex flex-col items-center text-center cursor-pointer hover:shadow-lg transition bg-slate-50 dark:bg-slate-800/50 dark:hover:bg-slate-700" onClick={() => onSelect(material)}>
                         <img src={material.photoUrl} alt={material.name} className="w-full h-32 object-cover rounded mb-2" />
                         <h4 className="font-semibold">{material.name}</h4>
@@ -171,13 +199,8 @@ const MaterialCatalogModal: React.FC<{
     );
 };
 
-const FieldError: React.FC<{ message?: string }> = ({ message }) => {
-    if (!message) return null;
-    return <p className="text-error text-xs mt-1">{message}</p>;
-};
-
-
 const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCancel: () => void }> = ({ quote: initialQuote, onSave, onCancel }) => {
+    const { materials, services, products, clients, freightCostPerKm } = useData();
     const [quote, setQuote] = useState<Quote>(initialQuote);
     const [itemType, setItemType] = useState<QuoteItemType>('material');
     
@@ -187,13 +210,17 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
     const [isDesignerOpen, setIsDesignerOpen] = useState(false);
+    const [isFreightCalculatorOpen, setIsFreightCalculatorOpen] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
     
     const totals = useMemo(() => {
-        const subtotal = quote.items.reduce((acc, item) => acc + item.totalPrice, 0);
-        return { subtotal, total: subtotal }; // Can add discounts, taxes here later
-    }, [quote.items]);
+        const subtotal = quote.items.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+        const itemDiscounts = quote.items.reduce((acc, item) => acc + (item.discount || 0), 0);
+        const subtotalAfterItemDiscounts = subtotal - itemDiscounts;
+        const total = subtotalAfterItemDiscounts - (quote.discount || 0) + (quote.freight || 0);
+        return { subtotal, total };
+    }, [quote.items, quote.discount, quote.freight]);
 
     const validateQuote = (isDraft: boolean): boolean => {
         const newErrors: Record<string, string> = {};
@@ -213,12 +240,13 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     };
     
     const handleMaterialSelect = (material: Material) => {
-        setItemFormData({
+        const updatedData = {
             ...itemFormData,
             materialId: material.id,
             unitPrice: material.costPerSqM,
             materialName: material.name,
-        });
+        };
+        setItemFormData(updateItemCalculations(updatedData));
         if (itemErrors.materialId) {
             const newItemErrors = { ...itemErrors };
             delete newItemErrors.materialId;
@@ -227,24 +255,47 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         setIsCatalogOpen(false);
     };
 
-    const updateItemCalculations = useCallback((data: Partial<QuoteItem>) => {
-        if (data.shapePoints && data.shapePoints.length > 0) {
-            const totalPrice = (data.quantity || 0) * (data.unitPrice || 0);
-            return { ...data, totalPrice };
+    // FIX: Update function signature to allow 'area' property, matching the form state.
+    const updateItemCalculations = useCallback((data: Partial<QuoteItem & { area?: number }>): Partial<QuoteItem & { area?: number }> => {
+        let quantity = data.quantity || 0;
+        const unitPrice = data.unitPrice || 0;
+        const discount = data.discount || 0;
+        let calculatedData = { ...data };
+
+        if (data.type === 'material') {
+            if (data.shapePoints && data.shapePoints.length > 0) {
+                // Area is the quantity for custom shapes
+            } else if (data.width && data.height) {
+                const width = parseFloat(data.width.toString());
+                const height = parseFloat(data.height.toString());
+                const area = width * height;
+                const perimeter = 2 * (width + height);
+                quantity = area;
+                // FIX: Add 'area' property to calculatedData to align with form state expectations for display.
+                calculatedData = { ...calculatedData, area, perimeter };
+            }
         }
-        if (data.type === 'material' && data.width && data.height) {
-            const width = parseFloat(data.width.toString());
-            const height = parseFloat(data.height.toString());
-            const area = width * height;
-            const perimeter = 2 * (width + height);
-            const totalPrice = area * (data.unitPrice || 0);
-            return { ...data, area, perimeter, quantity: area, totalPrice };
-        }
-        return data;
+        
+        const basePrice = quantity * unitPrice;
+        const totalPrice = basePrice - discount;
+
+        return { ...calculatedData, quantity, totalPrice };
     }, []);
 
     const handleItemFormChange = (field: keyof QuoteItem, value: any) => {
-        const updatedData = updateItemCalculations({ ...itemFormData, type: itemType, [field]: value });
+        let baseData = { ...itemFormData, type: itemType, [field]: value };
+
+        if (field === 'id') {
+            if (itemType === 'service') {
+                const service = services.find(s => s.id === value);
+                if (service) baseData.unitPrice = service.price;
+            } else if (itemType === 'product') {
+                const product = products.find(p => p.id === value);
+                if (product) baseData.unitPrice = product.price;
+            }
+        }
+
+        const updatedData = updateItemCalculations(baseData);
         setItemFormData(updatedData);
         if (itemErrors[field as string]) {
             const newItemErrors = { ...itemErrors };
@@ -255,8 +306,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     
     const handleShapeComplete = (data: { area: number, points: { x: number, y: number }[] }) => {
         setItemFormData(prev => {
-            const totalPrice = data.area * (prev.unitPrice || 0);
-            return {
+             const updatedData = updateItemCalculations({
                 ...prev,
                 quantity: data.area,
                 area: data.area,
@@ -264,8 +314,8 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 width: undefined,
                 height: undefined,
                 perimeter: undefined,
-                totalPrice: totalPrice
-            }
+            });
+            return updatedData;
         });
         setIsDesignerOpen(false);
     };
@@ -281,7 +331,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 if (!itemFormData.height || itemFormData.height <= 0) { newItemErrors.height = "Altura deve ser > 0."; }
             }
         } else if (itemType === 'service') {
-            const serviceExists = mockServices.some(s => s.id === itemFormData.id);
+            const serviceExists = services.some(s => s.id === itemFormData.id);
             if (!itemFormData.id || !serviceExists) {
                 newItemErrors.id = "Selecione um serviço válido.";
             }
@@ -289,7 +339,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 newItemErrors.quantity = "Quantidade deve ser > 0.";
             }
         } else if (itemType === 'product') {
-            const productExists = mockProducts.some(p => p.id === itemFormData.id);
+            const productExists = products.some(p => p.id === itemFormData.id);
             if (!itemFormData.id || !productExists) {
                 newItemErrors.id = "Selecione um produto válido.";
             }
@@ -307,55 +357,39 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         
         let newItem: QuoteItem | null = null;
         const baseId = `item-${Date.now()}`;
+        
+        const commonData = {
+            id: baseId,
+            quantity: itemFormData.quantity!,
+            unitPrice: itemFormData.unitPrice!,
+            totalPrice: itemFormData.totalPrice!,
+            discount: itemFormData.discount,
+        };
 
         if (itemType === 'material') {
-             if (itemFormData.shapePoints && itemFormData.shapePoints.length > 0) {
-                newItem = {
-                    id: baseId,
-                    type: 'material',
-                    description: `${itemFormData.description} (Custom) - ${itemFormData.materialName}`,
-                    quantity: itemFormData.quantity!,
-                    unitPrice: itemFormData.unitPrice!,
-                    totalPrice: itemFormData.totalPrice!,
-                    materialId: itemFormData.materialId,
-                    shapePoints: itemFormData.shapePoints,
-                };
-             } else {
-                 if (!itemFormData.width || !itemFormData.height || !itemFormData.description) return;
-                newItem = {
-                    id: baseId,
-                    type: 'material',
-                    description: `${itemFormData.description} - ${itemFormData.materialName}`,
-                    quantity: itemFormData.quantity!,
-                    unitPrice: itemFormData.unitPrice!,
-                    totalPrice: itemFormData.totalPrice!,
-                    width: itemFormData.width,
-                    height: itemFormData.height,
-                    perimeter: itemFormData.perimeter,
-                    materialId: itemFormData.materialId
-                };
-             }
+            newItem = {
+                ...commonData,
+                type: 'material',
+                description: `${itemFormData.description} - ${itemFormData.materialName}`,
+                width: itemFormData.width,
+                height: itemFormData.height,
+                perimeter: itemFormData.perimeter,
+                materialId: itemFormData.materialId,
+                shapePoints: itemFormData.shapePoints,
+            };
         } else if (itemType === 'service') {
-            const service = mockServices.find(s => s.id === itemFormData.id);
-            if (!service || !itemFormData.quantity) return;
-            newItem = {
-                id: baseId, type: 'service', description: service.name,
-                quantity: parseFloat(itemFormData.quantity.toString()), unitPrice: service.price,
-                totalPrice: parseFloat(itemFormData.quantity.toString()) * service.price,
-            };
+            const service = services.find(s => s.id === itemFormData.id);
+            if (!service) return;
+            newItem = { ...commonData, type: 'service', description: service.name };
         } else if (itemType === 'product') {
-            const product = mockProducts.find(p => p.id === itemFormData.id);
-             if (!product || !itemFormData.quantity) return;
-            newItem = {
-                id: baseId, type: 'product', description: product.name,
-                quantity: parseFloat(itemFormData.quantity.toString()), unitPrice: product.price,
-                totalPrice: parseFloat(itemFormData.quantity.toString()) * product.price,
-            };
+            const product = products.find(p => p.id === itemFormData.id);
+            if (!product) return;
+            newItem = { ...commonData, type: 'product', description: product.name };
         }
 
         if (newItem) {
             setQuote(prev => ({...prev, items: [...prev.items, newItem!]}));
-            setItemFormData({});
+            setItemFormData({unitPrice: 0, quantity: 0});
             setItemErrors({});
             if (errors.items) {
                 const newErrors = {...errors};
@@ -367,7 +401,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
 
     const handleItemTypeChange = (type: QuoteItemType) => {
         setItemType(type);
-        setItemFormData({});
+        setItemFormData({unitPrice: 0, quantity: 0});
         setItemErrors({});
     };
 
@@ -379,8 +413,6 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     };
     
     const renderItemForm = () => {
-        const baseInputClasses = "w-full p-2 border rounded bg-slate-50 dark:bg-slate-700";
-        const getInputClasses = (field: string) => `${baseInputClasses} ${itemErrors[field] ? 'border-error' : 'border-border dark:border-slate-600'}`;
         const hasCustomShape = itemFormData.shapePoints && itemFormData.shapePoints.length > 0;
 
         switch (itemType) {
@@ -388,32 +420,56 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 return <>
                     <div>
                         <div className="flex items-end space-x-2">
-                            <div className="flex-grow">
-                                <label className="text-sm font-medium text-text-secondary dark:text-slate-400">Material</label>
-                                <input type="text" readOnly value={itemFormData.materialName || 'Nenhum material selecionado'} className={`w-full p-2 border rounded bg-slate-100 dark:bg-slate-800 ${itemErrors.materialId ? 'border-error' : 'border-border dark:border-slate-600'}`} />
-                            </div>
+                             <Input
+                                label="Material"
+                                id="material-name"
+                                readOnly
+                                value={itemFormData.materialName || 'Nenhum material selecionado'}
+                                error={itemErrors.materialId}
+                                className="bg-slate-100 dark:bg-slate-800 flex-grow"
+                            />
                             <Button variant="secondary" onClick={() => setIsCatalogOpen(true)}>Procurar</Button>
                         </div>
-                        <FieldError message={itemErrors.materialId} />
                     </div>
                     <div className="mt-2">
-                        <input type="text" placeholder="Descrição da peça (Ex: Bancada)" value={itemFormData.description || ''} onChange={e => handleItemFormChange('description', e.target.value)} className={getInputClasses('description')}/>
-                        <FieldError message={itemErrors.description} />
+                        <Input
+                            placeholder="Descrição da peça (Ex: Bancada)"
+                            value={itemFormData.description || ''}
+                            onChange={e => handleItemFormChange('description', e.target.value)}
+                            error={itemErrors.description}
+                        />
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div>
-                            <input type="number" placeholder="Largura (m)" value={itemFormData.width || ''} onChange={e => handleItemFormChange('width', parseFloat(e.target.value) || 0)} className={getInputClasses('width')} disabled={hasCustomShape}/>
-                            <FieldError message={itemErrors.width} />
-                        </div>
-                        <div>
-                            <input type="number" placeholder="Altura (m)" value={itemFormData.height || ''} onChange={e => handleItemFormChange('height', parseFloat(e.target.value) || 0)} className={getInputClasses('height')} disabled={hasCustomShape}/>
-                            <FieldError message={itemErrors.height} />
-                        </div>
+                        <Input
+                            type="number"
+                            placeholder="Largura (m)"
+                            value={itemFormData.width || ''}
+                            onChange={e => handleItemFormChange('width', parseFloat(e.target.value) || 0)}
+                            error={itemErrors.width}
+                            disabled={hasCustomShape}
+                        />
+                         <Input
+                            type="number"
+                            placeholder="Altura (m)"
+                            value={itemFormData.height || ''}
+                            onChange={e => handleItemFormChange('height', parseFloat(e.target.value) || 0)}
+                            error={itemErrors.height}
+                            disabled={hasCustomShape}
+                        />
                     </div>
                      <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => setIsDesignerOpen(true)}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" /></svg>
                         {hasCustomShape ? 'Editar Forma Customizada' : 'Usar Designer Visual'}
                     </Button>
+                    <div className="mt-2">
+                        <Input
+                            type="number"
+                            placeholder="Desconto (R$)"
+                            value={itemFormData.discount || ''}
+                            onChange={e => handleItemFormChange('discount', parseFloat(e.target.value) || 0)}
+                            error={itemErrors.discount}
+                        />
+                    </div>
                      <div className="grid grid-cols-2 gap-2 mt-2 text-sm bg-slate-100 dark:bg-slate-800/50 p-2 rounded">
                         <div>Área: <span className="font-semibold">{itemFormData.area?.toFixed(3) || '0.000'} m²</span></div>
                         {!hasCustomShape && <div>Perímetro: <span className="font-semibold">{itemFormData.perimeter?.toFixed(2) || '0.00'} m</span></div>}
@@ -422,29 +478,57 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
             case 'service':
                 return <>
                     <div>
-                        <select value={itemFormData.id || ''} onChange={e => handleItemFormChange('id', e.target.value)} className={getInputClasses('id')}>
+                        <select value={itemFormData.id || ''} onChange={e => handleItemFormChange('id', e.target.value)}  className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${itemErrors.id ? 'border-error' : 'border-border dark:border-slate-600'}`}>
                             <option value="">Selecione o Serviço</option>
-                            {mockServices.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
                         <FieldError message={itemErrors.id} />
                     </div>
                     <div className="mt-2">
-                        <input type="number" placeholder="Quantidade" value={itemFormData.quantity || ''} onChange={e => handleItemFormChange('quantity', parseFloat(e.target.value) || 0)} className={getInputClasses('quantity')}/>
-                        <FieldError message={itemErrors.quantity} />
+                        <Input
+                            type="number"
+                            placeholder="Quantidade"
+                            value={itemFormData.quantity || ''}
+                            onChange={e => handleItemFormChange('quantity', parseFloat(e.target.value) || 0)}
+                            error={itemErrors.quantity}
+                        />
+                    </div>
+                    <div className="mt-2">
+                        <Input
+                            type="number"
+                            placeholder="Desconto (R$)"
+                            value={itemFormData.discount || ''}
+                            onChange={e => handleItemFormChange('discount', parseFloat(e.target.value) || 0)}
+                            error={itemErrors.discount}
+                        />
                     </div>
                 </>;
             case 'product':
                 return <>
                     <div>
-                        <select value={itemFormData.id || ''} onChange={e => handleItemFormChange('id', e.target.value)} className={getInputClasses('id')}>
+                        <select value={itemFormData.id || ''} onChange={e => handleItemFormChange('id', e.target.value)} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${itemErrors.id ? 'border-error' : 'border-border dark:border-slate-600'}`}>
                             <option value="">Selecione o Produto</option>
-                            {mockProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                         <FieldError message={itemErrors.id} />
                     </div>
                     <div className="mt-2">
-                        <input type="number" placeholder="Quantidade" value={itemFormData.quantity || ''} onChange={e => handleItemFormChange('quantity', parseFloat(e.target.value) || 0)} className={getInputClasses('quantity')}/>
-                        <FieldError message={itemErrors.quantity} />
+                        <Input
+                            type="number"
+                            placeholder="Quantidade"
+                            value={itemFormData.quantity || ''}
+                            onChange={e => handleItemFormChange('quantity', parseFloat(e.target.value) || 0)}
+                            error={itemErrors.quantity}
+                        />
+                    </div>
+                    <div className="mt-2">
+                       <Input
+                            type="number"
+                            placeholder="Desconto (R$)"
+                            value={itemFormData.discount || ''}
+                            onChange={e => handleItemFormChange('discount', parseFloat(e.target.value) || 0)}
+                            error={itemErrors.discount}
+                        />
                     </div>
                 </>;
         }
@@ -486,18 +570,24 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
 
     const handleClientSelect = (clientId: string) => {
         if (!clientId) {
-            setQuote(prev => ({ ...prev, clientName: '', clientEmail: '', clientPhone: '' }));
+            setQuote(prev => ({ ...prev, clientName: '', clientEmail: '', clientPhone: '', deliveryAddress: '', deliveryCep: '' }));
             return;
         }
-        const selectedClient = mockClients.find(c => c.id === clientId);
+        const selectedClient = clients.find(c => c.id === clientId);
         if (selectedClient) {
             setQuote(prev => ({
                 ...prev,
                 clientName: selectedClient.name,
                 clientEmail: selectedClient.email,
                 clientPhone: selectedClient.phone,
+                deliveryAddress: selectedClient.address,
+                deliveryCep: selectedClient.cep,
             }));
         }
+    };
+    
+    const handleApplyFreight = (calculatedFreight: number) => {
+        setQuote(prev => ({...prev, freight: calculatedFreight }));
     };
 
     return (
@@ -510,6 +600,12 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 onClose={() => setIsOptimizerOpen(false)} 
                 onComplete={handleOptimizationComplete}
             />}
+            <FreightCalculator 
+                isOpen={isFreightCalculatorOpen}
+                onClose={() => setIsFreightCalculatorOpen(false)}
+                onApply={handleApplyFreight}
+                costPerKm={freightCostPerKm}
+            />
 
 
             <CardHeader>{quote.id.startsWith('ORC') ? `Editando Orçamento ${quote.id}` : 'Novo Orçamento'}</CardHeader>
@@ -525,7 +621,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                             className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600"
                         >
                             <option value="">-- Digitar novo cliente --</option>
-                            {mockClients.map(client => (
+                            {clients.map(client => (
                                 <option key={client.id} value={client.id}>
                                     {client.name} - {client.cpfCnpj}
                                 </option>
@@ -533,20 +629,45 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                         </select>
                     </div>
 
-                    <div>
-                        <input type="text" placeholder="Nome do Cliente" value={quote.clientName} onChange={e => setQuote({...quote, clientName: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.clientName ? 'border-error' : 'border-border dark:border-slate-600'}`} />
-                        <FieldError message={errors.clientName} />
-                    </div>
-                    <div>
-                        <input type="email" placeholder="Email do Cliente" value={quote.clientEmail} onChange={e => setQuote({...quote, clientEmail: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.clientEmail ? 'border-error' : 'border-border dark:border-slate-600'}`} />
-                        <FieldError message={errors.clientEmail} />
-                    </div>
-                    <div>
-                         <input type="text" placeholder="Telefone do Cliente" value={quote.clientPhone} onChange={e => setQuote({...quote, clientPhone: e.target.value})} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.clientPhone ? 'border-error' : 'border-border dark:border-slate-600'}`} />
-                         <FieldError message={errors.clientPhone} />
-                    </div>
-                    <div className="md:col-span-2">
-                        <textarea placeholder="Endereço de Entrega" value={quote.deliveryAddress} onChange={e => setQuote({...quote, deliveryAddress: e.target.value})} className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600" rows={2}></textarea>
+                    <Input
+                        placeholder="Nome do Cliente"
+                        value={quote.clientName}
+                        onChange={e => setQuote({...quote, clientName: e.target.value})}
+                        error={errors.clientName}
+                    />
+                    <Input
+                        type="email"
+                        placeholder="Email do Cliente"
+                        value={quote.clientEmail}
+                        onChange={e => setQuote({...quote, clientEmail: e.target.value})}
+                        error={errors.clientEmail}
+                    />
+                    <Input
+                         placeholder="Telefone do Cliente"
+                         value={quote.clientPhone}
+                         onChange={e => setQuote({...quote, clientPhone: e.target.value})}
+                         error={errors.clientPhone}
+                    />
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="md:col-span-2">
+                            <Textarea
+                                label="Endereço de Entrega"
+                                id="delivery-address"
+                                placeholder="Rua, Número, Bairro, Cidade, Estado"
+                                value={quote.deliveryAddress}
+                                onChange={e => setQuote({...quote, deliveryAddress: e.target.value})}
+                                rows={2}
+                            />
+                        </div>
+                        <div>
+                            <Input
+                                label="CEP"
+                                id="delivery-cep"
+                                placeholder="00000-000"
+                                value={quote.deliveryCep}
+                                onChange={e => setQuote({...quote, deliveryCep: e.target.value})}
+                            />
+                        </div>
                     </div>
                 </div>
             
@@ -581,13 +702,14 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                             </div>
                             <div className="overflow-x-auto border border-border dark:border-slate-700 rounded-lg max-h-80">
                                 <table className="w-full text-left text-sm">
-                                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0"><tr className="border-b border-border dark:border-slate-700"><th className="p-2">Descrição</th><th className="p-2">Qtd.</th><th className="p-2">Preço Unit.</th><th className="p-2">Total</th><th className="p-2 text-center">Ações</th></tr></thead>
+                                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0"><tr className="border-b border-border dark:border-slate-700"><th className="p-2">Descrição</th><th className="p-2">Qtd.</th><th className="p-2">Preço Unit.</th><th className="p-2">Desconto</th><th className="p-2">Total</th><th className="p-2 text-center">Ações</th></tr></thead>
                                     <tbody>
                                         {quote.items.map(item => (
                                             <tr key={item.id} className="border-b border-border dark:border-slate-700">
                                                 <td className="p-2">{item.description}</td>
                                                 <td className="p-2">{item.quantity.toFixed(2)}</td>
                                                 <td className="p-2">{item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                                <td className="p-2 text-red-600 dark:text-red-400">{item.discount ? `- ${item.discount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : '-'}</td>
                                                 <td className="p-2">{item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                                 <td className="p-2 text-center">
                                                     <button 
@@ -601,7 +723,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                                             </tr>
                                         ))}
                                         {quote.items.length === 0 && (
-                                            <tr><td colSpan={5} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhum item adicionado.</td></tr>
+                                            <tr><td colSpan={6} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhum item adicionado.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -611,9 +733,44 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 </div>
 
                 <div className="mt-6 flex justify-end">
-                    <div className="text-right">
-                        <p className="text-text-secondary dark:text-slate-400">Subtotal: <span className="font-semibold text-text-primary dark:text-slate-200">{totals.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></p>
-                        <p className="text-xl text-text-primary dark:text-slate-100 font-bold">Total: <span className="text-primary">{totals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></p>
+                    <div className="w-full max-w-sm space-y-2">
+                        <div className="flex justify-between items-center">
+                            <span className="text-text-secondary dark:text-slate-400">Subtotal:</span>
+                            <span className="font-semibold text-text-primary dark:text-slate-200">{totals.subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                             <Input
+                                type="number"
+                                label="Desconto (R$):"
+                                id="quote-discount"
+                                placeholder="0,00"
+                                value={quote.discount || ''}
+                                onChange={e => setQuote({...quote, discount: parseFloat(e.target.value) || 0})}
+                                className="w-32 text-right"
+                            />
+                        </div>
+                        <div className="flex justify-between items-center">
+                             <Input
+                                type="number"
+                                label="Frete (R$):"
+                                id="quote-freight"
+                                placeholder="0,00"
+                                value={quote.freight || ''}
+                                onChange={e => setQuote({...quote, freight: parseFloat(e.target.value) || 0})}
+                                className="w-32 text-right"
+                                endAdornment={
+                                    <button type="button" onClick={() => setIsFreightCalculatorOpen(true)} className="pointer-events-auto text-text-secondary hover:text-primary dark:text-slate-400 dark:hover:text-slate-200" aria-label="Calcular Frete">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2a1 1 0 000 2h6a1 1 0 100-2H7zM6 7a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm0 3a1 1 0 000 2h6a1 1 0 100-2H6zm-1 4a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                }
+                            />
+                        </div>
+                        <div className="flex justify-between items-center text-xl text-text-primary dark:text-slate-100 font-bold pt-2 border-t border-border dark:border-slate-700">
+                            <span>Total:</span>
+                            <span className="text-primary">{totals.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
                     </div>
                 </div>
             </CardContent>
@@ -638,15 +795,30 @@ interface QuotesPageProps {
 }
 
 const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget }) => {
-    const [quotes, setQuotes] = useState<Quote[]>(mockQuotes);
+    const { quotes, saveQuote } = useData();
     const [currentView, setCurrentView] = useState<'list' | 'form'>('list');
     const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
 
     const [clientFilter, setClientFilter] = useState('');
-    const [dateFilter, setDateFilter] = useState('');
+    const [startDateFilter, setStartDateFilter] = useState('');
+    const [endDateFilter, setEndDateFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<QuoteStatus | ''>('');
     const [salespersonFilter, setSalespersonFilter] = useState('');
     const [showArchived, setShowArchived] = useState(false);
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Quote | null; direction: SortDirection }>({ key: 'createdAt', direction: 'descending' });
+
+    const handleSort = (key: keyof Quote) => {
+        let direction: SortDirection = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const handleArchiveToggle = (quote: Quote) => {
+        const newStatus = quote.status === 'archived' ? 'draft' : 'archived';
+        saveQuote({ ...quote, status: newStatus });
+    };
 
     const processedQuotes = useMemo(() => {
         const now = new Date();
@@ -663,7 +835,7 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
 
 
     const filteredQuotes = useMemo(() => {
-        return processedQuotes.filter(quote => {
+        let filtered = processedQuotes.filter(quote => {
              if (showArchived) {
                 if (quote.status !== 'archived') return false;
             } else {
@@ -673,10 +845,14 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
             const clientMatch = clientFilter 
                 ? quote.clientName.toLowerCase().includes(clientFilter.toLowerCase()) 
                 : true;
+
+            const date = new Date(quote.createdAt);
+            const startMatch = startDateFilter ? new Date(startDateFilter) <= date : true;
             
-            const dateMatch = dateFilter 
-                ? new Date(quote.createdAt).toISOString().split('T')[0] === dateFilter 
-                : true;
+            const end = endDateFilter ? new Date(endDateFilter) : null;
+            if (end) end.setHours(23, 59, 59, 999); // Include the whole end day
+            const endMatch = end ? date <= end : true;
+
 
             const statusMatch = statusFilter 
                 ? quote.status === statusFilter 
@@ -686,15 +862,37 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
                 ? quote.salespersonId === salespersonFilter
                 : true;
 
-            return clientMatch && dateMatch && statusMatch && salespersonMatch;
+            return clientMatch && startMatch && endMatch && statusMatch && salespersonMatch;
         });
-    }, [processedQuotes, clientFilter, dateFilter, statusFilter, salespersonFilter, showArchived]);
+
+        if (sortConfig.key) {
+            filtered.sort((a, b) => {
+                const aValue = a[sortConfig.key!];
+                const bValue = b[sortConfig.key!];
+
+                if (aValue === null || aValue === undefined) return 1;
+                if (bValue === null || bValue === undefined) return -1;
+    
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        
+        return filtered;
+    }, [processedQuotes, clientFilter, startDateFilter, endDateFilter, statusFilter, salespersonFilter, showArchived, sortConfig]);
 
     const handleNew = () => {
         setSelectedQuote({
             id: `new-${Date.now()}`,
-            clientName: '', clientEmail: '', clientPhone: '', deliveryAddress: '',
+            clientName: '', clientEmail: '', clientPhone: '', deliveryAddress: '', deliveryCep: '',
             status: 'draft', items: [], subtotal: 0, total: 0,
+            discount: 0,
+            freight: 0,
             createdAt: new Date().toISOString()
         });
         setCurrentView('form');
@@ -717,19 +915,7 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
     }, [searchTarget, quotes, clearSearchTarget]);
 
     const handleSave = (quoteToSave: Quote) => {
-        // FIX: 'totals' was used before it was declared.
-        const totals = {
-            subtotal: quoteToSave.items.reduce((acc, item) => acc + item.totalPrice, 0),
-            total: quoteToSave.items.reduce((acc, item) => acc + item.totalPrice, 0),
-        }
-        const quoteWithTotals = {...quoteToSave, ...totals};
-
-        if (quoteToSave.id.startsWith('new-')) {
-            const newId = `ORC-2024-${(mockQuotes.length + quotes.length + 1).toString().padStart(3, '0')}`;
-            setQuotes([...quotes, { ...quoteWithTotals, id: newId }]);
-        } else {
-            setQuotes(quotes.map(q => q.id === quoteToSave.id ? quoteWithTotals : q));
-        }
+        saveQuote(quoteToSave);
         setCurrentView('list');
         setSelectedQuote(null);
     };
@@ -746,16 +932,21 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
                     quotes={filteredQuotes} 
                     onNew={handleNew} 
                     onEdit={handleEdit}
+                    onArchiveToggle={handleArchiveToggle}
                     clientFilter={clientFilter}
                     onClientFilterChange={setClientFilter}
-                    dateFilter={dateFilter}
-                    onDateFilterChange={setDateFilter}
+                    startDateFilter={startDateFilter}
+                    onStartDateFilterChange={setStartDateFilter}
+                    endDateFilter={endDateFilter}
+                    onEndDateFilterChange={setEndDateFilter}
                     statusFilter={statusFilter}
                     onStatusFilterChange={setStatusFilter}
                     salespersonFilter={salespersonFilter}
                     onSalespersonFilterChange={setSalespersonFilter}
                     showArchived={showArchived}
                     onShowArchivedChange={setShowArchived}
+                    sortConfig={sortConfig}
+                    onSort={handleSort}
                 />
             )}
             {currentView === 'form' && selectedQuote && <QuoteForm quote={selectedQuote} onSave={handleSave} onCancel={handleCancel} />}

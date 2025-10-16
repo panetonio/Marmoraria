@@ -1,7 +1,8 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts';
 export type Role = keyof typeof ROLES;
+export type SortDirection = 'ascending' | 'descending';
 
 export interface User {
   id: string;
@@ -24,6 +25,7 @@ export interface Client {
   email: string;
   phone: string;
   address: string;
+  cep: string;
   cpfCnpj: string;
   createdAt: string;
 }
@@ -63,6 +65,7 @@ export interface Supplier {
   phone: string;
   email: string;
   address: string;
+  cep: string;
   cpfCnpj: string;
 }
 
@@ -95,12 +98,18 @@ export interface Product {
 
 export type QuoteItemType = 'material' | 'service' | 'product';
 
+export interface Point {
+    x: number;
+    y: number;
+}
+
 export interface QuoteItem {
   id: string;
   type: QuoteItemType;
   description: string;
   quantity: number; // Para material, isso representa a área (m²)
   unitPrice: number;
+  discount?: number;
   totalPrice: number;
   // Material specific
   width?: number;
@@ -109,7 +118,7 @@ export interface QuoteItem {
   wastePercentage?: number;
   materialId?: string;
   placement?: { x: number; y: number; fit: boolean };
-  shapePoints?: { x: number; y: number }[];
+  shapePoints?: Point[];
 }
 
 export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'archived';
@@ -120,9 +129,12 @@ export interface Quote {
   clientEmail: string;
   clientPhone: string;
   deliveryAddress: string;
+  deliveryCep: string;
   status: QuoteStatus;
   items: QuoteItem[];
   subtotal: number;
+  discount?: number;
+  freight?: number;
   total: number;
   createdAt: string;
   salespersonId?: string;
@@ -134,7 +146,12 @@ export interface Order {
   id: string; // PED-
   originalQuoteId: string; // ORC-
   clientName: string;
+  deliveryAddress: string;
+  deliveryCep: string;
   items: QuoteItem[];
+  subtotal: number;
+  discount?: number;
+  freight?: number;
   total: number;
   approvalDate: string;
   serviceOrderIds: string[];
@@ -192,4 +209,14 @@ export interface FinancialTransaction {
   paymentDate?: string; // ISO String
   relatedOrderId?: string;
   relatedClientId?: string;
+}
+
+export interface Receipt {
+  id: string;
+  supplierId: string;
+  supplierName: string;
+  cpfCnpj: string;
+  amount: number;
+  description: string;
+  createdAt: string;
 }

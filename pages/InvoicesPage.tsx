@@ -1,18 +1,10 @@
 import React, { useState, useMemo, FC, useEffect } from 'react';
 import type { Invoice, InvoiceStatus, Order, Page } from '../types';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-
-const InvoiceStatusBadge: React.FC<{ status: InvoiceStatus }> = ({ status }) => {
-    const statusMap: Record<InvoiceStatus, { label: string, variant: 'warning' | 'success' | 'error' }> = {
-        pending: { label: "Pendente", variant: "warning" },
-        issued: { label: "Emitida", variant: "success" },
-        canceled: { label: "Cancelada", variant: "error" },
-    };
-    return <Badge variant={statusMap[status].variant}>{statusMap[status].label}</Badge>;
-};
-
+import { useData } from '../context/DataContext';
+import StatusBadge from '../components/ui/StatusBadge';
+import { invoiceStatusMap } from '../config/statusMaps';
 
 const InvoiceList: React.FC<{
     invoices: Invoice[];
@@ -49,7 +41,7 @@ const InvoiceList: React.FC<{
                                     <td className="p-3">{invoice.clientName}</td>
                                     <td className="p-3">{invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString() : '—'}</td>
                                     <td className="p-3">{invoice.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                    <td className="p-3"><InvoiceStatusBadge status={invoice.status} /></td>
+                                    <td className="p-3"><StatusBadge status={invoice.status} statusMap={invoiceStatusMap} /></td>
                                     <td className="p-3">
                                         <button onClick={() => onView(invoice)} className="text-primary hover:underline font-semibold text-sm">Ver Detalhes</button>
                                     </td>
@@ -70,16 +62,21 @@ const InvoiceList: React.FC<{
 
 const InvoiceForm: React.FC<{
     invoice: Invoice;
-    orders: Order[];
     onSave: (invoice: Invoice) => void;
     onCancel: () => void;
     onIssue: (invoice: Invoice) => void;
-}> = ({ invoice: initialInvoice, orders, onSave, onCancel, onIssue }) => {
+}> = ({ invoice: initialInvoice, onSave, onCancel, onIssue }) => {
+    const { orders, invoices } = useData();
     const [invoice, setInvoice] = useState<Invoice>(initialInvoice);
     const isNew = invoice.id.startsWith('new-');
 
+    const ordersToInvoice = useMemo(() => {
+        const invoicedOrderIds = new Set(invoices.map(inv => inv.orderId));
+        return orders.filter(order => !invoicedOrderIds.has(order.id));
+    }, [invoices, orders]);
+
     const handleOrderSelection = (orderId: string) => {
-        const order = orders.find(o => o.id === orderId);
+        const order = ordersToInvoice.find(o => o.id === orderId);
         if (order) {
             setInvoice(prev => ({
                 ...prev,
@@ -105,7 +102,7 @@ const InvoiceForm: React.FC<{
                             aria-label="Selecionar Pedido"
                         >
                             <option value="">Selecione um pedido</option>
-                            {orders.map(order => (
+                            {ordersToInvoice.map(order => (
                                 <option key={order.id} value={order.id}>
                                     {order.id} - {order.clientName} ({order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
                                 </option>
@@ -122,7 +119,7 @@ const InvoiceForm: React.FC<{
                             <div><strong>Valor Total:</strong><p className="font-semibold text-lg">{invoice.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-sm">
-                            <div><strong>Status:</strong><p><InvoiceStatusBadge status={invoice.status} /></p></div>
+                            <div><strong>Status:</strong><p><StatusBadge status={invoice.status} statusMap={invoiceStatusMap} /></p></div>
                             <div><strong>Data de Criação:</strong><p>{new Date(invoice.createdAt).toLocaleString()}</p></div>
                             <div><strong>Data de Emissão:</strong><p>{invoice.issueDate ? new Date(invoice.issueDate).toLocaleString() : 'Não emitida'}</p></div>
                         </div>
@@ -143,21 +140,14 @@ const InvoiceForm: React.FC<{
 };
 
 interface InvoicesPageProps {
-    orders: Order[];
-    invoices: Invoice[];
-    setInvoices: (update: Invoice[] | ((prev: Invoice[]) => Invoice[])) => void;
     searchTarget: { page: Page; id: string } | null;
     clearSearchTarget: () => void;
 }
 
-const InvoicesPage: FC<InvoicesPageProps> = ({ orders, invoices, setInvoices, searchTarget, clearSearchTarget }) => {
+const InvoicesPage: FC<InvoicesPageProps> = ({ searchTarget, clearSearchTarget }) => {
+    const { invoices, saveInvoice, issueInvoice } = useData();
     const [currentView, setCurrentView] = useState<'list' | 'form'>('list');
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-
-    const ordersToInvoice = useMemo(() => {
-        const invoicedOrderIds = new Set(invoices.map(inv => inv.orderId));
-        return orders.filter(order => !invoicedOrderIds.has(order.id));
-    }, [invoices, orders]);
 
     const handleNew = () => {
         setSelectedInvoice({
@@ -188,17 +178,13 @@ const InvoicesPage: FC<InvoicesPageProps> = ({ orders, invoices, setInvoices, se
     }, [searchTarget, invoices, clearSearchTarget]);
 
     const handleSave = (invoiceToSave: Invoice) => {
-        setInvoices(prev => [...prev, { ...invoiceToSave, id: `NF-${(invoices.length + 1).toString().padStart(3, '0')}`}]);
+        saveInvoice(invoiceToSave);
         setCurrentView('list');
         setSelectedInvoice(null);
     };
 
     const handleIssue = (invoiceToIssue: Invoice) => {
-        setInvoices(invoices.map(inv => 
-            inv.id === invoiceToIssue.id 
-            ? { ...inv, status: 'issued', issueDate: new Date().toISOString() } 
-            : inv
-        ));
+        issueInvoice(invoiceToIssue.id);
         setCurrentView('list');
         setSelectedInvoice(null);
     }
@@ -217,7 +203,6 @@ const InvoicesPage: FC<InvoicesPageProps> = ({ orders, invoices, setInvoices, se
             ) : (
                 selectedInvoice && <InvoiceForm 
                     invoice={selectedInvoice} 
-                    orders={ordersToInvoice}
                     onSave={handleSave} 
                     onCancel={handleCancel}
                     onIssue={handleIssue}

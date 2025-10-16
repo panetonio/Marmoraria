@@ -1,21 +1,14 @@
 import React, { useState, useMemo, FC } from 'react';
-import { mockFinancialTransactions } from '../data/mockData';
 import type { FinancialTransaction, TransactionStatus, TransactionType } from '../types';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Tabs from '../components/ui/Tabs';
+import { useData } from '../context/DataContext';
+import StatusBadge from '../components/ui/StatusBadge';
+import { transactionStatusMap } from '../config/statusMaps';
 
 type FinanceView = 'contas' | 'fluxo_caixa' | 'relatorios';
 type ReportPeriod = 'day' | 'week' | 'month';
-
-const TransactionStatusBadge: FC<{ status: TransactionStatus }> = ({ status }) => {
-    const map = {
-        pago: { label: "Pago", variant: 'success' as const },
-        pendente: { label: "Pendente", variant: 'warning' as const },
-    };
-    return <Badge variant={map[status].variant}>{map[status].label}</Badge>;
-};
 
 const KPICard: FC<{ title: string; value: string; colorClass?: string }> = ({ title, value, colorClass = 'text-primary' }) => (
     <Card>
@@ -68,19 +61,9 @@ const ReportTable: FC<{ title: string, transactions: FinancialTransaction[], tot
 
 
 const FinancePage: FC = () => {
-    const [transactions, setTransactions] = useState<FinancialTransaction[]>(mockFinancialTransactions);
+    const { financialTransactions: transactions, markTransactionAsPaid } = useData();
     const [view, setView] = useState<FinanceView>('contas');
     const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('month');
-
-    const handleMarkAsPaid = (transactionId: string) => {
-        setTransactions(prev =>
-            prev.map(t =>
-                t.id === transactionId
-                    ? { ...t, status: 'pago', paymentDate: new Date().toISOString() }
-                    : t
-            )
-        );
-    };
     
     const monthlyReport = useMemo(() => {
         const now = new Date();
@@ -187,10 +170,10 @@ const FinancePage: FC = () => {
                                                 <td className="p-3">{t.description}</td>
                                                 <td className={`p-3 font-semibold ${t.type === 'receita' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{t.type === 'receita' ? 'Receita' : 'Despesa'}</td>
                                                 <td className="p-3 text-right font-mono">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                                <td className="p-3 text-center"><TransactionStatusBadge status={t.status} /></td>
+                                                <td className="p-3 text-center"><StatusBadge status={t.status} statusMap={transactionStatusMap} /></td>
                                                 <td className="p-3 text-center">
                                                     {t.status === 'pendente' && (
-                                                        <Button size="sm" onClick={() => handleMarkAsPaid(t.id)}>Marcar como Pago</Button>
+                                                        <Button size="sm" onClick={() => markTransactionAsPaid(t.id)}>Marcar como Pago</Button>
                                                     )}
                                                 </td>
                                             </tr>

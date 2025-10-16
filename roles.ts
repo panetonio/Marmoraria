@@ -10,6 +10,7 @@ export const PERMISSIONS: Record<Page, string> = {
   crm: 'manage_crm',
   finance: 'manage_finance',
   invoices: 'manage_invoices',
+  receipts: 'view_receipts',
 };
 
 export const ROLES = {
@@ -48,6 +49,7 @@ export const ROLES = {
       PERMISSIONS.crm,
       PERMISSIONS.finance,
       PERMISSIONS.invoices,
+      PERMISSIONS.receipts,
     ],
   },
 };

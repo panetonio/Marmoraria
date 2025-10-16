@@ -2,11 +2,8 @@ import React, { useState, useRef, MouseEvent, useMemo, useEffect } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Card, { CardContent } from './ui/Card';
-
-interface Point {
-    x: number;
-    y: number;
-}
+import type { Point } from '../types';
+import { calculateArea } from '../utils/helpers';
 
 interface ShapeDesignerProps {
     isOpen: boolean;
@@ -28,17 +25,6 @@ const ShapeDesigner: React.FC<ShapeDesignerProps> = ({ isOpen, onClose, onComple
         const last = points[points.length - 1];
         return first.x === last.x && first.y === last.y;
     }, [points]);
-
-    const calculateArea = (verts: Point[]): number => {
-        if (verts.length < 3) return 0;
-        let area = 0;
-        for (let i = 0; i < verts.length; i++) {
-            const p1 = verts[i];
-            const p2 = verts[(i + 1) % verts.length];
-            area += (p1.x * p2.y - p2.x * p1.y);
-        }
-        return Math.abs(area / 2);
-    };
 
     const areaInMeters = useMemo(() => calculateArea(points) / (SCALE * SCALE), [points]);
 
