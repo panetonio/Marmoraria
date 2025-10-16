@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
 import { stockStatusMap } from '../config/statusMaps';
 import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
 
 const StockAlerts: FC<{ lowStockMaterials: {name: string, current: number, min: number}[] }> = ({ lowStockMaterials }) => {
     if (lowStockMaterials.length === 0) return null;
@@ -157,16 +158,16 @@ const StockPage: React.FC = () => {
         <Card className="p-4 md:col-span-2">
             <div className="flex items-center space-x-4">
                 <label htmlFor="material-filter" className="font-semibold text-text-primary dark:text-slate-100">Filtrar por Material:</label>
-                <select
+                <Select
                     id="material-filter"
                     value={materialFilter}
                     onChange={(e) => setMaterialFilter(e.target.value)}
-                    className="p-2 border border-border dark:border-slate-600 rounded w-full max-w-xs bg-slate-50 dark:bg-slate-700"
+                    className="w-full max-w-xs"
                     aria-label="Filtrar por material"
                 >
                     <option value="">Todos os Materiais</option>
                     {materials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+                </Select>
             </div>
         </Card>
         <Card>

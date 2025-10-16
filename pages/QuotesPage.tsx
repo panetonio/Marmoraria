@@ -8,7 +8,6 @@ import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { useData } from '../context/DataContext';
-import FieldError from '../components/ui/FieldError';
 import StatusBadge from '../components/ui/StatusBadge';
 import { quoteStatusMap } from '../config/statusMaps';
 import Input from '../components/ui/Input';
@@ -16,6 +15,7 @@ import Textarea from '../components/ui/Textarea';
 import FreightCalculator from '../components/FreightCalculator';
 import { calculateQuoteItem, validateQuoteItem } from '../utils/helpers';
 import AddressForm from '../components/AddressForm';
+import Select from '../components/ui/Select';
 
 
 const QuoteList: React.FC<{
@@ -86,27 +86,26 @@ const QuoteList: React.FC<{
                         placeholder="Filtrar por Cliente..."
                         value={clientFilter}
                         onChange={(e) => onClientFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700 md:col-span-2"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700 md:col-span-2 h-[42px]"
                         aria-label="Filtrar por nome do cliente"
                     />
                      <input
                         type="date"
                         value={startDateFilter}
                         onChange={(e) => onStartDateFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
                         aria-label="Filtrar por data de início"
                     />
                     <input
                         type="date"
                         value={endDateFilter}
                         onChange={(e) => onEndDateFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
                         aria-label="Filtrar por data final"
                     />
-                    <select
+                    <Select
                         value={statusFilter}
                         onChange={(e) => onStatusFilterChange(e.target.value as QuoteStatus | '')}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
                         aria-label="Filtrar por status"
                     >
                         <option value="">Todos os Status</option>
@@ -115,18 +114,17 @@ const QuoteList: React.FC<{
                             .map(([value, label]) => (
                             <option key={value} value={value}>{label}</option>
                         ))}
-                    </select>
-                    <select
+                    </Select>
+                    <Select
                         value={salespersonFilter}
                         onChange={(e) => onSalespersonFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
                         aria-label="Filtrar por vendedor"
                     >
                         <option value="">Todos os Vendedores</option>
                         {salespeople.map(user => (
                             <option key={user.id} value={user.id}>{user.name}</option>
                         ))}
-                    </select>
+                    </Select>
                     <div className="flex items-center justify-start md:col-span-6 md:justify-end">
                          <Button variant={showArchived ? 'primary' : 'ghost'} onClick={() => onShowArchivedChange(!showArchived)}>
                             {showArchived ? 'Ver Ativos' : 'Ver Arquivados'}
@@ -438,13 +436,14 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 </>;
             case 'service':
                 return <>
-                    <div>
-                        <select value={itemFormData.id || ''} onChange={e => handleItemFormChange('id', e.target.value)}  className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${itemErrors.id ? 'border-error' : 'border-border dark:border-slate-600'}`}>
-                            <option value="">Selecione o Serviço</option>
-                            {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        <FieldError message={itemErrors.id} />
-                    </div>
+                    <Select
+                        value={itemFormData.id || ''}
+                        onChange={e => handleItemFormChange('id', e.target.value)}
+                        error={itemErrors.id}
+                    >
+                        <option value="">Selecione o Serviço</option>
+                        {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </Select>
                     <div className="mt-2">
                         <Input
                             type="number"
@@ -466,13 +465,14 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 </>;
             case 'product':
                 return <>
-                    <div>
-                        <select value={itemFormData.id || ''} onChange={e => handleItemFormChange('id', e.target.value)} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${itemErrors.id ? 'border-error' : 'border-border dark:border-slate-600'}`}>
-                            <option value="">Selecione o Produto</option>
-                            {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                        <FieldError message={itemErrors.id} />
-                    </div>
+                    <Select
+                        value={itemFormData.id || ''}
+                        onChange={e => handleItemFormChange('id', e.target.value)}
+                        error={itemErrors.id}
+                    >
+                        <option value="">Selecione o Produto</option>
+                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </Select>
                     <div className="mt-2">
                         <Input
                             type="number"
@@ -582,13 +582,10 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 <div className="space-y-4 mb-6">
                     <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 border-b border-border dark:border-slate-700 pb-2">Dados do Cliente</h3>
                      <div className="md:col-span-2">
-                         <label htmlFor="client-select" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">
-                            Selecionar Cliente Existente (Opcional)
-                        </label>
-                        <select
+                        <Select
+                            label="Selecionar Cliente Existente (Opcional)"
                             id="client-select"
                             onChange={(e) => handleClientSelect(e.target.value)}
-                            className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600"
                         >
                             <option value="">-- Digitar novo cliente --</option>
                             {clients.map(client => (
@@ -596,7 +593,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                                     {client.name} - {client.cpfCnpj}
                                 </option>
                             ))}
-                        </select>
+                        </Select>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -741,25 +738,21 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                     <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 mb-2">Forma de Pagamento</h3>
                     {errors.paymentMethod && <p className="text-error text-sm mb-2">{errors.paymentMethod}</p>}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="payment-method" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">
-                                Método
-                            </label>
-                            <select
-                                id="payment-method"
-                                value={quote.paymentMethod || ''}
-                                onChange={e => {
-                                    const method = e.target.value as PaymentMethod;
-                                    setQuote({...quote, paymentMethod: method, installments: method === 'cartao_credito' ? (quote.installments || 1) : undefined })
-                                }}
-                                className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.paymentMethod ? 'border-error' : 'border-border dark:border-slate-600'} h-[42px]`}
-                            >
-                                <option value="">-- Selecione --</option>
-                                {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
-                                    <option key={key} value={key}>{label}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <Select
+                            label="Método"
+                            id="payment-method"
+                            value={quote.paymentMethod || ''}
+                            onChange={e => {
+                                const method = e.target.value as PaymentMethod;
+                                setQuote({...quote, paymentMethod: method, installments: method === 'cartao_credito' ? (quote.installments || 1) : undefined })
+                            }}
+                            error={errors.paymentMethod}
+                        >
+                            <option value="">-- Selecione --</option>
+                            {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
+                                <option key={key} value={key}>{label}</option>
+                            ))}
+                        </Select>
                         {quote.paymentMethod === 'cartao_credito' && (
                             <div>
                                 <Input

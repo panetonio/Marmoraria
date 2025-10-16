@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import DocumentPreview from '../components/QuotePreview';
 import { useData } from '../context/DataContext';
+import Select from '../components/ui/Select';
 
 
 const CreateServiceOrderModal: FC<{
@@ -110,7 +111,7 @@ const CreateServiceOrderModal: FC<{
                     type="date"
                     value={deliveryDate}
                     onChange={e => setDeliveryDate(e.target.value)}
-                    className={`p-2 border rounded w-full text-text-primary bg-slate-50 dark:bg-slate-700 dark:text-slate-200 ${error && !deliveryDate ? 'border-error' : 'border-border dark:border-slate-700'}`}
+                    className={`p-2 border rounded w-full text-text-primary bg-slate-50 dark:bg-slate-700 dark:text-slate-200 ${error && !deliveryDate ? 'border-error' : 'border-border dark:border-slate-700'} h-[42px]`}
                 />
             </div>
             {error && <p className="text-error text-center text-sm mb-4">{error}</p>}
@@ -253,7 +254,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                         placeholder="Filtrar por ID do Pedido..."
                         value={orderIdFilter}
                         onChange={(e) => setOrderIdFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700 h-[42px]"
                         aria-label="Filtrar por ID do Pedido"
                     />
                     <input
@@ -261,34 +262,33 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                         placeholder="Filtrar por Cliente..."
                         value={clientFilter}
                         onChange={(e) => setClientFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700 h-[42px]"
                         aria-label="Filtrar por nome do cliente"
                     />
                     <input
                         type="date"
                         value={startDateFilter}
                         onChange={(e) => setStartDateFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
                         aria-label="Filtrar por data de início"
                     />
                      <input
                         type="date"
                         value={endDateFilter}
                         onChange={(e) => setEndDateFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
                         aria-label="Filtrar por data final"
                     />
-                    <select
+                    <Select
                         value={salespersonFilter}
                         onChange={(e) => setSalespersonFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
                         aria-label="Filtrar por vendedor"
                     >
                         <option value="">Todos os Vendedores</option>
                         {salespeople.map(user => (
                             <option key={user.id} value={user.id}>{user.name}</option>
                         ))}
-                    </select>
+                    </Select>
                 </div>
             </Card>
 

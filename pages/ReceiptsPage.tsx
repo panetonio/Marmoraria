@@ -3,6 +3,7 @@ import type { Receipt, Supplier } from '../types';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import { useData } from '../context/DataContext';
 import ViewReceiptModal from '../components/ViewReceiptModal';
+import Select from '../components/ui/Select';
 
 const ReceiptsPage: FC = () => {
     const { receipts, suppliers } = useData();
@@ -32,22 +33,21 @@ const ReceiptsPage: FC = () => {
 
             <Card className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <select
+                     <Select
                         value={supplierFilter}
                         onChange={(e) => setSupplierFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700"
                         aria-label="Filtrar por fornecedor"
                     >
                         <option value="">Todos os Fornecedores</option>
                         {suppliers.map(s => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
-                    </select>
+                    </Select>
                     <input
                         type="date"
                         value={dateFilter}
                         onChange={(e) => setDateFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700"
+                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
                         aria-label="Filtrar por data"
                     />
                 </div>

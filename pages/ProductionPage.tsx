@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import { useData } from '../context/DataContext';
 import StatusBadge from '../components/ui/StatusBadge';
 import { productionStatusMap } from '../config/statusMaps';
+import Select from '../components/ui/Select';
 
 const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
   { id: 'cutting', title: 'Em Corte', color: 'bg-orange-800' },
@@ -341,24 +342,22 @@ const ProductionPage: FC = () => {
                     placeholder="Filtrar por Pedido (PED-...)"
                     value={orderIdFilter}
                     onChange={(e) => setOrderIdFilter(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-border bg-slate-50 dark:border-slate-600 dark:bg-slate-700 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
+                    className="block w-full pl-3 pr-10 py-2 text-base border-border bg-slate-50 dark:border-slate-600 dark:bg-slate-700 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md h-[42px]"
                     aria-label="Filtrar por ID do Pedido"
                 />
             </div>
              <div className="flex-shrink-0">
-                <label htmlFor="professional-filter" className="sr-only">Filtrar por Profissional</label>
-                <select
+                <Select
                     id="professional-filter"
                     value={professionalFilter}
                     onChange={(e) => setProfessionalFilter(e.target.value)}
-                    className="block w-full pl-3 pr-10 py-2 text-base border-border bg-slate-50 dark:border-slate-600 dark:bg-slate-700 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
                     aria-label="Filtrar por profissional"
                 >
                     <option value="">Todos os Profissionais</option>
                     {mockProductionProfessionals.map(prof => (
                         <option key={prof.id} value={prof.id}>{prof.name}</option>
                     ))}
-                </select>
+                </Select>
             </div>
             <div className="flex bg-slate-200 dark:bg-slate-800 p-1 rounded-lg">
                 <button onClick={() => setViewMode('kanban')} className={`px-4 py-1 text-sm font-semibold rounded-md ${viewMode === 'kanban' ? 'bg-surface dark:bg-dark shadow' : 'text-text-secondary dark:text-slate-400'}`}>Kanban</button>

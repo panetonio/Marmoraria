@@ -10,6 +10,7 @@ import { generateWhatsAppLink } from '../../utils/helpers';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
 import AddressForm from '../components/AddressForm';
+import Select from '../components/ui/Select';
 
 type CrmView = 'clientes' | 'pipeline' | 'agenda';
 
@@ -198,13 +199,15 @@ const ClientForm: React.FC<{
                             onChange={e => setClient({...client, name: e.target.value})}
                             error={errors.name}
                         />
-                        <div>
-                            <label htmlFor="client-type" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Tipo</label>
-                            <select id="client-type" value={client.type} onChange={e => setClient({...client, type: e.target.value as 'pessoa_fisica' | 'empresa'})} className="p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 border-border dark:border-slate-600 h-[42px]">
-                                <option value="pessoa_fisica">Pessoa Física</option>
-                                <option value="empresa">Empresa</option>
-                            </select>
-                        </div>
+                        <Select
+                            label="Tipo"
+                            id="client-type"
+                            value={client.type}
+                            onChange={e => setClient({...client, type: e.target.value as 'pessoa_fisica' | 'empresa'})}
+                        >
+                            <option value="pessoa_fisica">Pessoa Física</option>
+                            <option value="empresa">Empresa</option>
+                        </Select>
                          <Input
                             label="CPF / CNPJ"
                             id="client-cpfCnpj"
@@ -324,20 +327,26 @@ const EventFormModal: FC<{
                         error={errors.time}
                     />
                 </div>
-                <div>
-                    <label htmlFor="event-client" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Cliente</label>
-                    <select id="event-client" value={clientId} onChange={e => setClientId(e.target.value)} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.clientId ? 'border-error' : 'border-border dark:border-slate-600'} h-[42px]`}>
-                        <option value="">-- Selecione --</option>
-                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                </div>
-                 <div>
-                    <label htmlFor="event-user" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Responsável</label>
-                    <select id="event-user" value={userId} onChange={e => setUserId(e.target.value)} className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.userId ? 'border-error' : 'border-border dark:border-slate-600'} h-[42px]`}>
-                        <option value="">-- Selecione --</option>
-                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
-                </div>
+                <Select
+                    label="Cliente"
+                    id="event-client"
+                    value={clientId}
+                    onChange={e => setClientId(e.target.value)}
+                    error={errors.clientId}
+                >
+                    <option value="">-- Selecione --</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+                 <Select
+                    label="Responsável"
+                    id="event-user"
+                    value={userId}
+                    onChange={e => setUserId(e.target.value)}
+                    error={errors.userId}
+                >
+                    <option value="">-- Selecione --</option>
+                    {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </Select>
                 <Textarea
                     label="Descrição"
                     id="event-description"

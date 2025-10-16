@@ -18,6 +18,7 @@ import Card from './components/ui/Card';
 import ThemeToggle from './components/ThemeToggle';
 import GlobalSearch from './components/GlobalSearch';
 import { DataProvider } from './context/DataContext';
+import Select from './components/ui/Select';
 
 const UserSwitcher: React.FC<{
   currentUser: User;
@@ -36,22 +37,19 @@ const UserSwitcher: React.FC<{
       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-text-secondary dark:text-slate-400" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
       </svg>
-      <div>
-        <label htmlFor="user-select" className="block text-sm font-medium text-text-secondary dark:text-slate-400">
-          Usuário Simulado
-        </label>
-        <select
+      <div className="w-48">
+        <Select
           id="user-select"
+          label="Usuário Simulado"
           value={currentUser.id}
           onChange={handleSelectChange}
-          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-border bg-slate-50 dark:border-slate-600 dark:bg-slate-700 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md"
         >
           {mockUsers.map(user => (
             <option key={user.id} value={user.id}>
               {user.name} ({ROLES[user.role].displayName})
             </option>
           ))}
-        </select>
+        </Select>
       </div>
     </Card>
   );
