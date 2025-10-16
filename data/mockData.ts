@@ -275,7 +275,8 @@ export const mockFinancialTransactions: FinancialTransaction[] = [
         status: 'pendente',
         dueDate: getFutureDate(30),
         relatedOrderId: 'PED-2024-001',
-        relatedClientId: 'cli-1'
+        relatedClientId: 'cli-1',
+        paymentMethod: 'cartao_credito',
     },
     {
         id: 'fin-1-2',
@@ -285,7 +286,8 @@ export const mockFinancialTransactions: FinancialTransaction[] = [
         status: 'pendente',
         dueDate: getFutureDate(60),
         relatedOrderId: 'PED-2024-001',
-        relatedClientId: 'cli-1'
+        relatedClientId: 'cli-1',
+        paymentMethod: 'cartao_credito',
     },
     {
         id: 'fin-1-3',
@@ -295,7 +297,8 @@ export const mockFinancialTransactions: FinancialTransaction[] = [
         status: 'pendente',
         dueDate: getFutureDate(90),
         relatedOrderId: 'PED-2024-001',
-        relatedClientId: 'cli-1'
+        relatedClientId: 'cli-1',
+        paymentMethod: 'cartao_credito',
     },
     {
         id: 'fin-2',
@@ -306,7 +309,8 @@ export const mockFinancialTransactions: FinancialTransaction[] = [
         dueDate: getPastDate(5),
         paymentDate: getPastDate(4),
         relatedOrderId: 'PED-2024-002',
-        relatedClientId: 'cli-3'
+        relatedClientId: 'cli-3',
+        paymentMethod: 'boleto',
     },
     {
         id: 'fin-3',
@@ -342,5 +346,6 @@ export const mockFinancialTransactions: FinancialTransaction[] = [
         dueDate: getPastDate(2),
         paymentDate: getPastDate(2),
         relatedClientId: 'cli-4',
+        paymentMethod: 'pix',
     },
 ];

@@ -178,6 +178,7 @@ export interface ServiceOrder {
   deliveryDate: string;
   assignedToIds: string[];
   status: ProductionStatus;
+  allocatedSlabId?: string;
 }
 
 export type InvoiceStatus = 'pending' | 'issued' | 'canceled';
@@ -220,6 +221,7 @@ export interface FinancialTransaction {
   paymentDate?: string; // ISO String
   relatedOrderId?: string;
   relatedClientId?: string;
+  paymentMethod?: PaymentMethod;
 }
 
 export interface Receipt {

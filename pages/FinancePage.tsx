@@ -1,5 +1,5 @@
 import React, { useState, useMemo, FC } from 'react';
-import type { FinancialTransaction, TransactionStatus, TransactionType } from '../types';
+import type { FinancialTransaction, TransactionStatus, TransactionType, PaymentMethod } from '../types';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Tabs from '../components/ui/Tabs';
@@ -65,6 +65,13 @@ const FinancePage: FC = () => {
     const [view, setView] = useState<FinanceView>('contas');
     const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('month');
     
+    const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+        pix: 'PIX',
+        cartao_credito: 'Cartão de Crédito',
+        boleto: 'Boleto Bancário',
+        dinheiro: 'Dinheiro',
+    };
+
     const monthlyReport = useMemo(() => {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -117,8 +124,15 @@ const FinancePage: FC = () => {
         const saidas = filtered.filter(t => t.type === 'despesa').sort((a,b) => new Date(b.paymentDate!).getTime() - new Date(a.paymentDate!).getTime());
         const totalEntradas = entradas.reduce((sum, t) => sum + t.amount, 0);
         const totalSaidas = saidas.reduce((sum, t) => sum + t.amount, 0);
+        
+        const totalsByPaymentMethod: Record<PaymentMethod, number> = { pix: 0, cartao_credito: 0, boleto: 0, dinheiro: 0 };
+        entradas.forEach(t => {
+            if (t.paymentMethod) {
+                totalsByPaymentMethod[t.paymentMethod] += t.amount;
+            }
+        });
 
-        return { entradas, saidas, totalEntradas, totalSaidas };
+        return { entradas, saidas, totalEntradas, totalSaidas, totalsByPaymentMethod };
     }, [transactions, reportPeriod]);
 
 
@@ -162,13 +176,18 @@ const FinancePage: FC = () => {
                         <CardContent>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
-                                    <thead><tr className="border-b border-border dark:border-slate-700"><th className="p-3">Vencimento</th><th className="p-3">Descrição</th><th className="p-3">Tipo</th><th className="p-3 text-right">Valor</th><th className="p-3 text-center">Status</th><th className="p-3 text-center">Ações</th></tr></thead>
+                                    <thead><tr className="border-b border-border dark:border-slate-700"><th className="p-3">Vencimento</th><th className="p-3">Descrição</th><th className="p-3">Tipo</th><th className="p-3">Método Pgto.</th><th className="p-3 text-right">Valor</th><th className="p-3 text-center">Status</th><th className="p-3 text-center">Ações</th></tr></thead>
                                     <tbody>
                                         {transactions.sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()).map(t => (
                                             <tr key={t.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                                 <td className="p-3">{new Date(t.dueDate).toLocaleDateString()}</td>
                                                 <td className="p-3">{t.description}</td>
                                                 <td className={`p-3 font-semibold ${t.type === 'receita' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{t.type === 'receita' ? 'Receita' : 'Despesa'}</td>
+                                                <td className="p-3 text-sm capitalize text-text-secondary dark:text-slate-400">
+                                                    {(t.type === 'receita' && t.paymentMethod)
+                                                        ? PAYMENT_METHOD_LABELS[t.paymentMethod]
+                                                        : 'N/A'}
+                                                </td>
                                                 <td className="p-3 text-right font-mono">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                                 <td className="p-3 text-center"><StatusBadge status={t.status} statusMap={transactionStatusMap} /></td>
                                                 <td className="p-3 text-center">
@@ -238,8 +257,26 @@ const FinancePage: FC = () => {
                                 </div>
                             </CardContent>
                          </Card>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-h-[400px]">
-                            <ReportTable title="Relatório de Entradas (Receitas Pagas)" transactions={filteredReportTransactions.entradas} total={filteredReportTransactions.totalEntradas} />
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[400px]">
+                            <div className="space-y-6">
+                                <ReportTable title="Relatório de Entradas (Receitas Pagas)" transactions={filteredReportTransactions.entradas} total={filteredReportTransactions.totalEntradas} />
+                                <Card>
+                                    <CardHeader>Entradas por Método de Pagamento</CardHeader>
+                                    <CardContent>
+                                        <ul className="space-y-2">
+                                            {/* FIX: Cast `total` to `number` to resolve TypeScript error due to `Object.entries` returning `unknown`. */}
+                                            {Object.entries(filteredReportTransactions.totalsByPaymentMethod).map(([method, total]) => (
+                                                (total as number) > 0 && (
+                                                    <li key={method} className="flex justify-between items-center text-sm">
+                                                        <span className="text-text-secondary dark:text-slate-400 capitalize">{PAYMENT_METHOD_LABELS[method as PaymentMethod]}</span>
+                                                        <span className="font-semibold">{(total as number).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                    </li>
+                                                )
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
+                            </div>
                             <ReportTable title="Relatório de Saídas (Despesas Pagas)" transactions={filteredReportTransactions.saidas} total={filteredReportTransactions.totalSaidas} />
                          </div>
                     </div>

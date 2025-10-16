@@ -60,6 +60,7 @@ interface DataContextType {
     deleteService: (serviceId: string) => void;
     saveProduct: (product: Product) => void;
     deleteProduct: (productId: string) => void;
+    allocateSlabToOrder: (serviceOrderId: string, slabId: string) => void;
 }
 
 // Create the context
@@ -106,7 +107,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     status: 'pendente',
                     dueDate: dueDate.toISOString(),
                     relatedOrderId: order.id,
-                    relatedClientId: relatedClientId
+                    relatedClientId: relatedClientId,
+                    paymentMethod: order.paymentMethod,
                 });
             }
         } else {
@@ -120,7 +122,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 status: 'pendente',
                 dueDate: dueDate.toISOString(),
                 relatedOrderId: order.id,
-                relatedClientId: relatedClientId
+                relatedClientId: relatedClientId,
+                paymentMethod: order.paymentMethod,
             });
         }
         return newTransactions;
@@ -198,7 +201,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     const createServiceOrder = (newOsData: Omit<ServiceOrder, 'id'>) => {
-        const newOsId = `OS-2024-${(serviceOrders.length + 1).toString().padStart(3, '0')}`;
+        const newOsId = `OS-2024-${(serviceOrders.length + mockServiceOrders.length + 1).toString().padStart(3, '0')}`;
         const newOs: ServiceOrder = { ...newOsData, id: newOsId };
         
         setServiceOrders(prev => [...prev, newOs]);
@@ -210,7 +213,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     const saveInvoice = (invoiceToSave: Invoice) => {
-        const newId = `NF-${(invoices.length + 1).toString().padStart(3, '0')}`;
+        const newId = `NF-${(invoices.length + mockInvoices.length + 1).toString().padStart(3, '0')}`;
         setInvoices(prev => [...prev, { ...invoiceToSave, id: newId }]);
     };
     
@@ -291,6 +294,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     const deleteProduct = (productId: string) => setProducts(prev => prev.filter(p => p.id !== productId));
 
+    const allocateSlabToOrder = (serviceOrderId: string, slabId: string) => {
+        // Update the Service Order with the allocated slab ID
+        setServiceOrders(prev => prev.map(so => 
+            so.id === serviceOrderId ? { ...so, allocatedSlabId: slabId } : so
+        ));
+
+        // Update the Stock Item status to 'em_uso'
+        setStockItems(prev => prev.map(item => 
+            item.id === slabId ? { ...item, status: 'em_uso' } : item
+        ));
+    };
+
 
     const value = {
         clients, setClients,
@@ -327,6 +342,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         deleteService,
         saveProduct,
         deleteProduct,
+        allocateSlabToOrder,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

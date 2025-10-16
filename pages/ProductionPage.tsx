@@ -1,6 +1,6 @@
 import React, { useState, useMemo, FC, DragEvent } from 'react';
 import { mockProductionProfessionals } from '../data/mockData';
-import type { ServiceOrder, ProductionStatus, ProductionProfessional } from '../types';
+import type { ServiceOrder, ProductionStatus, ProductionProfessional, StockItem } from '../types';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -54,6 +54,12 @@ const ServiceOrderDetailModal: FC<{
                   <h4 className="text-sm text-text-secondary dark:text-slate-400">Status Atual</h4>
                   <StatusBadge status={order.status} statusMap={productionStatusMap} />
                 </div>
+                 {order.allocatedSlabId && (
+                    <div className="col-span-2">
+                        <h4 className="text-sm text-text-secondary dark:text-slate-400">Chapa Alocada</h4>
+                        <p className="font-semibold font-mono text-primary">{order.allocatedSlabId}</p>
+                    </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -159,6 +165,75 @@ const ResourceAllocationModal: FC<{
   );
 };
 
+const SlabAllocationModal: FC<{
+    isOpen: boolean;
+    order: ServiceOrder;
+    onClose: () => void;
+    onSave: (serviceOrderId: string, slabId: string) => void;
+}> = ({ isOpen, order, onClose, onSave }) => {
+    const { stockItems, materials } = useData();
+    const [selectedSlabId, setSelectedSlabId] = useState('');
+
+    const requiredMaterialId = useMemo(() => {
+        const materialItem = order.items.find(item => item.type === 'material');
+        return materialItem?.materialId || null;
+    }, [order]);
+    
+    const availableSlabs = useMemo(() => {
+        if (!requiredMaterialId) return [];
+        return stockItems.filter(item => 
+            item.materialId === requiredMaterialId && item.status === 'disponivel'
+        );
+    }, [stockItems, requiredMaterialId]);
+    
+    const requiredMaterial = materials.find(m => m.id === requiredMaterialId);
+    
+    const handleSave = () => {
+        if (selectedSlabId) {
+            onSave(order.id, selectedSlabId);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Alocar Chapa para OS: ${order.id}`} className="max-w-3xl">
+            {!requiredMaterial ? (
+                <p>Esta OS não contém um item de material para alocação.</p>
+            ) : (
+                <>
+                    <div className="mb-4 p-3 bg-slate-100 dark:bg-slate-800/50 rounded-lg">
+                        <h4 className="font-semibold">Material Requerido: <span className="text-primary">{requiredMaterial.name}</span></h4>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto space-y-2">
+                        {availableSlabs.length > 0 ? availableSlabs.map(slab => (
+                            <label key={slab.id} className={`flex items-center p-3 rounded-lg border-2 cursor-pointer transition-all ${selectedSlabId === slab.id ? 'border-primary bg-primary/10' : 'border-border dark:border-slate-700'}`}>
+                                <input
+                                    type="radio"
+                                    name="slab-selection"
+                                    className="h-4 w-4 text-primary focus:ring-primary"
+                                    checked={selectedSlabId === slab.id}
+                                    onChange={() => setSelectedSlabId(slab.id)}
+                                />
+                                <img src={slab.photoUrl} alt={slab.id} className="w-20 h-12 object-cover rounded mx-4" />
+                                <div className="flex-1">
+                                    <p className="font-bold font-mono">{slab.id}</p>
+                                    <p className="text-sm text-text-secondary dark:text-slate-400">Dimensões: {slab.width}m x {slab.height}m</p>
+                                </div>
+                                <p className="text-sm text-text-secondary dark:text-slate-400">{slab.location}</p>
+                            </label>
+                        )) : (
+                            <p className="text-center p-8 text-text-secondary dark:text-slate-400">Nenhuma chapa de {requiredMaterial.name} disponível no estoque.</p>
+                        )}
+                    </div>
+                     <div className="flex justify-end mt-6 space-x-3">
+                        <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                        <Button onClick={handleSave} disabled={!selectedSlabId}>Alocar Chapa Selecionada</Button>
+                    </div>
+                </>
+            )}
+        </Modal>
+    );
+};
+
 const ConfirmationModal: FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -182,8 +257,9 @@ const KanbanCard: FC<{
   onDragStart: (e: DragEvent<HTMLElement>, orderId: string) => void;
   onDragEnd: (e: DragEvent<HTMLElement>) => void;
   onAssign: (order: ServiceOrder) => void;
+  onAllocate: (order: ServiceOrder) => void;
   onView: (order: ServiceOrder) => void;
-}> = ({ order, isDragging, onDragStart, onDragEnd, onAssign, onView }) => {
+}> = ({ order, isDragging, onDragStart, onDragEnd, onAssign, onAllocate, onView }) => {
   const assignedProfessionals = mockProductionProfessionals.filter(p => order.assignedToIds.includes(p.id));
   return (
     <Card
@@ -198,6 +274,13 @@ const KanbanCard: FC<{
         <p className="text-xs text-text-secondary dark:text-slate-400 font-mono">Pedido: {order.orderId}</p>
       </div>
       <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{order.clientName}</p>
+
+      {order.allocatedSlabId && (
+        <div className="mt-2 pt-2 border-t border-border/50 dark:border-slate-700/50 text-xs">
+            <span className="text-slate-500 dark:text-slate-400">Chapa:</span> <span className="font-mono text-primary font-semibold">{order.allocatedSlabId}</span>
+        </div>
+      )}
+
       <div className="mt-3 pt-3 border-t border-border dark:border-slate-700">
         <div className="flex justify-between items-center">
           <div className="flex -space-x-2">
@@ -211,10 +294,12 @@ const KanbanCard: FC<{
               <span className="text-xs text-slate-400 dark:text-slate-500">Não alocado</span>
             )}
           </div>
-          <Button variant="ghost" size="sm" onClick={(e) => {
-              e.stopPropagation();
-              onAssign(order);
-            }}>Alocar</Button>
+           {order.status === 'cutting' && !order.allocatedSlabId && (
+              <Button variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); onAllocate(order); }}>Alocar Chapa</Button>
+           )}
+           {order.status !== 'cutting' || order.allocatedSlabId ? (
+                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onAssign(order); }}>Equipe</Button>
+           ) : null}
         </div>
       </div>
     </Card>
@@ -222,9 +307,10 @@ const KanbanCard: FC<{
 };
 
 const ProductionPage: FC = () => {
-  const { serviceOrders, setServiceOrders } = useData();
+  const { serviceOrders, setServiceOrders, allocateSlabToOrder } = useData();
   const [viewMode, setViewMode] = useState<'kanban' | 'timeline'>('kanban');
   const [modalOrder, setModalOrder] = useState<ServiceOrder | null>(null);
+  const [allocatingOrder, setAllocatingOrder] = useState<ServiceOrder | null>(null);
   const [viewingOrder, setViewingOrder] = useState<ServiceOrder | null>(null);
   const [professionalFilter, setProfessionalFilter] = useState<string>('');
   const [orderIdFilter, setOrderIdFilter] = useState<string>('');
@@ -291,6 +377,11 @@ const ProductionPage: FC = () => {
     setConfirmationData(null);
   };
 
+  const handleSlabAllocationSave = (serviceOrderId: string, slabId: string) => {
+    allocateSlabToOrder(serviceOrderId, slabId);
+    setAllocatingOrder(null);
+  };
+
   const sortedTimelineOrders = useMemo(() => {
     return [...filteredServiceOrders].sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
   }, [filteredServiceOrders]);
@@ -311,6 +402,14 @@ const ProductionPage: FC = () => {
             productionTeam={productionTeam}
             onClose={() => setModalOrder(null)}
             onSave={handleAssignSave}
+        />
+      )}
+      {allocatingOrder && (
+        <SlabAllocationModal
+            isOpen={!!allocatingOrder}
+            order={allocatingOrder}
+            onClose={() => setAllocatingOrder(null)}
+            onSave={handleSlabAllocationSave}
         />
       )}
       {viewingOrder && (
@@ -392,6 +491,7 @@ const ProductionPage: FC = () => {
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
                         onAssign={setModalOrder}
+                        onAllocate={setAllocatingOrder}
                         onView={setViewingOrder} />
                   ))}
               </div>
