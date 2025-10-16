@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client, Page, SortDirection } from '../types';
+import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client, Page, SortDirection, PaymentMethod, Address } from '../types';
 import { mockUsers } from '../data/mockData';
 import DocumentPreview from '../components/QuotePreview';
 import CuttingOptimizer from '../components/CuttingOptimizer';
@@ -15,6 +15,7 @@ import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
 import FreightCalculator from '../components/FreightCalculator';
 import { calculateQuoteItem, validateQuoteItem } from '../utils/helpers';
+import AddressForm from '../components/AddressForm';
 
 
 const QuoteList: React.FC<{
@@ -223,6 +224,13 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         return { subtotal, total };
     }, [quote.items, quote.discount, quote.freight]);
 
+    const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+        pix: 'PIX',
+        cartao_credito: 'Cartão de Crédito',
+        boleto: 'Boleto Bancário',
+        dinheiro: 'Dinheiro',
+    };
+
     const validateQuote = (isDraft: boolean): boolean => {
         const newErrors: Record<string, string> = {};
         if (!quote.clientName.trim()) newErrors.clientName = "Nome do cliente é obrigatório.";
@@ -234,6 +242,11 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 newErrors.clientEmail = "Formato de email inválido.";
             }
             if (!quote.clientPhone.trim()) newErrors.clientPhone = "Telefone do cliente é obrigatório.";
+            if (!quote.paymentMethod) {
+                newErrors.paymentMethod = "A forma de pagamento é obrigatória.";
+            } else if (quote.paymentMethod === 'cartao_credito' && (!quote.installments || quote.installments < 1)) {
+                newErrors.installments = "O número de parcelas deve ser 1 ou mais.";
+            }
         }
         
         setErrors(newErrors);
@@ -501,6 +514,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         setErrors(prev => {
             const newErrors = { ...prev };
             delete newErrors.items;
+            delete newErrors.paymentMethod;
             return newErrors;
         });
     
@@ -517,8 +531,9 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     };
 
     const handleClientSelect = (clientId: string) => {
+        const emptyAddress: Address = { cep: '', uf: '', city: '', neighborhood: '', address: '', number: '' };
         if (!clientId) {
-            setQuote(prev => ({ ...prev, clientName: '', clientEmail: '', clientPhone: '', deliveryCep: '', deliveryUf: '', deliveryCity: '', deliveryNeighborhood: '', deliveryAddress: '', deliveryNumber: '', deliveryComplement: '' }));
+            setQuote(prev => ({ ...prev, clientName: '', clientEmail: '', clientPhone: '', deliveryAddress: emptyAddress }));
             return;
         }
         const selectedClient = clients.find(c => c.id === clientId);
@@ -528,15 +543,16 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 clientName: selectedClient.name,
                 clientEmail: selectedClient.email,
                 clientPhone: selectedClient.phone,
-                deliveryCep: selectedClient.cep,
-                deliveryUf: selectedClient.uf,
-                deliveryCity: selectedClient.city,
-                deliveryNeighborhood: selectedClient.neighborhood,
                 deliveryAddress: selectedClient.address,
-                deliveryNumber: selectedClient.number,
-                deliveryComplement: selectedClient.complement,
             }));
         }
+    };
+    
+    const handleDeliveryAddressChange = (field: keyof Address, value: string) => {
+        setQuote(prev => ({
+            ...prev,
+            deliveryAddress: { ...prev.deliveryAddress, [field]: value }
+        }));
     };
     
     const handleApplyFreight = (calculatedFreight: number) => {
@@ -611,65 +627,11 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
 
                 <div className="space-y-4 mb-6">
                     <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 border-b border-border dark:border-slate-700 pb-2">Endereço de Entrega</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                        <div className="md:col-span-2">
-                             <Input
-                                label="CEP"
-                                id="delivery-cep"
-                                value={quote.deliveryCep}
-                                onChange={e => setQuote({...quote, deliveryCep: e.target.value})}
-                            />
-                        </div>
-                         <div className="md:col-span-4">
-                             <Input
-                                label="Logradouro (Rua, Av.)"
-                                id="delivery-address"
-                                value={quote.deliveryAddress}
-                                onChange={e => setQuote({...quote, deliveryAddress: e.target.value})}
-                            />
-                        </div>
-                         <div className="md:col-span-2">
-                             <Input
-                                label="Número"
-                                id="delivery-number"
-                                value={quote.deliveryNumber}
-                                onChange={e => setQuote({...quote, deliveryNumber: e.target.value})}
-                            />
-                        </div>
-                        <div className="md:col-span-4">
-                           <Input
-                                label="Complemento"
-                                id="delivery-complement"
-                                value={quote.deliveryComplement || ''}
-                                onChange={e => setQuote({...quote, deliveryComplement: e.target.value})}
-                            />
-                        </div>
-                         <div className="md:col-span-2">
-                            <Input
-                                label="Bairro"
-                                id="delivery-neighborhood"
-                                value={quote.deliveryNeighborhood}
-                                onChange={e => setQuote({...quote, deliveryNeighborhood: e.target.value})}
-                            />
-                        </div>
-                        <div className="md:col-span-3">
-                            <Input
-                                label="Cidade"
-                                id="delivery-city"
-                                value={quote.deliveryCity}
-                                onChange={e => setQuote({...quote, deliveryCity: e.target.value})}
-                            />
-                        </div>
-                        <div className="md:col-span-1">
-                            <Input
-                                label="UF"
-                                id="delivery-uf"
-                                value={quote.deliveryUf}
-                                maxLength={2}
-                                onChange={e => setQuote({...quote, deliveryUf: e.target.value.toUpperCase()})}
-                            />
-                        </div>
-                    </div>
+                    <AddressForm
+                        address={quote.deliveryAddress}
+                        onAddressChange={handleDeliveryAddressChange}
+                        errors={{}} // Validation for delivery address is not implemented yet
+                    />
                 </div>
             
                 <div className="border-t border-border dark:border-slate-700 pt-4">
@@ -774,6 +736,46 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                         </div>
                     </div>
                 </div>
+
+                 <div className="mt-6 border-t border-border dark:border-slate-700 pt-6">
+                    <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 mb-2">Forma de Pagamento</h3>
+                    {errors.paymentMethod && <p className="text-error text-sm mb-2">{errors.paymentMethod}</p>}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="payment-method" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">
+                                Método
+                            </label>
+                            <select
+                                id="payment-method"
+                                value={quote.paymentMethod || ''}
+                                onChange={e => {
+                                    const method = e.target.value as PaymentMethod;
+                                    setQuote({...quote, paymentMethod: method, installments: method === 'cartao_credito' ? (quote.installments || 1) : undefined })
+                                }}
+                                className={`p-2 border rounded w-full bg-slate-50 dark:bg-slate-700 ${errors.paymentMethod ? 'border-error' : 'border-border dark:border-slate-600'} h-[42px]`}
+                            >
+                                <option value="">-- Selecione --</option>
+                                {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
+                                    <option key={key} value={key}>{label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {quote.paymentMethod === 'cartao_credito' && (
+                            <div>
+                                <Input
+                                    label="Nº de Parcelas"
+                                    id="installments"
+                                    type="number"
+                                    min="1"
+                                    value={quote.installments || ''}
+                                    onChange={e => setQuote({...quote, installments: parseInt(e.target.value, 10) || 1})}
+                                    error={errors.installments}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                 <div>
@@ -891,7 +893,7 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
         setSelectedQuote({
             id: `new-${Date.now()}`,
             clientName: '', clientEmail: '', clientPhone: '', 
-            deliveryCep: '', deliveryUf: '', deliveryCity: '', deliveryNeighborhood: '', deliveryAddress: '', deliveryNumber: '', deliveryComplement: '',
+            deliveryAddress: { cep: '', uf: '', city: '', neighborhood: '', address: '', number: '' },
             status: 'draft', items: [], subtotal: 0, total: 0,
             discount: 0,
             freight: 0,

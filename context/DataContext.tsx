@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import type { 
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem, 
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt 
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address 
 } from '../types';
 import { 
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers, 
@@ -79,6 +79,46 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [receipts, setReceipts] = useState<Receipt[]>([]);
     const [freightCostPerKm, setFreightCostPerKm] = useState<number>(8);
 
+    const generateFinancialTransactionsForOrder = (order: Order) => {
+        const newTransactions: FinancialTransaction[] = [];
+        const now = new Date();
+        
+        if (!order.paymentMethod) return [];
+
+        const relatedClientId = clients.find(c => c.name === order.clientName)?.id;
+
+        if (order.paymentMethod === 'cartao_credito' && order.installments && order.installments > 0) {
+            const installmentAmount = order.total / order.installments;
+            for (let i = 1; i <= order.installments; i++) {
+                const dueDate = new Date(now);
+                dueDate.setMonth(now.getMonth() + i);
+                newTransactions.push({
+                    id: `fin-${Date.now()}-${i}`,
+                    description: `Parcela ${i}/${order.installments} - Pedido ${order.id}`,
+                    amount: installmentAmount,
+                    type: 'receita',
+                    status: 'pendente',
+                    dueDate: dueDate.toISOString(),
+                    relatedOrderId: order.id,
+                    relatedClientId: relatedClientId
+                });
+            }
+        } else {
+            const dueDate = new Date(now);
+            dueDate.setDate(now.getDate() + 30); // Default due date for one-off payments
+            newTransactions.push({
+                id: `fin-${Date.now()}-1`,
+                description: `Recebimento Pedido ${order.id}`,
+                amount: order.total,
+                type: 'receita',
+                status: 'pendente',
+                dueDate: dueDate.toISOString(),
+                relatedOrderId: order.id,
+                relatedClientId: relatedClientId
+            });
+        }
+        return newTransactions;
+    };
 
 
     // Define modifier functions
@@ -107,17 +147,47 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     const saveQuote = (quoteToSave: Quote) => {
-        const totals = {
-            subtotal: quoteToSave.items.reduce((acc, item) => acc + item.totalPrice, 0),
-            total: quoteToSave.items.reduce((acc, item) => acc + item.totalPrice, 0),
-        }
-        const quoteWithTotals = {...quoteToSave, ...totals};
+        const isNewQuote = quoteToSave.id.startsWith('new-');
+        
+        let savedQuote = { ...quoteToSave };
 
-        if (quoteToSave.id.startsWith('new-')) {
+        if (isNewQuote) {
             const newId = `ORC-2024-${(mockQuotes.length + quotes.length + 1).toString().padStart(3, '0')}`;
-            setQuotes(prev => [...prev, { ...quoteWithTotals, id: newId }]);
+            savedQuote.id = newId;
+            setQuotes(prev => [...prev, savedQuote]);
         } else {
-            setQuotes(prev => prev.map(q => q.id === quoteToSave.id ? quoteWithTotals : q));
+            setQuotes(prev => prev.map(q => q.id === savedQuote.id ? savedQuote : q));
+        }
+
+        // Check if the quote was approved to convert to an order
+        if (savedQuote.status === 'approved') {
+            const existingOrder = orders.find(o => o.originalQuoteId === savedQuote.id);
+            if (!existingOrder) {
+                const newOrderId = `PED-2024-${(orders.length + mockOrders.length + 1).toString().padStart(3, '0')}`;
+                // FIX: Removed incorrect, flattened address properties and used the `deliveryAddress` object,
+                // aligning with the `Order` type definition.
+                const newOrder: Order = {
+                    id: newOrderId,
+                    originalQuoteId: savedQuote.id,
+                    clientName: savedQuote.clientName,
+                    deliveryAddress: savedQuote.deliveryAddress,
+                    items: savedQuote.items,
+                    subtotal: savedQuote.subtotal,
+                    discount: savedQuote.discount,
+                    freight: savedQuote.freight,
+                    total: savedQuote.total,
+                    paymentMethod: savedQuote.paymentMethod,
+                    installments: savedQuote.installments,
+                    approvalDate: new Date().toISOString(),
+                    salespersonId: savedQuote.salespersonId,
+                    serviceOrderIds: [],
+                };
+                setOrders(prev => [...prev, newOrder]);
+
+                // Generate financial transactions
+                const newTransactions = generateFinancialTransactionsForOrder(newOrder);
+                setFinancialTransactions(prev => [...prev, ...newTransactions]);
+            }
         }
     };
     

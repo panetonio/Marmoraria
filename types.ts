@@ -3,6 +3,17 @@ import { ROLES } from './roles';
 export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
+export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
+
+export interface Address {
+  cep: string;
+  uf: string;
+  city: string;
+  neighborhood: string;
+  address: string;
+  number: string;
+  complement?: string;
+}
 
 export interface User {
   id: string;
@@ -24,15 +35,7 @@ export interface Client {
   type: 'pessoa_fisica' | 'empresa';
   email: string;
   phone: string;
-  // Address fields
-  cep: string;
-  uf: string;
-  city: string;
-  neighborhood: string;
-  address: string;
-  number: string;
-  complement?: string;
-  
+  address: Address;
   cpfCnpj: string;
   createdAt: string;
 }
@@ -71,15 +74,7 @@ export interface Supplier {
   contactPerson: string;
   phone: string;
   email: string;
-  // Address fields
-  cep: string;
-  uf: string;
-  city: string;
-  neighborhood: string;
-  address: string;
-  number: string;
-  complement?: string;
-
+  address: Address;
   cpfCnpj: string;
 }
 
@@ -142,20 +137,14 @@ export interface Quote {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
-  // Delivery Address fields
-  deliveryCep: string;
-  deliveryUf: string;
-  deliveryCity: string;
-  deliveryNeighborhood: string;
-  deliveryAddress: string;
-  deliveryNumber: string;
-  deliveryComplement?: string;
-
+  deliveryAddress: Address;
   status: QuoteStatus;
   items: QuoteItem[];
   subtotal: number;
   discount?: number;
   freight?: number;
+  paymentMethod?: PaymentMethod;
+  installments?: number;
   total: number;
   createdAt: string;
   salespersonId?: string;
@@ -167,19 +156,13 @@ export interface Order {
   id: string; // PED-
   originalQuoteId: string; // ORC-
   clientName: string;
-  // Delivery Address fields
-  deliveryCep: string;
-  deliveryUf: string;
-  deliveryCity: string;
-  deliveryNeighborhood: string;
-  deliveryAddress: string;
-  deliveryNumber: string;
-  deliveryComplement?: string;
-
+  deliveryAddress: Address;
   items: QuoteItem[];
   subtotal: number;
   discount?: number;
   freight?: number;
+  paymentMethod?: PaymentMethod;
+  installments?: number;
   total: number;
   approvalDate: string;
   serviceOrderIds: string[];

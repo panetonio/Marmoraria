@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Quote, Order } from '../types';
+import type { Quote, Order, PaymentMethod } from '../types';
 import { mockUsers } from '../data/mockData';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
@@ -16,6 +16,13 @@ interface DocumentPreviewProps {
 const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     
+    const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+        pix: 'PIX',
+        cartao_credito: 'Cartão de Crédito',
+        boleto: 'Boleto Bancário',
+        dinheiro: 'Dinheiro',
+    };
+
     const handleGeneratePdf = async () => {
         // FIX: Explicitly use `window.document` to avoid conflict with the component's `document` prop.
         const printableArea = window.document.getElementById('printable-area');
@@ -73,8 +80,9 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
         phone: 'clientPhone' in document ? document.clientPhone : 'N/A',
     };
     
-    const deliveryAddressLine1 = `${document.deliveryAddress}, ${document.deliveryNumber}${document.deliveryComplement ? ` - ${document.deliveryComplement}` : ''}`;
-    const deliveryAddressLine2 = `${document.deliveryNeighborhood} - ${document.deliveryCity}, ${document.deliveryUf}`;
+    const deliveryAddress = document.deliveryAddress;
+    const deliveryAddressLine1 = `${deliveryAddress.address}, ${deliveryAddress.number}${deliveryAddress.complement ? ` - ${deliveryAddress.complement}` : ''}`;
+    const deliveryAddressLine2 = `${deliveryAddress.neighborhood} - ${deliveryAddress.city}, ${deliveryAddress.uf}`;
     
     const itemSubtotal = document.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const itemDiscounts = document.items.reduce((sum, item) => sum + (item.discount || 0), 0);
@@ -120,7 +128,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                             <h3 className="font-semibold text-text-secondary mb-2">ENDEREÇO DE ENTREGA:</h3>
                             <p className="font-bold text-dark">{deliveryAddressLine1}</p>
                             <p className="text-dark">{deliveryAddressLine2}</p>
-                            {document.deliveryCep && <p className="text-dark">CEP: {document.deliveryCep}</p>}
+                            {deliveryAddress.cep && <p className="text-dark">CEP: {deliveryAddress.cep}</p>}
                         </div>
                     )}
                 </section>
@@ -186,7 +194,16 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                     </div>
                 </section>
                 
-                <footer className="mt-12 pt-6 border-t border-border text-center text-xs text-text-secondary">
+                <footer className="mt-12 pt-6 border-t border-border text-left text-xs text-text-secondary">
+                    {document.paymentMethod && (
+                        <div className="mb-4">
+                            <h4 className="font-semibold text-sm text-dark">Condições de Pagamento:</h4>
+                            <p className="text-sm text-slate-800">
+                                {PAYMENT_METHOD_LABELS[document.paymentMethod]}
+                                {document.paymentMethod === 'cartao_credito' && document.installments && ` em ${document.installments}x`}
+                            </p>
+                        </div>
+                    )}
                     <p><strong>Condições Gerais:</strong> Validade da proposta: 15 dias. Prazo de entrega a combinar.</p>
                     <p>Agradecemos a sua preferência!</p>
                 </footer>
