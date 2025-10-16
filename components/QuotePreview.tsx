@@ -24,7 +24,6 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
     };
 
     const handleGeneratePdf = async () => {
-        // FIX: Explicitly use `window.document` to avoid conflict with the component's `document` prop.
         const printableArea = window.document.getElementById('printable-area');
         if (!printableArea || isGenerating) return;
     
@@ -60,6 +59,20 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                 heightLeft -= pdfHeight;
             }
             
+            // Add page numbers
+            const pageCount = pdf.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                pdf.setPage(i);
+                pdf.setFontSize(10);
+                pdf.setTextColor(150);
+                pdf.text(
+                    `Página ${i} de ${pageCount}`,
+                    pdf.internal.pageSize.getWidth() / 2,
+                    pdf.internal.pageSize.getHeight() - 10,
+                    { align: 'center' }
+                );
+            }
+
             const docType = 'originalQuoteId' in document ? 'pedido' : 'orcamento';
             pdf.save(`${docType}-${document.id}.pdf`);
         } catch (error) {
@@ -100,7 +113,7 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
             <div className="w-full bg-white mx-auto p-8 border border-border" id="printable-area">
                 <header className="flex justify-between items-center pb-6 border-b border-border">
                     <div>
-                        <h1 className="text-3xl font-bold text-dark">Marmoraria ERP</h1>
+                        <img src="https://via.placeholder.com/180x60?text=Sua+Logo+Aqui" alt="Logo da Empresa" className="h-16 mb-2" />
                         <p className="text-text-secondary">Rua das Pedras, 123 - Cidade, Estado</p>
                         <p className="text-text-secondary">contato@marmorariaerp.com | (11) 5555-4444</p>
                     </div>
