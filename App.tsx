@@ -13,13 +13,14 @@ import CrmPage from './pages/CrmPage';
 import FinancePage from './pages/FinancePage';
 import InvoicesPage from './pages/InvoicesPage';
 import ReceiptsPage from './pages/ReceiptsPage';
+import ActivityLogPage from './pages/ActivityLogPage';
 import type { Page, User } from './types';
 import { mockUsers } from './data/mockData';
 import { ROLES, PERMISSIONS } from './roles';
 import Card from './components/ui/Card';
 import ThemeToggle from './components/ThemeToggle';
 import GlobalSearch from './components/GlobalSearch';
-import { DataProvider } from './context/DataContext';
+import { useData } from './context/DataContext';
 import Select from './components/ui/Select';
 
 const UserSwitcher: React.FC<{
@@ -84,10 +85,13 @@ const App: React.FC = () => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   };
   
-  const [currentUser, setCurrentUser] = useState<User>(mockUsers[0]);
+  const { currentUser, switchUser } = useData();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [searchTarget, setSearchTarget] = useState<{ page: Page; id: string } | null>(null);
 
+  const handleUserChange = (user: User) => {
+    switchUser(user.id);
+  };
 
   useEffect(() => {
     // When user changes, check if they can still view the current page.
@@ -134,20 +138,21 @@ const App: React.FC = () => {
         return <FinancePage />;
       case 'receipts':
         return <ReceiptsPage />;
+      case 'activityLog':
+        return <ActivityLogPage onNavigate={handleSearchNavigate} />;
       default:
         return <Dashboard />;
     }
   };
 
   return (
-    <DataProvider>
       <div className="flex h-screen font-sans">
         <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={currentUser} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="bg-background dark:bg-slate-900 p-4 flex justify-end items-center space-x-4 border-b border-border dark:border-slate-700">
               <GlobalSearch onNavigate={handleSearchNavigate} />
               <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-              <UserSwitcher currentUser={currentUser} onUserChange={setCurrentUser} />
+              <UserSwitcher currentUser={currentUser} onUserChange={handleUserChange} />
           </header>
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background dark:bg-slate-900">
             <div className="container mx-auto px-6 py-8">
@@ -157,7 +162,6 @@ const App: React.FC = () => {
           </main>
         </div>
       </div>
-    </DataProvider>
   );
 };
 

@@ -1,10 +1,29 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'activityLog';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
 export type Priority = 'normal' | 'alta' | 'urgente';
+
+export type ActivityType = 
+  | 'CLIENT_CREATED' | 'CLIENT_UPDATED'
+  | 'QUOTE_CREATED' | 'QUOTE_UPDATED' | 'QUOTE_APPROVED'
+  | 'ORDER_CREATED'
+  | 'SERVICE_ORDER_CREATED' | 'SERVICE_ORDER_STATUS_CHANGED'
+  | 'INVOICE_CREATED' | 'INVOICE_ISSUED'
+  | 'SUPPLIER_CREATED' | 'SUPPLIER_UPDATED'
+  | 'NOTE_ADDED'
+  | 'RECEIPT_CREATED';
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string; // ISO String
+  userId: string;
+  activityType: ActivityType;
+  relatedEntityId: string; // ID of the quote, order, client, etc.
+  details: string; // A human-readable summary of the action
+}
 
 export interface Address {
   cep: string;

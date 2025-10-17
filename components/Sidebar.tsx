@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import type { Page, User } from '../types';
 import { ICONS } from '../constants';
@@ -60,6 +58,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, user }) 
           {hasPermission('crm') && <NavLink page="crm" label="CRM" icon={ICONS.crm} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasPermission('invoices') && <NavLink page="invoices" label="Faturamento" icon={ICONS.invoices} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasPermission('finance') && <NavLink page="finance" label="Financeiro" icon={ICONS.finance} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasPermission('activityLog') && <NavLink page="activityLog" label="Histórico" icon={ICONS.activityLog} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
         </nav>
       </div>
     </div>

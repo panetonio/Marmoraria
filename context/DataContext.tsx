@@ -1,12 +1,12 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import type { 
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem, 
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType 
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, ActivityLog
 } from '../types';
 import { 
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers, 
     mockMaterials, mockStockItems, mockServices, mockProducts, mockQuotes, 
-    mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions 
+    mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions, mockUsers, mockActivityLogs
 } from '../data/mockData';
 
 // Define the shape of the context data
@@ -40,6 +40,9 @@ interface DataContextType {
     setReceipts: React.Dispatch<React.SetStateAction<Receipt[]>>;
     freightCostPerKm: number;
     setFreightCostPerKm: React.Dispatch<React.SetStateAction<number>>;
+    currentUser: User;
+    switchUser: (userId: string) => void;
+    activityLogs: ActivityLog[];
 
 
     // Add specific data manipulation functions here
@@ -97,6 +100,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>(mockFinancialTransactions);
     const [receipts, setReceipts] = useState<Receipt[]>([]);
     const [freightCostPerKm, setFreightCostPerKm] = useState<number>(8);
+    const [currentUser, setCurrentUser] = useState<User>(mockUsers[0]);
+    const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(mockActivityLogs);
+
+    const switchUser = (userId: string) => {
+        const user = mockUsers.find(u => u.id === userId);
+        if (user) {
+            setCurrentUser(user);
+        }
+    };
+
+    const addActivity = (activityData: Omit<ActivityLog, 'id' | 'timestamp' | 'userId'>) => {
+        const newActivity: ActivityLog = {
+            ...activityData,
+            id: `log-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            userId: currentUser.id,
+        };
+        setActivityLogs(prev => [newActivity, ...prev]);
+    };
 
     const generateFinancialTransactionsForOrder = (order: Order) => {
         const newTransactions: FinancialTransaction[] = [];
@@ -150,10 +172,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             createdAt: new Date().toISOString(),
         };
         setClients(prev => [...prev, newClient]);
+        addActivity({
+            activityType: 'CLIENT_CREATED',
+            relatedEntityId: newClient.id,
+            details: `cadastrou o novo cliente "${newClient.name}".`,
+        });
     };
 
     const updateClient = (clientToUpdate: Client) => {
         setClients(prev => prev.map(c => c.id === clientToUpdate.id ? clientToUpdate : c));
+        addActivity({
+            activityType: 'CLIENT_UPDATED',
+            relatedEntityId: clientToUpdate.id,
+            details: `atualizou os dados do cliente "${clientToUpdate.name}".`
+        });
     };
 
     const addNote = (clientId: string, content: string) => {
@@ -161,10 +193,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             id: `note-${Date.now()}`,
             clientId,
             content,
-            userId: 'user-1', // Placeholder for current user
+            userId: currentUser.id,
             createdAt: new Date().toISOString(),
         };
         setNotes(prev => [...prev, newNote]);
+        const clientName = clients.find(c => c.id === clientId)?.name || 'desconhecido';
+        addActivity({
+            activityType: 'NOTE_ADDED',
+            relatedEntityId: clientId,
+            details: `adicionou uma nota ao cliente "${clientName}".`
+        });
     };
     
     const saveQuote = (quoteToSave: Quote) => {
@@ -176,8 +214,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const newId = `ORC-2024-${(mockQuotes.length + quotes.length + 1).toString().padStart(3, '0')}`;
             savedQuote.id = newId;
             setQuotes(prev => [...prev, savedQuote]);
+            addActivity({
+                activityType: 'QUOTE_CREATED',
+                relatedEntityId: savedQuote.id,
+                details: `criou o orçamento ${savedQuote.id} para "${savedQuote.clientName}".`
+            });
         } else {
             setQuotes(prev => prev.map(q => q.id === savedQuote.id ? savedQuote : q));
+             addActivity({
+                activityType: 'QUOTE_UPDATED',
+                relatedEntityId: savedQuote.id,
+                details: `atualizou o orçamento ${savedQuote.id}.`
+            });
         }
 
         // Check if the quote was approved to convert to an order
@@ -204,6 +252,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     serviceOrderIds: [],
                 };
                 setOrders(prev => [...prev, newOrder]);
+                 addActivity({
+                    activityType: 'QUOTE_APPROVED',
+                    relatedEntityId: savedQuote.id,
+                    details: `aprovou o orçamento ${savedQuote.id}.`
+                });
+                addActivity({
+                    activityType: 'ORDER_CREATED',
+                    relatedEntityId: newOrder.id,
+                    details: `gerou o pedido ${newOrder.id} para "${newOrder.clientName}".`
+                });
 
                 // Generate financial transactions
                 const newTransactions = generateFinancialTransactionsForOrder(newOrder);
@@ -227,6 +285,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ? { ...o, serviceOrderIds: [...o.serviceOrderIds, newOs.id] } 
                 : o
         ));
+         addActivity({
+            activityType: 'SERVICE_ORDER_CREATED',
+            relatedEntityId: newOs.id,
+            details: `criou a Ordem de Serviço ${newOs.id} para o pedido ${newOs.orderId}.`
+        });
     };
 
     const updateServiceOrderPriority = (serviceOrderId: string, priority: Priority) => {
@@ -243,23 +306,50 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const saveInvoice = (invoiceToSave: Invoice) => {
         const newId = `NF-${(invoices.length + mockInvoices.length + 1).toString().padStart(3, '0')}`;
-        setInvoices(prev => [...prev, { ...invoiceToSave, id: newId }]);
+        const finalInvoice = { ...invoiceToSave, id: newId };
+        setInvoices(prev => [...prev, finalInvoice]);
+         addActivity({
+            activityType: 'INVOICE_CREATED',
+            relatedEntityId: finalInvoice.id,
+            details: `criou a Nota Fiscal ${finalInvoice.id} para o pedido ${finalInvoice.orderId}.`
+        });
     };
     
     const issueInvoice = (invoiceId: string) => {
-        setInvoices(prev => prev.map(inv => 
-            inv.id === invoiceId 
-            ? { ...inv, status: 'issued', issueDate: new Date().toISOString() } 
-            : inv
-        ));
+        let issuedInvoice: Invoice | undefined;
+        setInvoices(prev => prev.map(inv => {
+            if (inv.id === invoiceId) {
+                issuedInvoice = { ...inv, status: 'issued', issueDate: new Date().toISOString() };
+                return issuedInvoice;
+            }
+            return inv;
+        }));
+        if(issuedInvoice){
+             addActivity({
+                activityType: 'INVOICE_ISSUED',
+                relatedEntityId: invoiceId,
+                details: `emitiu a Nota Fiscal ${invoiceId} para "${issuedInvoice.clientName}".`
+            });
+        }
     };
     
     const saveSupplier = (supplierToSave: Supplier) => {
         if (supplierToSave.id.startsWith('new-')) {
             const newId = `sup-${suppliers.length + 1}`;
-            setSuppliers(prev => [...prev, { ...supplierToSave, id: newId }]);
+            const newSupplier = { ...supplierToSave, id: newId };
+            setSuppliers(prev => [...prev, newSupplier]);
+            addActivity({
+                activityType: 'SUPPLIER_CREATED',
+                relatedEntityId: newSupplier.id,
+                details: `cadastrou o novo fornecedor "${newSupplier.name}".`
+            });
         } else {
             setSuppliers(prev => prev.map(s => s.id === supplierToSave.id ? supplierToSave : s));
+            addActivity({
+                activityType: 'SUPPLIER_UPDATED',
+                relatedEntityId: supplierToSave.id,
+                details: `atualizou os dados do fornecedor "${supplierToSave.name}".`
+            });
         }
     };
     
@@ -299,6 +389,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             createdAt: now.toISOString(),
         };
         setReceipts(prev => [...prev, newReceipt]);
+        addActivity({
+            activityType: 'RECEIPT_CREATED',
+            relatedEntityId: newReceipt.id,
+            details: `gerou um recibo de ${newReceipt.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} para "${newReceipt.supplierName}".`
+        });
     };
 
     const saveMaterial = (material: Material) => {
@@ -441,6 +536,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         financialTransactions, setFinancialTransactions,
         receipts, setReceipts,
         freightCostPerKm, setFreightCostPerKm,
+        currentUser,
+        switchUser,
+        activityLogs,
         
         addClient,
         updateClient,

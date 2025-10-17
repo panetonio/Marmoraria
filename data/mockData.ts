@@ -1,4 +1,4 @@
-import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address } from '../types';
+import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, ActivityLog } from '../types';
 
 export const mockUsers: User[] = [
     { id: 'user-1', name: 'Admin', role: 'admin' },
@@ -368,4 +368,31 @@ export const mockFinancialTransactions: FinancialTransaction[] = [
         relatedClientId: 'cli-4',
         paymentMethod: 'pix',
     },
+];
+
+export const mockActivityLogs: ActivityLog[] = [
+    {
+        id: 'log-1',
+        timestamp: '2024-07-30T11:00:00Z',
+        userId: 'user-2',
+        activityType: 'QUOTE_APPROVED',
+        relatedEntityId: 'ORC-2024-003',
+        details: 'Orçamento ORC-2024-003 para Carlos Souza foi aprovado.'
+    },
+    {
+        id: 'log-2',
+        timestamp: '2024-07-29T10:00:00Z',
+        userId: 'user-4',
+        activityType: 'INVOICE_ISSUED',
+        relatedEntityId: 'NF-001',
+        details: 'Nota Fiscal NF-001 foi emitida para o pedido PED-2024-001.'
+    },
+    {
+        id: 'log-3',
+        timestamp: '2024-07-28T10:00:00Z',
+        userId: 'user-2',
+        activityType: 'ORDER_CREATED',
+        relatedEntityId: 'PED-2024-001',
+        details: 'Pedido PED-2024-001 criado a partir do orçamento ORC-2024-001.'
+    }
 ];
