@@ -1,6 +1,6 @@
 import React, { useState, useMemo, FC, useEffect } from 'react';
 import { mockUsers } from '../data/mockData';
-import type { Order, QuoteItem, ServiceOrder, Page, SortDirection } from '../types';
+import type { Order, QuoteItem, ServiceOrder, Page, SortDirection, ProductionStatus } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
@@ -8,6 +8,44 @@ import DocumentPreview from '../components/QuotePreview';
 import { useData } from '../context/DataContext';
 import Select from '../components/ui/Select';
 import Input from '../components/ui/Input';
+import StatusBadge from '../components/ui/StatusBadge';
+import type { StatusMap } from '../components/ui/StatusBadge';
+
+type OrderStatus = 'approved' | 'in_production' | 'in_logistics' | 'completed';
+
+const orderStatusMap: StatusMap<OrderStatus> = {
+    approved: { label: 'Aguardando Produção', variant: 'default' },
+    in_production: { label: 'Em Produção', variant: 'warning' },
+    in_logistics: { label: 'Em Logística', variant: 'primary' },
+    completed: { label: 'Concluído', variant: 'success' },
+};
+
+const getOrderStatus = (order: Order, allServiceOrders: ServiceOrder[]): OrderStatus => {
+    const relatedSOs = allServiceOrders.filter(so => so.orderId === order.id);
+
+    const assignedItemIds = new Set(relatedSOs.flatMap(os => os.items.map(item => item.id)));
+    const hasUnassignedItems = order.items.some(item => !assignedItemIds.has(item.id));
+
+    if (relatedSOs.length === 0 || hasUnassignedItems) {
+        return 'approved';
+    }
+
+    if (relatedSOs.every(so => so.status === 'completed')) {
+        return 'completed';
+    }
+    
+    const productionStatuses: ProductionStatus[] = ['cutting', 'finishing'];
+    if (relatedSOs.some(so => productionStatuses.includes(so.status))) {
+        return 'in_production';
+    }
+
+    const logisticsStatuses: ProductionStatus[] = ['awaiting_pickup', 'ready_for_logistics', 'scheduled', 'in_transit', 'realizado'];
+    if (relatedSOs.some(so => logisticsStatuses.includes(so.status))) {
+        return 'in_logistics';
+    }
+
+    return 'approved'; // Fallback
+};
 
 
 const CreateServiceOrderModal: FC<{
@@ -141,6 +179,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
     const [startDateFilter, setStartDateFilter] = useState('');
     const [endDateFilter, setEndDateFilter] = useState('');
     const [salespersonFilter, setSalespersonFilter] = useState('');
+    const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
     const [sortConfig, setSortConfig] = useState<{ key: keyof Order | null; direction: SortDirection }>({ key: 'approvalDate', direction: 'descending' });
 
     const salespeople = useMemo(() => mockUsers.filter(u => u.role === 'vendedor'), []);
@@ -161,7 +200,12 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
     };
 
     const filteredOrders = useMemo(() => {
-        let filtered = orders.filter(order => {
+        const ordersWithStatus = orders.map(order => ({
+            ...order,
+            status: getOrderStatus(order, serviceOrders)
+        }));
+
+        let filtered = ordersWithStatus.filter(order => {
             const orderIdMatch = orderIdFilter ? order.id.toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
             const clientMatch = clientFilter ? order.clientName.toLowerCase().includes(clientFilter.toLowerCase()) : true;
             
@@ -176,7 +220,8 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
             const endMatch = end ? date < end : true;
             
             const salespersonMatch = salespersonFilter ? order.salespersonId === salespersonFilter : true;
-            return orderIdMatch && clientMatch && startMatch && endMatch && salespersonMatch;
+            const statusMatch = statusFilter ? order.status === statusFilter : true;
+            return orderIdMatch && clientMatch && startMatch && endMatch && salespersonMatch && statusMatch;
         });
 
         if (sortConfig.key) {
@@ -198,7 +243,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
         }
 
         return filtered;
-    }, [orders, orderIdFilter, clientFilter, startDateFilter, endDateFilter, salespersonFilter, sortConfig]);
+    }, [orders, serviceOrders, orderIdFilter, clientFilter, startDateFilter, endDateFilter, salespersonFilter, statusFilter, sortConfig]);
 
     const handleOpenOsModal = (order: Order) => {
         setSelectedOrderForOs(order);
@@ -255,7 +300,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
             <p className="mt-2 text-text-secondary dark:text-slate-400">Gerencie os pedidos e gere as Ordens de Serviço (OS) para a produção.</p>
 
             <Card className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                     <div>
                         <Input
                             id="order-id-filter-orders"
@@ -309,6 +354,19 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                             ))}
                         </Select>
                     </div>
+                     <div>
+                        <Select
+                            id="status-filter-orders"
+                            label="Status do Pedido"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as OrderStatus | '')}
+                        >
+                            <option value="">Todos os Status</option>
+                            {Object.entries(orderStatusMap).map(([value, { label }]) => (
+                                <option key={value} value={value}>{label}</option>
+                            ))}
+                        </Select>
+                    </div>
                 </div>
             </Card>
 
@@ -322,6 +380,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                                     <SortableTh columnKey="clientName">Cliente</SortableTh>
                                     <SortableTh columnKey="approvalDate">Data de Aprovação</SortableTh>
                                     <SortableTh columnKey="salespersonId">Vendedor</SortableTh>
+                                    <th className="p-3">Status</th>
                                     <SortableTh columnKey="total">Total</SortableTh>
                                     <th className="p-3">OS Geradas</th>
                                     <th className="p-3 text-center">Ações</th>
@@ -342,6 +401,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                                             <td className="p-3">{order.clientName}</td>
                                             <td className="p-3">{new Date(order.approvalDate).toLocaleDateString()}</td>
                                             <td className="p-3">{order.salespersonId ? salespeopleMap[order.salespersonId] : 'N/A'}</td>
+                                            <td className="p-3"><StatusBadge status={order.status} statusMap={orderStatusMap} /></td>
                                             <td className="p-3 text-right font-semibold">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                             <td className="p-3 text-xs font-mono">{order.serviceOrderIds.join(', ')}</td>
                                             <td className="p-3 text-center space-x-2">
@@ -366,7 +426,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                                 })}
                                 {filteredOrders.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhum pedido encontrado com os filtros aplicados.</td>
+                                        <td colSpan={8} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhum pedido encontrado com os filtros aplicados.</td>
                                     </tr>
                                 )}
                             </tbody>
