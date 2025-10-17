@@ -1,4 +1,4 @@
-import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, ActivityLog } from '../types';
+import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, ActivityLog, Equipment, MaintenanceLog } from '../types';
 
 export const mockUsers: User[] = [
     { id: 'user-1', name: 'Admin', role: 'admin' },
@@ -394,5 +394,64 @@ export const mockActivityLogs: ActivityLog[] = [
         activityType: 'ORDER_CREATED',
         relatedEntityId: 'PED-2024-001',
         details: 'Pedido PED-2024-001 criado a partir do orçamento ORC-2024-001.'
+    }
+];
+
+export const mockEquipment: Equipment[] = [
+    {
+        id: 'EQP-001',
+        name: 'Serra-ponte',
+        serialNumber: 'SN-987654',
+        purchaseDate: '2022-03-15T00:00:00Z',
+        purchaseInvoiceNumber: 'NFe-12345',
+        supplierCnpj: '11.222.333/0001-44',
+        warrantyEndDate: '2025-03-15T00:00:00Z',
+        currentLocation: 'Fábrica - Setor de Corte',
+        assignedTo: 'prof-1',
+        status: 'operacional',
+    },
+    {
+        id: 'EQP-002',
+        name: 'Lixadeira de Borda',
+        serialNumber: 'SN-123456',
+        purchaseDate: '2023-01-20T00:00:00Z',
+        purchaseInvoiceNumber: 'NFe-67890',
+        supplierCnpj: '22.333.444/0001-55',
+        warrantyEndDate: '2025-01-20T00:00:00Z',
+        currentLocation: 'Fábrica - Setor de Acabamento',
+        assignedTo: 'prof-3',
+        status: 'em_manutencao',
+    },
+    {
+        id: 'EQP-003',
+        name: 'Furadeira de Bancada',
+        serialNumber: 'SN-ABCDEFG',
+        purchaseDate: '2021-11-10T00:00:00Z',
+        purchaseInvoiceNumber: 'NFe-11223',
+        supplierCnpj: '11.222.333/0001-44',
+        warrantyEndDate: '2022-11-10T00:00:00Z',
+        currentLocation: 'Fábrica - Setor de Acabamento',
+        assignedTo: 'prof-4',
+        status: 'operacional',
+    }
+];
+
+export const mockMaintenanceLogs: MaintenanceLog[] = [
+    {
+        id: 'MAINT-001',
+        equipmentId: 'EQP-001',
+        maintenanceDate: '2024-06-10T00:00:00Z',
+        description: 'Troca de disco de corte e lubrificação geral.',
+        cost: 850.00,
+        performedBy: 'user-3', // Maria (Produção)
+        nextMaintenanceDate: '2024-12-10T00:00:00Z',
+    },
+    {
+        id: 'MAINT-002',
+        equipmentId: 'EQP-002',
+        maintenanceDate: '2024-07-25T00:00:00Z',
+        description: 'Reparo no motor principal. Peça encomendada.',
+        cost: 450.00,
+        performedBy: 'user-5', // Pedro (Produção)
     }
 ];

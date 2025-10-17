@@ -14,6 +14,7 @@ export const PERMISSIONS: Record<Page, string> = {
   receipts: 'view_receipts',
   catalog: 'manage_catalog',
   activityLog: 'view_activity_log',
+  equipment: 'manage_equipment',
 };
 
 export const ROLES = {
@@ -24,7 +25,7 @@ export const ROLES = {
         'view_production', 'view_logistics', 'manage_stock', 'view_stock', 'manage_suppliers',
         'manage_crm', 'manage_finance', 'manage_invoices', 'view_receipts',
         'manage_catalog', 'manage_stock_levels', 'assign_production_resources',
-        'view_activity_log'
+        'view_activity_log', 'manage_equipment'
     ],
   },
   vendedor: {
@@ -49,7 +50,8 @@ export const ROLES = {
       'manage_stock',   // Permite ações como alocar chapas
       PERMISSIONS.suppliers,
       'manage_stock_levels',
-      'assign_production_resources'
+      'assign_production_resources',
+      PERMISSIONS.equipment,
     ],
   },
   aux_administrativo: {

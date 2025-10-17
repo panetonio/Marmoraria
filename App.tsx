@@ -14,6 +14,7 @@ import FinancePage from './pages/FinancePage';
 import InvoicesPage from './pages/InvoicesPage';
 import ReceiptsPage from './pages/ReceiptsPage';
 import ActivityLogPage from './pages/ActivityLogPage';
+import EquipmentPage from './pages/EquipmentPage';
 import type { Page, User } from './types';
 import { mockUsers } from './data/mockData';
 import { ROLES, PERMISSIONS } from './roles';
@@ -140,6 +141,8 @@ const App: React.FC = () => {
         return <ReceiptsPage />;
       case 'activityLog':
         return <ActivityLogPage onNavigate={handleSearchNavigate} />;
+      case 'equipment':
+        return <EquipmentPage />;
       default:
         return <Dashboard />;
     }

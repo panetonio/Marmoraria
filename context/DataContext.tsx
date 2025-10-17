@@ -1,12 +1,12 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import type { 
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem, 
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, ActivityLog
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, ActivityLog, Equipment, MaintenanceLog
 } from '../types';
 import { 
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers, 
     mockMaterials, mockStockItems, mockServices, mockProducts, mockQuotes, 
-    mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions, mockUsers, mockActivityLogs
+    mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions, mockUsers, mockActivityLogs, mockEquipment, mockMaintenanceLogs
 } from '../data/mockData';
 
 // Define the shape of the context data
@@ -43,7 +43,8 @@ interface DataContextType {
     currentUser: User;
     switchUser: (userId: string) => void;
     activityLogs: ActivityLog[];
-
+    equipment: Equipment[];
+    maintenanceLogs: MaintenanceLog[];
 
     // Add specific data manipulation functions here
     addClient: (client: Client) => void;
@@ -76,6 +77,8 @@ interface DataContextType {
     setFinalizationType: (orderId: string, type: FinalizationType) => void;
     confirmDelivery: (orderId: string) => void;
     confirmInstallation: (orderId: string) => void;
+    saveEquipment: (equipment: Equipment) => void;
+    addMaintenanceLog: (log: Omit<MaintenanceLog, 'id'>) => void;
 }
 
 // Create the context
@@ -102,6 +105,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [freightCostPerKm, setFreightCostPerKm] = useState<number>(8);
     const [currentUser, setCurrentUser] = useState<User>(mockUsers[0]);
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(mockActivityLogs);
+    const [equipment, setEquipment] = useState<Equipment[]>(mockEquipment);
+    const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(mockMaintenanceLogs);
 
     const switchUser = (userId: string) => {
         const user = mockUsers.find(u => u.id === userId);
@@ -518,6 +523,37 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }));
     };
 
+    const saveEquipment = (eq: Equipment) => {
+        if (eq.id.startsWith('new-')) {
+            const newId = `EQP-${(equipment.length + mockEquipment.length + 1).toString().padStart(3, '0')}`;
+            const newEquipment = { ...eq, id: newId };
+            setEquipment(prev => [...prev, newEquipment]);
+            addActivity({
+                activityType: 'EQUIPMENT_CREATED',
+                relatedEntityId: newId,
+                details: `cadastrou o novo equipamento "${newEquipment.name}".`
+            });
+        } else {
+            setEquipment(prev => prev.map(e => e.id === eq.id ? eq : e));
+            addActivity({
+                activityType: 'EQUIPMENT_UPDATED',
+                relatedEntityId: eq.id,
+                details: `atualizou os dados do equipamento "${eq.name}".`
+            });
+        }
+    };
+    
+    const addMaintenanceLog = (log: Omit<MaintenanceLog, 'id'>) => {
+        const newLog = { ...log, id: `MAINT-${Date.now()}` };
+        setMaintenanceLogs(prev => [...prev, newLog]);
+        const equipmentName = equipment.find(e => e.id === log.equipmentId)?.name || 'desconhecido';
+        addActivity({
+            activityType: 'MAINTENANCE_LOGGED',
+            relatedEntityId: log.equipmentId,
+            details: `registrou uma manutenção para o equipamento "${equipmentName}".`
+        });
+    };
+
 
     const value = {
         clients, setClients,
@@ -539,6 +575,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         currentUser,
         switchUser,
         activityLogs,
+        equipment,
+        maintenanceLogs,
         
         addClient,
         updateClient,
@@ -570,6 +608,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setFinalizationType,
         confirmDelivery,
         confirmInstallation,
+        saveEquipment,
+        addMaintenanceLog,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

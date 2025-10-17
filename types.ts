@@ -1,6 +1,6 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'activityLog';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'activityLog' | 'equipment';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
@@ -14,7 +14,8 @@ export type ActivityType =
   | 'INVOICE_CREATED' | 'INVOICE_ISSUED'
   | 'SUPPLIER_CREATED' | 'SUPPLIER_UPDATED'
   | 'NOTE_ADDED'
-  | 'RECEIPT_CREATED';
+  | 'RECEIPT_CREATED'
+  | 'EQUIPMENT_CREATED' | 'EQUIPMENT_UPDATED' | 'MAINTENANCE_LOGGED';
 
 export interface ActivityLog {
   id: string;
@@ -272,4 +273,29 @@ export interface Receipt {
   amount: number;
   description: string;
   createdAt: string;
+}
+
+export type EquipmentStatus = 'operacional' | 'em_manutencao' | 'desativado';
+
+export interface Equipment {
+  id: string;
+  name: string;
+  serialNumber: string;
+  purchaseDate: string; // ISO string
+  purchaseInvoiceNumber: string;
+  supplierCnpj: string;
+  warrantyEndDate: string; // ISO string
+  currentLocation: string;
+  assignedTo: string; // ProductionProfessional ID
+  status: EquipmentStatus;
+}
+
+export interface MaintenanceLog {
+  id: string;
+  equipmentId: string;
+  maintenanceDate: string; // ISO string
+  description: string;
+  cost: number;
+  performedBy: string; // User ID
+  nextMaintenanceDate?: string; // ISO string
 }
