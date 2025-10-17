@@ -19,6 +19,7 @@ const getActivityConfig = (activityType: ActivityLog['activityType']): { page: P
     if (activityType.includes('INVOICE')) return { page: 'invoices', icon: ICONS.invoices };
     if (activityType.includes('SUPPLIER')) return { page: 'suppliers', icon: ICONS.suppliers };
     if (activityType.includes('RECEIPT')) return { page: 'receipts', icon: ICONS.receipts };
+    if (activityType.includes('EQUIPMENT') || activityType.includes('MAINTENANCE')) return { page: 'equipment', icon: ICONS.equipment };
     return { page: null, icon: ICONS.dashboard }; // Fallback icon
 }
 
