@@ -13,6 +13,7 @@ export const PERMISSIONS: Record<Page, string> = {
   invoices: 'manage_invoices',
   receipts: 'view_receipts',
   catalog: 'manage_catalog',
+  users: 'manage_users',
 };
 
 export const ROLES = {
@@ -22,7 +23,7 @@ export const ROLES = {
         'view_dashboard', 'manage_quotes', 'view_quotes', 'view_orders',
         'view_production', 'view_logistics', 'manage_stock', 'view_stock', 'manage_suppliers',
         'manage_crm', 'manage_finance', 'manage_invoices', 'view_receipts',
-        'manage_catalog', 'manage_stock_levels', 'assign_production_resources'
+        'manage_catalog', 'manage_stock_levels', 'assign_production_resources', 'manage_users'
     ],
   },
   vendedor: {

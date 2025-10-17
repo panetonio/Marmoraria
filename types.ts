@@ -1,6 +1,6 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
@@ -20,6 +20,17 @@ export interface User {
   id: string;
   name: string;
   role: Role;
+}
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+  customPermissions?: Page[]; // Páginas específicas que o usuário pode acessar
+  isActive: boolean;
+  createdAt: string;
 }
 
 export type ProductionProfessionalRole = 'cortador' | 'acabador' | 'montador' | 'entregador';

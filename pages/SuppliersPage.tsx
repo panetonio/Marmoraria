@@ -3,7 +3,7 @@ import type { Supplier, Address } from '../types';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { useData } from '../context/DataContext';
-import { generateWhatsAppLink } from '../../utils/helpers';
+import { generateWhatsAppLink } from '../utils/helpers';
 import CreateReceiptModal from '../components/CreateReceiptModal';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';

@@ -1,13 +1,14 @@
-import React, { createContext, useState, useContext, ReactNode } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type { 
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem, 
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType 
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User 
 } from '../types';
 import { 
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers, 
     mockMaterials, mockStockItems, mockServices, mockProducts, mockQuotes, 
     mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions 
 } from '../data/mockData';
+import { api } from '../utils/api';
 
 // Define the shape of the context data
 interface DataContextType {
@@ -38,6 +39,8 @@ interface DataContextType {
     setFinancialTransactions: React.Dispatch<React.SetStateAction<FinancialTransaction[]>>;
     receipts: Receipt[];
     setReceipts: React.Dispatch<React.SetStateAction<Receipt[]>>;
+    users: User[];
+    setUsers: React.Dispatch<React.SetStateAction<User[]>>;
     freightCostPerKm: number;
     setFreightCostPerKm: React.Dispatch<React.SetStateAction<number>>;
 
@@ -81,22 +84,122 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 // Create the provider component
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     // Initialize all states here
-    const [clients, setClients] = useState<Client[]>(mockClients);
+    const [clients, setClients] = useState<Client[]>([]);
     const [opportunities, setOpportunities] = useState<Opportunity[]>(mockOpportunities);
     const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>(mockAgendaEvents);
     const [notes, setNotes] = useState<Note[]>(mockNotes);
-    const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [materials, setMaterials] = useState<Material[]>(mockMaterials);
     const [services, setServices] = useState<Service[]>(mockServices);
     const [products, setProducts] = useState<Product[]>(mockProducts);
     const [stockItems, setStockItems] = useState<StockItem[]>(mockStockItems);
-    const [quotes, setQuotes] = useState<Quote[]>(mockQuotes);
+    const [quotes, setQuotes] = useState<Quote[]>([]);
     const [orders, setOrders] = useState<Order[]>(mockOrders);
     const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(mockServiceOrders);
     const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
     const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>(mockFinancialTransactions);
     const [receipts, setReceipts] = useState<Receipt[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [freightCostPerKm, setFreightCostPerKm] = useState<number>(8);
+
+    // Carregar dados do backend
+    useEffect(() => {
+        loadClients();
+        loadSuppliers();
+        loadQuotes();
+        loadOrders();
+        loadUsers();
+    }, []);
+
+    const loadClients = async () => {
+        try {
+            const result = await api.getClients();
+            if (result.success) {
+                const mappedClients = result.data.map((c: any) => ({
+                    ...c,
+                    id: c._id || c.id,
+                }));
+                setClients(mappedClients);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar clientes:', error);
+            // Em caso de erro, usar dados mock como fallback
+            setClients(mockClients);
+        }
+    };
+
+    const loadSuppliers = async () => {
+        try {
+            const result = await api.getSuppliers();
+            if (result.success) {
+                const mappedSuppliers = result.data.map((s: any) => ({
+                    ...s,
+                    id: s._id || s.id,
+                }));
+                setSuppliers(mappedSuppliers);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar fornecedores:', error);
+            setSuppliers(mockSuppliers);
+        }
+    };
+
+    const loadQuotes = async () => {
+        try {
+            const result = await api.getQuotes();
+            if (result.success) {
+                const mappedQuotes = result.data.map((q: any) => ({
+                    ...q,
+                    id: q._id || q.id,
+                }));
+                setQuotes(mappedQuotes);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar orçamentos:', error);
+            setQuotes(mockQuotes);
+        }
+    };
+
+    const loadOrders = async () => {
+        try {
+            console.log('🔄 Carregando pedidos do backend...');
+            const result = await api.getOrders();
+            if (result.success) {
+                console.log(`📦 ${result.count || result.data.length} pedido(s) encontrado(s)`);
+                const mappedOrders = result.data.map((o: any) => ({
+                    ...o,
+                    id: o._id || o.id,
+                    originalQuoteId: o.originalQuoteId?._id || o.originalQuoteId,
+                    serviceOrderIds: o.serviceOrderIds || [],
+                }));
+                setOrders(mappedOrders);
+                console.log('✅ Pedidos carregados com sucesso');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao carregar pedidos:', error);
+            console.log('⚠️ Usando dados mock como fallback');
+            setOrders(mockOrders);
+        }
+    };
+
+    const loadUsers = async () => {
+        try {
+            console.log('🔄 Carregando usuários do backend...');
+            const result = await api.getUsers();
+            if (result.success) {
+                console.log(`👥 ${result.count || result.data.length} usuário(s) encontrado(s)`);
+                const mappedUsers = result.data.map((u: any) => ({
+                    ...u,
+                    id: u._id || u.id,
+                }));
+                setUsers(mappedUsers);
+                console.log('✅ Usuários carregados com sucesso');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao carregar usuários:', error);
+            setUsers([]);
+        }
+    };
 
     const generateFinancialTransactionsForOrder = (order: Order) => {
         const newTransactions: FinancialTransaction[] = [];
@@ -143,17 +246,26 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 
     // Define modifier functions
-    const addClient = (clientToSave: Client) => {
-        const newClient: Client = {
-            ...clientToSave,
-            id: `cli-${clients.length + 1}`,
-            createdAt: new Date().toISOString(),
-        };
-        setClients(prev => [...prev, newClient]);
+    const addClient = async (clientToSave: Client) => {
+        try {
+            const result = await api.createClient(clientToSave);
+            if (result.success) {
+                await loadClients();
+            }
+        } catch (error) {
+            console.error('Erro ao adicionar cliente:', error);
+        }
     };
 
-    const updateClient = (clientToUpdate: Client) => {
-        setClients(prev => prev.map(c => c.id === clientToUpdate.id ? clientToUpdate : c));
+    const updateClient = async (clientToUpdate: Client) => {
+        try {
+            const result = await api.updateClient(clientToUpdate.id, clientToUpdate);
+            if (result.success) {
+                await loadClients();
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar cliente:', error);
+        }
     };
 
     const addNote = (clientId: string, content: string) => {
@@ -167,18 +279,46 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setNotes(prev => [...prev, newNote]);
     };
     
-    const saveQuote = (quoteToSave: Quote) => {
-        const isNewQuote = quoteToSave.id.startsWith('new-');
-        
-        let savedQuote = { ...quoteToSave };
-
-        if (isNewQuote) {
-            const newId = `ORC-2024-${(mockQuotes.length + quotes.length + 1).toString().padStart(3, '0')}`;
-            savedQuote.id = newId;
-            setQuotes(prev => [...prev, savedQuote]);
-        } else {
-            setQuotes(prev => prev.map(q => q.id === savedQuote.id ? savedQuote : q));
+    const saveQuote = async (quoteToSave: Quote) => {
+        try {
+            const isNewQuote = quoteToSave.id.startsWith('new-');
+            
+            if (isNewQuote) {
+                const result = await api.createQuote(quoteToSave);
+                if (result.success) {
+                    console.log('✅ Orçamento criado com sucesso:', result.message);
+                    await loadQuotes();
+                    // Se o novo orçamento já foi criado como aprovado, recarregar pedidos
+                    if (quoteToSave.status === 'approved') {
+                        console.log('📦 Carregando pedidos após aprovação...');
+                        await loadOrders();
+                        if (result.order) {
+                            console.log('✨ Pedido criado automaticamente:', result.order.id || result.order._id);
+                        }
+                    }
+                    return;
+                }
+            } else {
+                const result = await api.updateQuote(quoteToSave.id, quoteToSave);
+                if (result.success) {
+                    console.log('✅ Orçamento atualizado com sucesso:', result.message);
+                    await loadQuotes();
+                    // Se o orçamento foi aprovado, recarregar pedidos pois um novo foi criado
+                    if (quoteToSave.status === 'approved') {
+                        console.log('📦 Carregando pedidos após aprovação...');
+                        await loadOrders();
+                        if (result.order) {
+                            console.log('✨ Pedido criado automaticamente:', result.order.id || result.order._id);
+                        }
+                    }
+                    return;
+                }
+            }
+        } catch (error) {
+            console.error('❌ Erro ao salvar orçamento:', error);
         }
+
+        let savedQuote = { ...quoteToSave };
 
         // Check if the quote was approved to convert to an order
         if (savedQuote.status === 'approved') {
@@ -254,12 +394,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         ));
     };
     
-    const saveSupplier = (supplierToSave: Supplier) => {
-        if (supplierToSave.id.startsWith('new-')) {
-            const newId = `sup-${suppliers.length + 1}`;
-            setSuppliers(prev => [...prev, { ...supplierToSave, id: newId }]);
-        } else {
-            setSuppliers(prev => prev.map(s => s.id === supplierToSave.id ? supplierToSave : s));
+    const saveSupplier = async (supplierToSave: Supplier) => {
+        try {
+            if (supplierToSave.id.startsWith('new-')) {
+                const result = await api.createSupplier(supplierToSave);
+                if (result.success) {
+                    await loadSuppliers();
+                }
+            } else {
+                const result = await api.updateSupplier(supplierToSave.id, supplierToSave);
+                if (result.success) {
+                    await loadSuppliers();
+                }
+            }
+        } catch (error) {
+            console.error('Erro ao salvar fornecedor:', error);
         }
     };
     
@@ -440,6 +589,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         invoices, setInvoices,
         financialTransactions, setFinancialTransactions,
         receipts, setReceipts,
+        users, setUsers,
         freightCostPerKm, setFreightCostPerKm,
         
         addClient,

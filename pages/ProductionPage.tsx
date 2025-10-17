@@ -1,6 +1,6 @@
 import React, { useState, useMemo, FC, DragEvent, ChangeEvent, useEffect } from 'react';
 import { mockProductionProfessionals } from '../data/mockData';
-import type { ServiceOrder, ProductionStatus, ProductionProfessional, StockItem, Priority, FinalizationType } from '../types';
+import type { ServiceOrder, ProductionStatus, ProductionProfessional, StockItem, Priority, FinalizationType, User } from '../types';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -33,13 +33,16 @@ const ServiceOrderDetailModal: FC<{
   onRemoveAttachment: (orderId: string) => void;
   onUpdatePriority: (orderId: string, priority: Priority) => void;
   onUpdateObservations: (orderId: string, observations: string) => void;
-}> = ({ isOpen, order, onClose, onAttachClick, onRemoveAttachment, onUpdatePriority, onUpdateObservations }) => {
-  const assignedProfessionals = mockProductionProfessionals.filter(p => order.assignedToIds.includes(p.id));
+  onUpdateTeam: (orderId: string, assignedToIds: string[]) => void;
+  allUsers: (ProductionProfessional | User)[];
+}> = ({ isOpen, order, onClose, onAttachClick, onRemoveAttachment, onUpdatePriority, onUpdateObservations, onUpdateTeam, allUsers }) => {
   const [observations, setObservations] = useState(order.observations || '');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(order.assignedToIds);
 
   useEffect(() => {
     // Sync local state if the order prop changes (e.g., opening modal for a different order)
     setObservations(order.observations || '');
+    setSelectedUserIds(order.assignedToIds);
   }, [order]);
 
   const handleCloseAndSave = () => {
@@ -47,7 +50,17 @@ const ServiceOrderDetailModal: FC<{
     if (observations !== (order.observations || '')) {
       onUpdateObservations(order.id, observations);
     }
+    // Salvar mudanças na equipe se houver alteração
+    if (JSON.stringify(selectedUserIds.sort()) !== JSON.stringify(order.assignedToIds.sort())) {
+      onUpdateTeam(order.id, selectedUserIds);
+    }
     onClose();
+  };
+
+  const handleToggleUser = (userId: string) => {
+    setSelectedUserIds(prev => 
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
   };
 
   const professionalRoles: Record<ProductionProfessional['role'], string> = {
@@ -55,6 +68,17 @@ const ServiceOrderDetailModal: FC<{
       acabador: "Acabador",
       montador: "Montador",
       entregador: "Entregador"
+  };
+
+  const roleLabels: Record<string, string> = {
+    admin: "Administrador",
+    vendedor: "Vendedor",
+    producao: "Produção",
+    aux_administrativo: "Aux. Administrativo",
+    cortador: "Cortador",
+    acabador: "Acabador",
+    montador: "Montador",
+    entregador: "Entregador"
   };
 
   return (
@@ -168,25 +192,55 @@ const ServiceOrderDetailModal: FC<{
         
         <div className="md:col-span-1">
           <Card className="p-0">
-            <CardHeader>Equipe Alocada</CardHeader>
+            <CardHeader>Alocar Equipe</CardHeader>
             <CardContent>
-              <ul className="space-y-3">
-                {assignedProfessionals.length > 0 ? (
-                  assignedProfessionals.map(prof => (
-                    <li key={prof.id} className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-slate-600 text-white flex items-center justify-center text-sm font-bold ring-2 ring-white mr-3">
-                        {prof.name.charAt(0)}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {allUsers.length > 0 ? allUsers.map(user => {
+                  const role = 'role' in user ? user.role : '';
+                  const roleLabel = roleLabels[role] || role;
+                  const isSelected = selectedUserIds.includes(user.id);
+                  
+                  return (
+                    <label 
+                      key={user.id} 
+                      className={`flex items-center p-2 rounded-lg cursor-pointer transition-colors ${
+                        isSelected 
+                          ? 'bg-primary/10 border-2 border-primary' 
+                          : 'hover:bg-slate-100 dark:hover:bg-slate-700 border-2 border-transparent'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                        checked={isSelected}
+                        onChange={() => handleToggleUser(user.id)}
+                      />
+                      <div className="ml-3 flex items-center flex-1">
+                        <div className="w-8 h-8 rounded-full bg-slate-600 text-white flex items-center justify-center text-sm font-bold ring-2 ring-white mr-3">
+                          {user.name.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-text-primary dark:text-slate-100 text-sm">
+                            {user.name}
+                          </p>
+                          <p className="text-xs text-text-secondary dark:text-slate-400">
+                            {roleLabel}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-text-primary dark:text-slate-100">{prof.name}</p>
-                        <p className="text-xs text-text-secondary dark:text-slate-400 capitalize">{professionalRoles[prof.role]}</p>
-                      </div>
-                    </li>
-                  ))
-                ) : (
-                  <p className="text-sm text-text-secondary dark:text-slate-400 text-center py-4">Nenhum profissional alocado.</p>
+                    </label>
+                  );
+                }) : (
+                  <p className="text-sm text-text-secondary dark:text-slate-400 text-center py-4">
+                    Nenhum usuário disponível
+                  </p>
                 )}
-              </ul>
+              </div>
+              <div className="mt-3 pt-3 border-t border-border dark:border-slate-700">
+                <p className="text-xs text-text-secondary dark:text-slate-400">
+                  {selectedUserIds.length} {selectedUserIds.length === 1 ? 'pessoa alocada' : 'pessoas alocadas'}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -198,7 +252,7 @@ const ServiceOrderDetailModal: FC<{
 const ResourceAllocationModal: FC<{
   isOpen: boolean;
   order: ServiceOrder;
-  productionTeam: ProductionProfessional[];
+  productionTeam: (ProductionProfessional | User)[];
   onClose: () => void;
   onSave: (orderId: string, assignedToIds: string[]) => void;
 }> = ({ isOpen, order, productionTeam, onClose, onSave }) => {
@@ -217,20 +271,45 @@ const ResourceAllocationModal: FC<{
       entregador: "Entregador"
   };
 
+  const roleLabels: Record<string, string> = {
+    admin: "Administrador",
+    vendedor: "Vendedor",
+    producao: "Produção",
+    aux_administrativo: "Auxiliar Administrativo",
+    cortador: "Cortador",
+    acabador: "Acabador",
+    montador: "Montador",
+    entregador: "Entregador"
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Alocar Recursos para: ${order.id}`} className="max-w-md">
-        <div className="space-y-2">
-          {productionTeam.map(professional => (
-            <label key={professional.id} className="flex items-center p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                checked={selectedUserIds.includes(professional.id)}
-                onChange={() => handleCheckboxChange(professional.id)}
-              />
-              <span className="ml-3 text-text-primary dark:text-slate-100">{professional.name} <span className="text-xs text-text-secondary dark:text-slate-400 capitalize">({professionalRoles[professional.role]})</span></span>
-            </label>
-          ))}
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {productionTeam.length > 0 ? productionTeam.map(member => {
+            const role = 'role' in member ? member.role : '';
+            const roleLabel = roleLabels[role] || role;
+            
+            return (
+              <label key={member.id} className="flex items-center p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  checked={selectedUserIds.includes(member.id)}
+                  onChange={() => handleCheckboxChange(member.id)}
+                />
+                <span className="ml-3 text-text-primary dark:text-slate-100">
+                  {member.name} 
+                  <span className="text-xs text-text-secondary dark:text-slate-400 ml-1">
+                    ({roleLabel})
+                  </span>
+                </span>
+              </label>
+            );
+          }) : (
+            <p className="text-center text-text-secondary dark:text-slate-400 py-4">
+              Nenhum usuário disponível para alocação
+            </p>
+          )}
         </div>
         <div className="flex justify-end mt-6 space-x-3">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
@@ -460,7 +539,7 @@ const ProductionPage: FC = () => {
   const { 
       serviceOrders, setServiceOrders, allocateSlabToOrder, addAttachmentToServiceOrder, 
       removeAttachmentFromServiceOrder, updateServiceOrderPriority, 
-      updateServiceOrderObservations, setFinalizationType
+      updateServiceOrderObservations, setFinalizationType, users
   } = useData();
   const [viewMode, setViewMode] = useState<'kanban' | 'timeline'>('kanban');
   const [modalOrder, setModalOrder] = useState<ServiceOrder | null>(null);
@@ -472,7 +551,11 @@ const ProductionPage: FC = () => {
   const [finalizingOrder, setFinalizingOrder] = useState<ServiceOrder | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
-  const productionTeam = useMemo(() => mockProductionProfessionals, []);
+  // Usar usuários reais do backend
+  const productionTeam = useMemo(() => {
+    // Pegar usuários de produção ou todos se não tiver
+    return users.length > 0 ? users : mockProductionProfessionals;
+  }, [users]);
 
   const filteredServiceOrders = useMemo(() => {
     return serviceOrders.filter(order => {
@@ -572,6 +655,10 @@ const ProductionPage: FC = () => {
             onRemoveAttachment={removeAttachmentFromServiceOrder}
             onUpdatePriority={updateServiceOrderPriority}
             onUpdateObservations={updateServiceOrderObservations}
+            onUpdateTeam={(orderId, assignedToIds) => {
+              setServiceOrders(prev => prev.map(o => o.id === orderId ? {...o, assignedToIds} : o));
+            }}
+            allUsers={productionTeam}
         />
       )}
       {finalizingOrder && (
@@ -607,8 +694,8 @@ const ProductionPage: FC = () => {
                     aria-label="Filtrar por profissional"
                 >
                     <option value="">Todos os Profissionais</option>
-                    {mockProductionProfessionals.map(prof => (
-                        <option key={prof.id} value={prof.id}>{prof.name}</option>
+                    {productionTeam.map(member => (
+                        <option key={member.id} value={member.id}>{member.name}</option>
                     ))}
                 </Select>
             </div>

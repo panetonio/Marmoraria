@@ -13,52 +13,50 @@ import CrmPage from './pages/CrmPage';
 import FinancePage from './pages/FinancePage';
 import InvoicesPage from './pages/InvoicesPage';
 import ReceiptsPage from './pages/ReceiptsPage';
-import type { Page, User } from './types';
-import { mockUsers } from './data/mockData';
-import { ROLES, PERMISSIONS } from './roles';
-import Card from './components/ui/Card';
+import UsersPage from './pages/UsersPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import type { Page } from './types';
 import ThemeToggle from './components/ThemeToggle';
 import GlobalSearch from './components/GlobalSearch';
+import Button from './components/ui/Button';
 import { DataProvider } from './context/DataContext';
-import Select from './components/ui/Select';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-const UserSwitcher: React.FC<{
-  currentUser: User;
-  onUserChange: (user: User) => void;
-}> = ({ currentUser, onUserChange }) => {
-  const handleSelectChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedUserId = event.target.value;
-    const selectedUser = mockUsers.find(u => u.id === selectedUserId);
-    if (selectedUser) {
-      onUserChange(selectedUser);
-    }
-  };
+const UserInfo: React.FC = () => {
+  const { currentUser, logout } = useAuth();
+
+  if (!currentUser) return null;
 
   return (
-    <Card className="p-4 flex items-center space-x-4">
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-text-secondary dark:text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+    <div className="flex items-center gap-3 bg-white dark:bg-slate-800 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-slate-600 dark:text-slate-400" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
       </svg>
-      <div className="w-48">
-        <Select
-          id="user-select"
-          label="Usuário Simulado"
-          value={currentUser.id}
-          onChange={handleSelectChange}
-        >
-          {mockUsers.map(user => (
-            <option key={user.id} value={user.id}>
-              {user.name} ({ROLES[user.role].displayName})
-            </option>
-          ))}
-        </Select>
+      <div className="flex-1">
+        <p className="text-sm font-medium text-slate-800 dark:text-white">
+          {currentUser.name}
+        </p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {currentUser.email}
+        </p>
       </div>
-    </Card>
+      <Button
+        variant="secondary"
+        onClick={logout}
+        title="Sair"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+        </svg>
+      </Button>
+    </div>
   );
 };
 
 
-const App: React.FC = () => {
+const MainApp: React.FC = () => {
+  const { currentUser, hasAccessToPage } = useAuth();
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark' || savedTheme === 'light') {
@@ -84,22 +82,15 @@ const App: React.FC = () => {
     setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
   };
   
-  const [currentUser, setCurrentUser] = useState<User>(mockUsers[0]);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [searchTarget, setSearchTarget] = useState<{ page: Page; id: string } | null>(null);
 
-
   useEffect(() => {
-    // When user changes, check if they can still view the current page.
-    // If not, redirect them to their default page (dashboard).
-    const requiredPermission = PERMISSIONS[currentPage];
-    if (requiredPermission) {
-        const hasAccess = ROLES[currentUser.role].permissions.includes(requiredPermission);
-        if (!hasAccess) {
-        setCurrentPage('dashboard');
-        }
+    // When accessing a page, check if user has permission
+    if (!hasAccessToPage(currentPage)) {
+      setCurrentPage('dashboard');
     }
-  }, [currentUser, currentPage]);
+  }, [currentPage, hasAccessToPage]);
 
   const handleSearchNavigate = (page: Page, id: string) => {
     setCurrentPage(page);
@@ -109,6 +100,10 @@ const App: React.FC = () => {
   const clearSearchTarget = () => setSearchTarget(null);
 
   const renderPage = () => {
+    if (!hasAccessToPage(currentPage)) {
+      return <Dashboard />;
+    }
+
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
@@ -134,20 +129,26 @@ const App: React.FC = () => {
         return <FinancePage />;
       case 'receipts':
         return <ReceiptsPage />;
+      case 'users':
+        return <UsersPage />;
       default:
         return <Dashboard />;
     }
   };
 
+  if (!currentUser) {
+    return null; // Será tratado pelo App principal
+  }
+
   return (
     <DataProvider>
       <div className="flex h-screen font-sans">
-        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={currentUser} />
+        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="bg-background dark:bg-slate-900 p-4 flex justify-end items-center space-x-4 border-b border-border dark:border-slate-700">
               <GlobalSearch onNavigate={handleSearchNavigate} />
               <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
-              <UserSwitcher currentUser={currentUser} onUserChange={setCurrentUser} />
+              <UserInfo />
           </header>
           <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background dark:bg-slate-900">
             <div className="container mx-auto px-6 py-8">
@@ -159,6 +160,32 @@ const App: React.FC = () => {
       </div>
     </DataProvider>
   );
+};
+
+const App: React.FC = () => {
+  const [showRegister, setShowRegister] = useState(false);
+
+  return (
+    <AuthProvider>
+      <AuthWrapper showRegister={showRegister} setShowRegister={setShowRegister} />
+    </AuthProvider>
+  );
+};
+
+const AuthWrapper: React.FC<{ 
+  showRegister: boolean; 
+  setShowRegister: (show: boolean) => void;
+}> = ({ showRegister, setShowRegister }) => {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    if (showRegister) {
+      return <RegisterPage onLoginClick={() => setShowRegister(false)} />;
+    }
+    return <LoginPage onRegisterClick={() => setShowRegister(true)} />;
+  }
+
+  return <MainApp />;
 };
 
 export default App;

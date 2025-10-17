@@ -170,7 +170,7 @@ interface OrdersPageProps {
 }
 
 const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) => {
-    const { orders, serviceOrders, createServiceOrder } = useData();
+    const { orders, serviceOrders, createServiceOrder, quotes } = useData();
     const [isOsModalOpen, setIsOsModalOpen] = useState(false);
     const [selectedOrderForOs, setSelectedOrderForOs] = useState<Order | null>(null);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
@@ -297,7 +297,10 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                 <DocumentPreview document={viewingOrder} onClose={() => setViewingOrder(null)} />
             )}
             <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Pedidos Aprovados</h1>
-            <p className="mt-2 text-text-secondary dark:text-slate-400">Gerencie os pedidos e gere as Ordens de Serviço (OS) para a produção.</p>
+            <p className="mt-2 text-text-secondary dark:text-slate-400">
+                Gerencie os pedidos aprovados vindos dos orçamentos e gere as Ordens de Serviço (OS) para a produção. 
+                <span className="inline-block ml-2 text-primary font-medium">Clique em qualquer pedido para ver os detalhes.</span>
+            </p>
 
             <Card className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
@@ -396,17 +399,21 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                                     const hasUnassignedItems = order.items.some(item => !assignedItemIds.has(item.id));
 
                                     return (
-                                        <tr key={order.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                        <tr 
+                                            key={order.id} 
+                                            className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer"
+                                            onClick={() => setViewingOrder(order)}
+                                        >
                                             <td className="p-3 font-mono text-sm">{order.id}</td>
                                             <td className="p-3">{order.clientName}</td>
                                             <td className="p-3">{new Date(order.approvalDate).toLocaleDateString()}</td>
                                             <td className="p-3">{order.salespersonId ? salespeopleMap[order.salespersonId] : 'N/A'}</td>
                                             <td className="p-3"><StatusBadge status={order.status} statusMap={orderStatusMap} /></td>
                                             <td className="p-3 text-right font-semibold">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                            <td className="p-3 text-xs font-mono">{order.serviceOrderIds.join(', ')}</td>
-                                            <td className="p-3 text-center space-x-2">
+                                            <td className="p-3 text-xs font-mono">{order.serviceOrderIds.join(', ') || '-'}</td>
+                                            <td className="p-3 text-center space-x-2" onClick={(e) => e.stopPropagation()}>
                                                  <Button size="sm" variant="ghost" onClick={() => setViewingOrder(order)}>
-                                                    Ver PDF
+                                                    Ver Detalhes
                                                 </Button>
                                                 {hasUnassignedItems ? (
                                                     <Button size="sm" variant="secondary" onClick={() => handleOpenOsModal(order)}>

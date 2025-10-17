@@ -1,14 +1,13 @@
 
 
 import React from 'react';
-import type { Page, User } from '../types';
+import type { Page } from '../types';
 import { ICONS } from '../constants';
-import { ROLES, PERMISSIONS } from '../roles';
+import { useAuth } from '../context/AuthContext';
 
 interface SidebarProps {
   currentPage: Page;
   setCurrentPage: (page: Page) => void;
-  user: User;
 }
 
 const NavLink: React.FC<{
@@ -34,12 +33,8 @@ const NavLink: React.FC<{
   );
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, user }) => {
-  
-  const hasPermission = (page: Page): boolean => {
-    const requiredPermission = PERMISSIONS[page];
-    return ROLES[user.role].permissions.includes(requiredPermission);
-  }
+const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
+  const { hasAccessToPage } = useAuth();
 
   return (
     <div className="flex flex-col w-64 bg-dark h-full text-white">
@@ -48,18 +43,19 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, user }) 
       </div>
       <div className="flex flex-col flex-1 p-4">
         <nav>
-          {hasPermission('dashboard') && <NavLink page="dashboard" label="Dashboard" icon={ICONS.dashboard} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('quotes') && <NavLink page="quotes" label="Orçamentos" icon={ICONS.quotes} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('orders') && <NavLink page="orders" label="Pedidos" icon={ICONS.orders} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('production') && <NavLink page="production" label="Produção" icon={ICONS.production} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('logistics') && <NavLink page="logistics" label="Logística" icon={ICONS.logistics} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('stock') && <NavLink page="stock" label="Estoque" icon={ICONS.stock} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('catalog') && <NavLink page="catalog" label="Catálogo" icon={ICONS.catalog} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('suppliers') && <NavLink page="suppliers" label="Fornecedores" icon={ICONS.suppliers} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('receipts') && <NavLink page="receipts" label="Recibos" icon={ICONS.receipts} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('crm') && <NavLink page="crm" label="CRM" icon={ICONS.crm} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('invoices') && <NavLink page="invoices" label="Faturamento" icon={ICONS.invoices} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
-          {hasPermission('finance') && <NavLink page="finance" label="Financeiro" icon={ICONS.finance} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('dashboard') && <NavLink page="dashboard" label="Dashboard" icon={ICONS.dashboard} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('quotes') && <NavLink page="quotes" label="Orçamentos" icon={ICONS.quotes} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('orders') && <NavLink page="orders" label="Pedidos" icon={ICONS.orders} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('production') && <NavLink page="production" label="Produção" icon={ICONS.production} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('logistics') && <NavLink page="logistics" label="Logística" icon={ICONS.logistics} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('stock') && <NavLink page="stock" label="Estoque" icon={ICONS.stock} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('catalog') && <NavLink page="catalog" label="Catálogo" icon={ICONS.catalog} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('suppliers') && <NavLink page="suppliers" label="Fornecedores" icon={ICONS.suppliers} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('receipts') && <NavLink page="receipts" label="Recibos" icon={ICONS.receipts} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('crm') && <NavLink page="crm" label="CRM" icon={ICONS.crm} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('invoices') && <NavLink page="invoices" label="Faturamento" icon={ICONS.invoices} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('finance') && <NavLink page="finance" label="Financeiro" icon={ICONS.finance} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+          {hasAccessToPage('users') && <NavLink page="users" label="Usuários" icon={ICONS.users} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
         </nav>
       </div>
     </div>

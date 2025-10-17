@@ -6,7 +6,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Tabs from '../components/ui/Tabs';
 import { useData } from '../context/DataContext';
-import { generateWhatsAppLink } from '../../utils/helpers';
+import { generateWhatsAppLink } from '../utils/helpers';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
 import AddressForm from '../components/AddressForm';
