@@ -96,13 +96,14 @@ const LogisticsKanbanCard: FC<{
             )}
             
             <div className="mt-3 pt-3 border-t border-border dark:border-slate-700 space-y-2">
+                {/* Primary Status-Changing Actions */}
                 {order.status === 'ready_for_logistics' && <Button size="sm" className="w-full" onClick={() => onSchedule(order)}>Agendar</Button>}
                 {order.status === 'scheduled' && <Button size="sm" className="w-full" onClick={() => onStartRoute(order.id)}>Iniciar Rota</Button>}
                 {order.status === 'in_transit' && <Button size="sm" className="w-full" onClick={() => onArrive(order.id)}>Chegou ao Destino</Button>}
                 
+                {/* Confirmation Actions (in 'Realizado' column) */}
                 {order.status === 'realizado' && (
                     <div className="space-y-2">
-                        {/* Delivery Confirmation */}
                         {order.finalizationType !== 'pickup' && !order.delivery_confirmed && (
                              <Button size="sm" className="w-full" variant="secondary" onClick={() => onConfirmDelivery(order.id)}>Confirmar Entrega</Button>
                         )}
@@ -113,7 +114,6 @@ const LogisticsKanbanCard: FC<{
                             </div>
                         )}
                         
-                        {/* Installation Confirmation */}
                         {order.finalizationType === 'delivery_installation' && !order.installation_confirmed && (
                              <Button size="sm" className="w-full" variant="secondary" onClick={() => onConfirmInstallation(order.id)} disabled={!order.delivery_confirmed}>Confirmar Instalação</Button>
                         )}
@@ -126,15 +126,17 @@ const LogisticsKanbanCard: FC<{
                     </div>
                 )}
                 
-                {/* Term Generation */}
-                <div className="!mt-3 pt-2 border-t border-dashed">
-                    {order.delivery_confirmed && (
-                        <Button size="sm" variant="ghost" className="w-full" onClick={() => onGenerateReceiptTerm(order)}>Gerar Termo Recebimento</Button>
-                    )}
-                    {order.installation_confirmed && (
-                        <Button size="sm" variant="ghost" className="w-full" onClick={() => onGenerateInstallTerm(order)}>Gerar Termo Instalação</Button>
-                    )}
-                </div>
+                {/* Document Generation */}
+                {( (order.status === 'ready_for_logistics' || order.status === 'scheduled') && order.finalizationType !== 'pickup') || order.installation_confirmed ? (
+                    <div className="!mt-3 pt-2 border-t border-dashed space-y-2">
+                        {(order.status === 'ready_for_logistics' || order.status === 'scheduled') && order.finalizationType !== 'pickup' && (
+                            <Button size="sm" variant="ghost" className="w-full" onClick={() => onGenerateReceiptTerm(order)}>Gerar Termo Recebimento</Button>
+                        )}
+                        {order.installation_confirmed && (
+                            <Button size="sm" variant="ghost" className="w-full" onClick={() => onGenerateInstallTerm(order)}>Gerar Termo Instalação</Button>
+                        )}
+                    </div>
+                ) : null}
             </div>
         </Card>
     );
