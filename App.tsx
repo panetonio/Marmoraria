@@ -142,7 +142,7 @@ const App: React.FC = () => {
       case 'activityLog':
         return <ActivityLogPage onNavigate={handleSearchNavigate} />;
       case 'equipment':
-        return <EquipmentPage />;
+        return <EquipmentPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       default:
         return <Dashboard />;
     }

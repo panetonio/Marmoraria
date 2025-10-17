@@ -1,6 +1,6 @@
-import React, { useState, useMemo, FC } from 'react';
+import React, { useState, useMemo, FC, useEffect } from 'react';
 import { useData } from '../context/DataContext';
-import type { Equipment, MaintenanceLog, EquipmentStatus } from '../types';
+import type { Equipment, MaintenanceLog, EquipmentStatus, Page } from '../types';
 import { mockProductionProfessionals, mockUsers } from '../data/mockData';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -140,7 +140,12 @@ const MaintenanceFormModal: FC<{
     );
 };
 
-const EquipmentPage: FC = () => {
+interface EquipmentPageProps {
+    searchTarget: { page: Page; id: string } | null;
+    clearSearchTarget: () => void;
+}
+
+const EquipmentPage: FC<EquipmentPageProps> = ({ searchTarget, clearSearchTarget }) => {
     const { equipment, maintenanceLogs, saveEquipment, addMaintenanceLog } = useData();
     const [view, setView] = useState<'list' | 'form'>('list');
     const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
@@ -159,6 +164,18 @@ const EquipmentPage: FC = () => {
         setEditingEquipment(JSON.parse(JSON.stringify(eq)));
         setView('form');
     };
+
+    useEffect(() => {
+        if (searchTarget && searchTarget.page === 'equipment') {
+            const eq = equipment.find(e => e.id === searchTarget.id);
+            if (eq) {
+                // The maintenance log relatedEntityId is the equipmentId.
+                // So this should work for both 'EQUIPMENT' and 'MAINTENANCE' activities.
+                handleEdit(eq);
+            }
+            clearSearchTarget();
+        }
+    }, [searchTarget, equipment, clearSearchTarget]);
 
     const handleSave = (eq: Equipment) => {
         saveEquipment(eq);
