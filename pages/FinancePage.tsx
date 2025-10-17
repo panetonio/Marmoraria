@@ -1,4 +1,4 @@
-import React, { useState, useMemo, FC } from 'react';
+import React, { useState, useMemo, FC, useEffect, ChangeEvent } from 'react';
 import type { FinancialTransaction, TransactionStatus, TransactionType, PaymentMethod } from '../types';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -6,6 +6,10 @@ import Tabs from '../components/ui/Tabs';
 import { useData } from '../context/DataContext';
 import StatusBadge from '../components/ui/StatusBadge';
 import { transactionStatusMap } from '../config/statusMaps';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import { exportTransactionsToCSV } from '../utils/helpers';
 
 type FinanceView = 'contas' | 'fluxo_caixa' | 'relatorios';
 type ReportPeriod = 'day' | 'week' | 'month';
@@ -19,7 +23,7 @@ const KPICard: FC<{ title: string; value: string; colorClass?: string }> = ({ ti
     </Card>
 );
 
-const ReportTable: FC<{ title: string, transactions: FinancialTransaction[], total: number }> = ({ title, transactions, total }) => (
+const ReportTable: FC<{ title: React.ReactNode, transactions: FinancialTransaction[], total: number }> = ({ title, transactions, total }) => (
     <Card className="p-0 flex flex-col">
         <CardHeader>{title}</CardHeader>
         <CardContent className="flex-grow">
@@ -59,11 +63,160 @@ const ReportTable: FC<{ title: string, transactions: FinancialTransaction[], tot
     </Card>
 );
 
+const TransactionEditModal: FC<{
+    transaction: FinancialTransaction;
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (transaction: FinancialTransaction) => void;
+    paymentMethodLabels: Record<PaymentMethod, string>;
+}> = ({ transaction, isOpen, onClose, onSave, paymentMethodLabels }) => {
+    const [formData, setFormData] = useState<FinancialTransaction>(transaction);
+
+    useEffect(() => {
+        setFormData(transaction);
+    }, [transaction]);
+
+    const handleChange = (field: keyof FinancialTransaction, value: any) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleDateChange = (dateString: string) => {
+        // Preserves the time part of the original ISO string to avoid timezone shifts
+        const originalTime = formData.dueDate.split('T')[1] || '00:00:00.000Z';
+        const newIsoString = `${dateString}T${originalTime}`;
+        setFormData(prev => ({ ...prev, dueDate: newIsoString }));
+    };
+
+    const dateInputValue = useMemo(() => {
+        try {
+            return formData.dueDate.split('T')[0];
+        } catch (e) {
+            return '';
+        }
+    }, [formData.dueDate]);
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Editar Transação`}>
+            <div className="space-y-4">
+                <Input
+                    label="Descrição"
+                    id="edit-desc"
+                    value={formData.description}
+                    onChange={e => handleChange('description', e.target.value)}
+                />
+                <Input
+                    label="Valor (R$)"
+                    id="edit-amount"
+                    type="number"
+                    value={formData.amount}
+                    onChange={e => handleChange('amount', parseFloat(e.target.value) || 0)}
+                />
+                <Input
+                    label="Data de Vencimento"
+                    id="edit-dueDate"
+                    type="date"
+                    value={dateInputValue}
+                    onChange={e => handleDateChange(e.target.value)}
+                />
+                {formData.type === 'receita' && (
+                    <Select
+                        label="Método de Pagamento"
+                        id="edit-paymentMethod"
+                        value={formData.paymentMethod || ''}
+                        onChange={e => handleChange('paymentMethod', e.target.value as PaymentMethod)}
+                    >
+                        <option value="">-- Selecione --</option>
+                        {Object.entries(paymentMethodLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </Select>
+                )}
+            </div>
+            <div className="flex justify-end mt-6 space-x-3">
+                <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                <Button onClick={() => onSave(formData)}>Salvar Alterações</Button>
+            </div>
+        </Modal>
+    );
+};
+
+const AttachmentModal: FC<{
+    transaction: FinancialTransaction;
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (transactionId: string, file: File) => void;
+}> = ({ transaction, isOpen, onClose, onSave }) => {
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [error, setError] = useState<string>('');
+
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                setError('O arquivo é muito grande. O limite é de 5MB.');
+                setSelectedFile(null);
+            } else {
+                setError('');
+                setSelectedFile(file);
+            }
+        }
+    };
+
+    const handleSave = () => {
+        if (selectedFile) {
+            onSave(transaction.id, selectedFile);
+        } else {
+            setError('Por favor, selecione um arquivo.');
+        }
+    };
+
+    useEffect(() => {
+        if (!isOpen) {
+            setSelectedFile(null);
+            setError('');
+        }
+    }, [isOpen]);
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Anexar Comprovante para ${transaction.id}`}>
+            <div className="space-y-4">
+                <p className="text-sm text-text-secondary dark:text-slate-400">
+                    Anexe o comprovante de pagamento para a transação: <span className="font-semibold text-text-primary dark:text-slate-200">{transaction.description}</span> no valor de <span className="font-semibold text-text-primary dark:text-slate-200">{transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>.
+                </p>
+                <div>
+                    <label htmlFor="attachment-file" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">
+                        Selecione o arquivo (PDF ou Imagem, máx 5MB)
+                    </label>
+                    <input 
+                        id="attachment-file" 
+                        type="file" 
+                        accept="image/*,application/pdf"
+                        onChange={handleFileChange}
+                        className="block w-full text-sm text-text-secondary dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                    />
+                </div>
+                {selectedFile && (
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg text-sm">
+                        Arquivo selecionado: <span className="font-semibold">{selectedFile.name}</span>
+                    </div>
+                )}
+                {error && <p className="text-error text-center text-sm">{error}</p>}
+            </div>
+            <div className="flex justify-end mt-6 space-x-3">
+                <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                <Button onClick={handleSave} disabled={!selectedFile}>Salvar Anexo</Button>
+            </div>
+        </Modal>
+    );
+};
+
 
 const FinancePage: FC = () => {
-    const { financialTransactions: transactions, markTransactionAsPaid } = useData();
+    const { financialTransactions: transactions, markTransactionAsPaid, updateFinancialTransaction } = useData();
     const [view, setView] = useState<FinanceView>('contas');
     const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('month');
+    const [editingTransaction, setEditingTransaction] = useState<FinancialTransaction | null>(null);
+    const [attachingTransaction, setAttachingTransaction] = useState<FinancialTransaction | null>(null);
     
     const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
         pix: 'PIX',
@@ -167,6 +320,35 @@ const FinancePage: FC = () => {
         return projection;
     }, [transactions]);
 
+    const handleEditTransaction = (transaction: FinancialTransaction) => {
+        setEditingTransaction(transaction);
+    };
+
+    const handleSaveTransaction = (transaction: FinancialTransaction) => {
+        updateFinancialTransaction(transaction);
+        setEditingTransaction(null);
+    };
+
+    const handleSaveAttachment = (transactionId: string, file: File) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const url = event.target?.result as string;
+            const transaction = transactions.find(t => t.id === transactionId);
+            if (transaction) {
+                const updatedTransaction = {
+                    ...transaction,
+                    attachment: {
+                        name: file.name,
+                        url: url,
+                    },
+                };
+                updateFinancialTransaction(updatedTransaction);
+                setAttachingTransaction(null);
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
 
     const renderView = () => {
         switch (view) {
@@ -191,9 +373,23 @@ const FinancePage: FC = () => {
                                                 <td className="p-3 text-right font-mono">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                                 <td className="p-3 text-center"><StatusBadge status={t.status} statusMap={transactionStatusMap} /></td>
                                                 <td className="p-3 text-center">
-                                                    {t.status === 'pendente' && (
-                                                        <Button size="sm" onClick={() => markTransactionAsPaid(t.id)}>Marcar como Pago</Button>
-                                                    )}
+                                                    <div className="flex items-center justify-center space-x-2">
+                                                        {t.status === 'pendente' && (
+                                                            <>
+                                                                <Button size="sm" variant="ghost" onClick={() => handleEditTransaction(t)}>Editar</Button>
+                                                                <Button size="sm" onClick={() => markTransactionAsPaid(t.id)}>Marcar como Pago</Button>
+                                                            </>
+                                                        )}
+                                                        {t.status === 'pago' && (
+                                                            <>
+                                                                {t.attachment ? (
+                                                                    <Button size="sm" variant="ghost" onClick={() => window.open(t.attachment.url, '_blank')}>Ver Comprovante</Button>
+                                                                ) : (
+                                                                    <Button size="sm" variant="secondary" onClick={() => setAttachingTransaction(t)}>Anexar</Button>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -259,7 +455,21 @@ const FinancePage: FC = () => {
                          </Card>
                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[400px]">
                             <div className="space-y-6">
-                                <ReportTable title="Relatório de Entradas (Receitas Pagas)" transactions={filteredReportTransactions.entradas} total={filteredReportTransactions.totalEntradas} />
+                                <ReportTable 
+                                    title={
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="text-xl font-semibold text-text-primary dark:text-slate-100">Relatório de Entradas</h3>
+                                            <Button variant="ghost" size="sm" onClick={() => exportTransactionsToCSV(filteredReportTransactions.entradas, `entradas_${reportPeriod}.csv`)} disabled={filteredReportTransactions.entradas.length === 0}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                                </svg>
+                                                Exportar CSV
+                                            </Button>
+                                        </div>
+                                    }
+                                    transactions={filteredReportTransactions.entradas} 
+                                    total={filteredReportTransactions.totalEntradas} 
+                                />
                                 <Card>
                                     <CardHeader>Entradas por Método de Pagamento</CardHeader>
                                     <CardContent>
@@ -277,7 +487,21 @@ const FinancePage: FC = () => {
                                     </CardContent>
                                 </Card>
                             </div>
-                            <ReportTable title="Relatório de Saídas (Despesas Pagas)" transactions={filteredReportTransactions.saidas} total={filteredReportTransactions.totalSaidas} />
+                             <ReportTable 
+                                title={
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-xl font-semibold text-text-primary dark:text-slate-100">Relatório de Saídas</h3>
+                                        <Button variant="ghost" size="sm" onClick={() => exportTransactionsToCSV(filteredReportTransactions.saidas, `saidas_${reportPeriod}.csv`)} disabled={filteredReportTransactions.saidas.length === 0}>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                            </svg>
+                                            Exportar CSV
+                                        </Button>
+                                    </div>
+                                }
+                                transactions={filteredReportTransactions.saidas} 
+                                total={filteredReportTransactions.totalSaidas} 
+                             />
                          </div>
                     </div>
                 );
@@ -286,6 +510,23 @@ const FinancePage: FC = () => {
 
     return (
         <div>
+            {editingTransaction && (
+                <TransactionEditModal
+                    isOpen={!!editingTransaction}
+                    transaction={editingTransaction}
+                    onClose={() => setEditingTransaction(null)}
+                    onSave={handleSaveTransaction}
+                    paymentMethodLabels={PAYMENT_METHOD_LABELS}
+                />
+            )}
+            {attachingTransaction && (
+                <AttachmentModal
+                    isOpen={!!attachingTransaction}
+                    transaction={attachingTransaction}
+                    onClose={() => setAttachingTransaction(null)}
+                    onSave={handleSaveAttachment}
+                />
+            )}
             <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Módulo Financeiro</h1>
             <p className="mt-2 text-text-secondary dark:text-slate-400 mb-6">Controle contas a pagar, a receber e visualize relatórios.</p>
 

@@ -12,9 +12,12 @@ export const quoteStatusMap: StatusMap<QuoteStatus> = {
 export const productionStatusMap: StatusMap<ProductionStatus> = {
   cutting: { label: 'Em Corte', variant: 'warning' },
   finishing: { label: 'Em Acabamento', variant: 'primary' },
-  assembly: { label: 'Em Montagem', variant: 'primary' },
-  ready_for_delivery: { label: 'Pronto para Entrega', variant: 'primary' },
-  delivered: { label: 'Entregue', variant: 'success' },
+  awaiting_pickup: { label: 'Aguardando Retirada', variant: 'warning' },
+  ready_for_logistics: { label: 'Pronto p/ Logística', variant: 'primary' },
+  scheduled: { label: 'Agendado', variant: 'primary' },
+  in_transit: { label: 'Em Rota', variant: 'warning' },
+  realizado: { label: 'Realizado', variant: 'primary' },
+  completed: { label: 'Finalizado', variant: 'success' },
 };
 
 export const stockStatusMap: StatusMap<StockItemStatus> = {

@@ -1,6 +1,6 @@
-import React, { useState, useMemo, FC, DragEvent } from 'react';
+import React, { useState, useMemo, FC, DragEvent, ChangeEvent, useEffect } from 'react';
 import { mockProductionProfessionals } from '../data/mockData';
-import type { ServiceOrder, ProductionStatus, ProductionProfessional, StockItem } from '../types';
+import type { ServiceOrder, ProductionStatus, ProductionProfessional, StockItem, Priority, FinalizationType } from '../types';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -8,21 +8,47 @@ import { useData } from '../context/DataContext';
 import StatusBadge from '../components/ui/StatusBadge';
 import { productionStatusMap } from '../config/statusMaps';
 import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
+import Input from '../components/ui/Input';
+import FinalizationTypeModal from '../components/FinalizationTypeModal';
+
 
 const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
   { id: 'cutting', title: 'Em Corte', color: 'bg-orange-800' },
   { id: 'finishing', title: 'Em Acabamento', color: 'bg-blue-700' },
-  { id: 'assembly', title: 'Em Montagem', color: 'bg-indigo-700' },
-  { id: 'ready_for_delivery', title: 'Pronto para Entrega', color: 'bg-purple-700' },
-  { id: 'delivered', title: 'Entregue', color: 'bg-green-800' },
+  { id: 'awaiting_pickup', title: 'Aguardando Retirada', color: 'bg-yellow-600' },
 ];
+
+const priorityConfig: Record<Priority, { label: string; className: string }> = {
+    normal: { label: 'Normal', className: 'bg-slate-500 text-white' },
+    alta: { label: 'Alta', className: 'bg-amber-500 text-white' },
+    urgente: { label: 'Urgente', className: 'bg-red-600 text-white' },
+};
 
 const ServiceOrderDetailModal: FC<{
   isOpen: boolean;
   order: ServiceOrder;
   onClose: () => void;
-}> = ({ isOpen, order, onClose }) => {
+  onAttachClick: (order: ServiceOrder) => void;
+  onRemoveAttachment: (orderId: string) => void;
+  onUpdatePriority: (orderId: string, priority: Priority) => void;
+  onUpdateObservations: (orderId: string, observations: string) => void;
+}> = ({ isOpen, order, onClose, onAttachClick, onRemoveAttachment, onUpdatePriority, onUpdateObservations }) => {
   const assignedProfessionals = mockProductionProfessionals.filter(p => order.assignedToIds.includes(p.id));
+  const [observations, setObservations] = useState(order.observations || '');
+
+  useEffect(() => {
+    // Sync local state if the order prop changes (e.g., opening modal for a different order)
+    setObservations(order.observations || '');
+  }, [order]);
+
+  const handleCloseAndSave = () => {
+    // Only save if there's a change
+    if (observations !== (order.observations || '')) {
+      onUpdateObservations(order.id, observations);
+    }
+    onClose();
+  };
 
   const professionalRoles: Record<ProductionProfessional['role'], string> = {
       cortador: "Cortador",
@@ -32,7 +58,7 @@ const ServiceOrderDetailModal: FC<{
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Detalhes da OS: ${order.id}`} className="max-w-4xl">
+    <Modal isOpen={isOpen} onClose={handleCloseAndSave} title={`Detalhes da OS: ${order.id}`} className="max-w-4xl">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
           <Card className="p-0">
@@ -54,12 +80,34 @@ const ServiceOrderDetailModal: FC<{
                   <h4 className="text-sm text-text-secondary dark:text-slate-400">Status Atual</h4>
                   <StatusBadge status={order.status} statusMap={productionStatusMap} />
                 </div>
+                 <div className="col-span-2">
+                    <Select
+                        label="Prioridade"
+                        id="priority-select"
+                        value={order.priority || 'normal'}
+                        onChange={(e) => onUpdatePriority(order.id, e.target.value as Priority)}
+                    >
+                        <option value="normal">Normal</option>
+                        <option value="alta">Alta</option>
+                        <option value="urgente">Urgente</option>
+                    </Select>
+                 </div>
                  {order.allocatedSlabId && (
                     <div className="col-span-2">
                         <h4 className="text-sm text-text-secondary dark:text-slate-400">Chapa Alocada</h4>
                         <p className="font-semibold font-mono text-primary">{order.allocatedSlabId}</p>
                     </div>
                 )}
+                <div className="col-span-2">
+                    <Textarea
+                        label="Observações Gerais"
+                        id="os-observations"
+                        rows={4}
+                        value={observations}
+                        onChange={(e) => setObservations(e.target.value)}
+                        placeholder="Adicione notas importantes para a produção, como detalhes de acabamento, cuidados especiais, etc."
+                    />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -87,6 +135,33 @@ const ServiceOrderDetailModal: FC<{
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="p-0">
+            <CardHeader>Anexos</CardHeader>
+             <CardContent>
+                {order.attachment ? (
+                    <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg">
+                        <div className="flex items-center space-x-3">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-text-secondary dark:text-slate-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm font-medium text-text-primary dark:text-slate-200">{order.attachment.name}</p>
+                        </div>
+                        <div className="space-x-2">
+                            <a href={order.attachment.url} target="_blank" rel="noopener noreferrer">
+                                <Button variant="ghost" size="sm">Ver</Button>
+                            </a>
+                            <Button variant="destructive" size="sm" onClick={() => onRemoveAttachment(order.id)}>Remover</Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="text-center">
+                        <p className="text-sm text-text-secondary dark:text-slate-400 mb-2">Nenhum arquivo anexado a esta OS.</p>
+                        <Button variant="secondary" size="sm" onClick={() => onAttachClick(order)}>Anexar Arquivo</Button>
+                    </div>
+                )}
             </CardContent>
           </Card>
         </div>
@@ -234,18 +309,71 @@ const SlabAllocationModal: FC<{
     );
 };
 
-const ConfirmationModal: FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  message: string;
-}> = ({ isOpen, onClose, onConfirm, message }) => {
+const AttachmentModalOS: FC<{
+    order: ServiceOrder;
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (serviceOrderId: string, file: File) => void;
+}> = ({ order, isOpen, onClose, onSave }) => {
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [error, setError] = useState<string>('');
+
+    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                setError('O arquivo é muito grande. O limite é de 5MB.');
+                setSelectedFile(null);
+            } else {
+                setError('');
+                setSelectedFile(file);
+            }
+        }
+    };
+
+    const handleSave = () => {
+        if (selectedFile) {
+            onSave(order.id, selectedFile);
+        } else {
+            setError('Por favor, selecione um arquivo.');
+        }
+    };
+
+    useEffect(() => {
+        if (!isOpen) {
+            setSelectedFile(null);
+            setError('');
+        }
+    }, [isOpen]);
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Confirmar Ação">
-            <p className="text-text-primary dark:text-slate-200">{message}</p>
+        <Modal isOpen={isOpen} onClose={onClose} title={`Anexar Arquivo para OS: ${order.id}`}>
+            <div className="space-y-4">
+                <p className="text-sm text-text-secondary dark:text-slate-400">
+                    Anexe um projeto, foto ou documento relevante para a execução da OS.
+                </p>
+                <div>
+                    <label htmlFor="attachment-file-os" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">
+                        Selecione o arquivo (PDF ou Imagem, máx 5MB)
+                    </label>
+                    <input 
+                        id="attachment-file-os" 
+                        type="file" 
+                        accept="image/*,application/pdf"
+                        onChange={handleFileChange}
+                        className="block w-full text-sm text-text-secondary dark:text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                    />
+                </div>
+                {selectedFile && (
+                    <div className="p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg text-sm">
+                        Arquivo selecionado: <span className="font-semibold">{selectedFile.name}</span>
+                    </div>
+                )}
+                {error && <p className="text-error text-center text-sm">{error}</p>}
+            </div>
             <div className="flex justify-end mt-6 space-x-3">
                 <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-                <Button variant="primary" onClick={onConfirm}>Confirmar</Button>
+                <Button onClick={handleSave} disabled={!selectedFile}>Salvar Anexo</Button>
             </div>
         </Modal>
     );
@@ -259,19 +387,36 @@ const KanbanCard: FC<{
   onAssign: (order: ServiceOrder) => void;
   onAllocate: (order: ServiceOrder) => void;
   onView: (order: ServiceOrder) => void;
-}> = ({ order, isDragging, onDragStart, onDragEnd, onAssign, onAllocate, onView }) => {
+  onFinalize: (order: ServiceOrder) => void;
+}> = ({ order, isDragging, onDragStart, onDragEnd, onAssign, onAllocate, onView, onFinalize }) => {
   const assignedProfessionals = mockProductionProfessionals.filter(p => order.assignedToIds.includes(p.id));
+  const priority = order.priority || 'normal';
+
   return (
     <Card
       draggable
       onDragStart={(e) => onDragStart(e, order.id)}
       onDragEnd={onDragEnd}
       onClick={() => onView(order)}
-      className={`p-4 mt-4 shadow-sm border border-border dark:border-slate-700 cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-200 ${isDragging ? 'opacity-40 scale-95 bg-slate-200 dark:bg-slate-700' : ''}`}
+      className={`p-4 mt-4 shadow-sm border border-border dark:border-slate-700 cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-200 relative ${isDragging ? 'opacity-40 scale-95 bg-slate-200 dark:bg-slate-700' : ''}`}
     >
-      <div className="flex justify-between items-center">
-        <p className="font-bold text-sm font-mono">{order.id}</p>
-        <p className="text-xs text-text-secondary dark:text-slate-400 font-mono">Pedido: {order.orderId}</p>
+      {priority !== 'normal' && (
+        <div className={`absolute -top-2 -right-2 px-2 py-0.5 text-xs font-bold rounded-full shadow-lg ${priorityConfig[priority].className}`}>
+            {priorityConfig[priority].label.toUpperCase()}
+        </div>
+      )}
+      <div className="flex justify-between items-start">
+        <div>
+            <p className="font-bold text-sm font-mono">{order.id}</p>
+            <p className="text-xs text-text-secondary dark:text-slate-400 font-mono">Pedido: {order.orderId}</p>
+        </div>
+        {order.attachment && (
+            <div title={order.attachment.name} className="text-slate-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a3 3 0 10-6 0v4a3 3 0 106 0V7a1 1 0 10-2 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clipRule="evenodd" />
+                </svg>
+            </div>
+        )}
       </div>
       <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{order.clientName}</p>
 
@@ -282,7 +427,7 @@ const KanbanCard: FC<{
       )}
 
       <div className="mt-3 pt-3 border-t border-border dark:border-slate-700">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-2">
           <div className="flex -space-x-2">
             {assignedProfessionals.length > 0 ? (
               assignedProfessionals.map(professional => (
@@ -294,12 +439,17 @@ const KanbanCard: FC<{
               <span className="text-xs text-slate-400 dark:text-slate-500">Não alocado</span>
             )}
           </div>
-           {order.status === 'cutting' && !order.allocatedSlabId && (
-              <Button variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); onAllocate(order); }}>Alocar Chapa</Button>
-           )}
-           {order.status !== 'cutting' || order.allocatedSlabId ? (
+          <div className="flex items-center gap-2">
+            {order.status === 'finishing' && (
+                 <Button variant="accent" size="sm" onClick={(e) => { e.stopPropagation(); onFinalize(order); }}>Finalizar Produção</Button>
+            )}
+            {order.status === 'cutting' && !order.allocatedSlabId && (
+                <Button variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); onAllocate(order); }}>Alocar Chapa</Button>
+            )}
+            {order.status !== 'cutting' || order.allocatedSlabId ? (
                 <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onAssign(order); }}>Equipe</Button>
-           ) : null}
+            ) : null}
+          </div>
         </div>
       </div>
     </Card>
@@ -307,16 +457,20 @@ const KanbanCard: FC<{
 };
 
 const ProductionPage: FC = () => {
-  const { serviceOrders, setServiceOrders, allocateSlabToOrder } = useData();
+  const { 
+      serviceOrders, setServiceOrders, allocateSlabToOrder, addAttachmentToServiceOrder, 
+      removeAttachmentFromServiceOrder, updateServiceOrderPriority, 
+      updateServiceOrderObservations, setFinalizationType
+  } = useData();
   const [viewMode, setViewMode] = useState<'kanban' | 'timeline'>('kanban');
   const [modalOrder, setModalOrder] = useState<ServiceOrder | null>(null);
-  const [allocatingOrder, setAllocatingOrder] = useState<ServiceOrder | null>(null);
+  const [slabAllocatingOrder, setSlabAllocatingOrder] = useState<ServiceOrder | null>(null);
+  const [attachmentModalOrder, setAttachmentModalOrder] = useState<ServiceOrder | null>(null);
   const [viewingOrder, setViewingOrder] = useState<ServiceOrder | null>(null);
   const [professionalFilter, setProfessionalFilter] = useState<string>('');
   const [orderIdFilter, setOrderIdFilter] = useState<string>('');
-  const [confirmationData, setConfirmationData] = useState<{ orderId: string; newStatus: ProductionStatus } | null>(null);
+  const [finalizingOrder, setFinalizingOrder] = useState<ServiceOrder | null>(null);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
-  const [draggedOverColumn, setDraggedOverColumn] = useState<ProductionStatus | null>(null);
 
   const productionTeam = useMemo(() => mockProductionProfessionals, []);
 
@@ -324,7 +478,8 @@ const ProductionPage: FC = () => {
     return serviceOrders.filter(order => {
       const professionalMatch = professionalFilter ? order.assignedToIds.includes(professionalFilter) : true;
       const orderIdMatch = orderIdFilter ? order.orderId.toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
-      return professionalMatch && orderIdMatch;
+      const productionStatuses: ProductionStatus[] = ['cutting', 'finishing', 'awaiting_pickup'];
+      return professionalMatch && orderIdMatch && productionStatuses.includes(order.status);
     });
   }, [serviceOrders, professionalFilter, orderIdFilter]);
   
@@ -341,23 +496,24 @@ const ProductionPage: FC = () => {
     e.preventDefault();
   };
   
-  const handleDragEnter = (e: DragEvent<HTMLDivElement>, status: ProductionStatus) => {
-    e.preventDefault();
-    setDraggedOverColumn(status);
-  };
-
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDraggedOverColumn(null);
-  };
-  
   const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: ProductionStatus) => {
     e.preventDefault();
-    setDraggedOverColumn(null);
     const orderId = e.dataTransfer.getData("orderId");
     const order = serviceOrders.find(o => o.id === orderId);
     if (order && order.status !== newStatus) {
-        setConfirmationData({ orderId, newStatus });
+        if(newStatus === 'awaiting_pickup') return; // Cannot drag here
+        setServiceOrders(prevOrders =>
+            prevOrders.map(o =>
+                o.id === orderId ? { ...o, status: newStatus } : o
+            )
+        );
+    }
+  };
+
+  const handleFinalizeConfirm = (type: FinalizationType) => {
+    if (finalizingOrder) {
+        setFinalizationType(finalizingOrder.id, type);
+        setFinalizingOrder(null);
     }
   };
 
@@ -366,32 +522,19 @@ const ProductionPage: FC = () => {
       setModalOrder(null);
   }
 
-  const handleConfirmStatusChange = () => {
-    if (!confirmationData) return;
-    const { orderId, newStatus } = confirmationData;
-    setServiceOrders(prevOrders =>
-      prevOrders.map(order =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
-    setConfirmationData(null);
-  };
-
   const handleSlabAllocationSave = (serviceOrderId: string, slabId: string) => {
     allocateSlabToOrder(serviceOrderId, slabId);
-    setAllocatingOrder(null);
+    setSlabAllocatingOrder(null);
+  };
+
+  const handleSaveAttachment = (serviceOrderId: string, file: File) => {
+    addAttachmentToServiceOrder(serviceOrderId, file);
+    setAttachmentModalOrder(null);
   };
 
   const sortedTimelineOrders = useMemo(() => {
     return [...filteredServiceOrders].sort((a, b) => new Date(a.deliveryDate).getTime() - new Date(b.deliveryDate).getTime());
   }, [filteredServiceOrders]);
-
-  const columnTitles = useMemo(() => 
-    KANBAN_COLUMNS.reduce((acc, col) => {
-        acc[col.id] = col.title;
-        return acc;
-    }, {} as Record<ProductionStatus, string>), []);
-
 
   return (
     <div>
@@ -404,12 +547,20 @@ const ProductionPage: FC = () => {
             onSave={handleAssignSave}
         />
       )}
-      {allocatingOrder && (
+      {slabAllocatingOrder && (
         <SlabAllocationModal
-            isOpen={!!allocatingOrder}
-            order={allocatingOrder}
-            onClose={() => setAllocatingOrder(null)}
+            isOpen={!!slabAllocatingOrder}
+            order={slabAllocatingOrder}
+            onClose={() => setSlabAllocatingOrder(null)}
             onSave={handleSlabAllocationSave}
+        />
+      )}
+      {attachmentModalOrder && (
+        <AttachmentModalOS
+            isOpen={!!attachmentModalOrder}
+            order={attachmentModalOrder}
+            onClose={() => setAttachmentModalOrder(null)}
+            onSave={handleSaveAttachment}
         />
       )}
       {viewingOrder && (
@@ -417,14 +568,17 @@ const ProductionPage: FC = () => {
             isOpen={!!viewingOrder}
             order={viewingOrder}
             onClose={() => setViewingOrder(null)}
+            onAttachClick={() => setAttachmentModalOrder(viewingOrder)}
+            onRemoveAttachment={removeAttachmentFromServiceOrder}
+            onUpdatePriority={updateServiceOrderPriority}
+            onUpdateObservations={updateServiceOrderObservations}
         />
       )}
-      {confirmationData && (
-          <ConfirmationModal
-            isOpen={!!confirmationData}
-            onClose={() => setConfirmationData(null)}
-            onConfirm={handleConfirmStatusChange}
-            message={`Tem certeza que deseja mover a OS ${confirmationData.orderId} para o status "${columnTitles[confirmationData.newStatus]}"?`}
+      {finalizingOrder && (
+          <FinalizationTypeModal
+            isOpen={!!finalizingOrder}
+            onClose={() => setFinalizingOrder(null)}
+            onConfirm={handleFinalizeConfirm}
           />
       )}
       <div className="flex justify-between items-center">
@@ -466,15 +620,13 @@ const ProductionPage: FC = () => {
       </div>
       
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-5 gap-5 mt-6 h-[75vh]">
+        <div className="grid grid-cols-3 gap-5 mt-6 h-[75vh]">
           {KANBAN_COLUMNS.map(column => (
             <div 
                 key={column.id} 
-                className={`bg-slate-100 dark:bg-slate-800/50 rounded-lg p-3 flex flex-col transition-colors duration-200 ${draggedOverColumn === column.id ? 'bg-primary/10 dark:bg-primary/20' : ''}`}
+                className={`bg-slate-100 dark:bg-slate-800/50 rounded-lg p-3 flex flex-col`}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, column.id)}
-                onDragEnter={(e) => handleDragEnter(e, column.id)}
-                onDragLeave={handleDragLeave}
             >
               <div className={`flex items-center mb-4 border-l-4 pl-2 ${column.color.replace('bg-', 'border-')}`}>
                 <div className={`w-3 h-3 rounded-full mr-2 ${column.color}`}></div>
@@ -491,8 +643,10 @@ const ProductionPage: FC = () => {
                         onDragStart={handleDragStart}
                         onDragEnd={handleDragEnd}
                         onAssign={setModalOrder}
-                        onAllocate={setAllocatingOrder}
-                        onView={setViewingOrder} />
+                        onAllocate={setSlabAllocatingOrder}
+                        onView={setViewingOrder}
+                        onFinalize={setFinalizingOrder}
+                    />
                   ))}
               </div>
             </div>
@@ -509,25 +663,34 @@ const ProductionPage: FC = () => {
                             <th className="p-3">Data de Entrega</th>
                             <th className="p-3">OS ID</th>
                             <th className="p-3">Cliente</th>
+                            <th className="p-3">Prioridade</th>
                             <th className="p-3">Status</th>
                             <th className="p-3 text-right">Valor</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedTimelineOrders.map(order => (
+                        {sortedTimelineOrders.map(order => {
+                          const priority = order.priority || 'normal';
+                          return (
                             <tr key={order.id} onClick={() => setViewingOrder(order)} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer">
                                 <td className="p-3 font-semibold">{new Date(order.deliveryDate).toLocaleDateString()}</td>
                                 <td className="p-3 font-mono text-sm">{order.id}</td>
                                 <td className="p-3">{order.clientName}</td>
                                 <td className="p-3">
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${priorityConfig[priority].className}`}>
+                                        {priorityConfig[priority].label}
+                                    </span>
+                                </td>
+                                <td className="p-3">
                                     <StatusBadge status={order.status} statusMap={productionStatusMap} />
                                 </td>
                                 <td className="p-3 text-right">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             </tr>
-                        ))}
+                          );
+                        })}
                          {sortedTimelineOrders.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhuma Ordem de Serviço encontrada com os filtros aplicados.</td>
+                                <td colSpan={6} className="text-center p-4 text-text-secondary dark:text-slate-400">Nenhuma Ordem de Serviço encontrada com os filtros aplicados.</td>
                             </tr>
                         )}
                     </tbody>

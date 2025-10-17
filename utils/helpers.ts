@@ -1,4 +1,4 @@
-import type { Point, QuoteItem, QuoteItemType, Service, Product } from '../types';
+import type { Point, QuoteItem, QuoteItemType, Service, Product, FinancialTransaction } from '../types';
 
 export const generateWhatsAppLink = (phone: string): string => {
     if (!phone) return '';
@@ -85,4 +85,49 @@ export const validateQuoteItem = (
         }
     }
     return errors;
+};
+
+export const exportTransactionsToCSV = (transactions: FinancialTransaction[], filename: string) => {
+    if (transactions.length === 0) return;
+
+    const headers = [
+        'Data Pagamento',
+        'Descrição',
+        'Valor',
+        'Tipo',
+        'Status',
+        'Método Pagamento',
+        'Pedido Relacionado',
+        'Cliente Relacionado'
+    ];
+
+    const escapeCSV = (str: string) => `"${str.replace(/"/g, '""')}"`;
+
+    const csvRows = [
+        headers.join(','),
+        ...transactions.map(t => {
+            const row = [
+                t.paymentDate ? new Date(t.paymentDate).toLocaleDateString('pt-BR') : 'N/A',
+                escapeCSV(t.description),
+                t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                t.type,
+                t.status,
+                t.paymentMethod || 'N/A',
+                t.relatedOrderId || 'N/A',
+                t.relatedClientId || 'N/A'
+            ];
+            return row.join(',');
+        })
+    ];
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };

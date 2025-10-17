@@ -7,6 +7,7 @@ import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import DocumentPreview from '../components/QuotePreview';
 import { useData } from '../context/DataContext';
 import Select from '../components/ui/Select';
+import Input from '../components/ui/Input';
 
 
 const CreateServiceOrderModal: FC<{
@@ -60,9 +61,11 @@ const CreateServiceOrderModal: FC<{
             return;
         }
 
+        // FIX: Add missing 'deliveryAddress' property to satisfy the 'Omit<ServiceOrder, "id">' type.
         const newOsData: Omit<ServiceOrder, 'id'> = {
             orderId: order.id,
             clientName: order.clientName,
+            deliveryAddress: order.deliveryAddress,
             items: selectedItems,
             total: selectedItemsTotal,
             deliveryDate: new Date(deliveryDate).toISOString(),
@@ -164,9 +167,13 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
             
             const date = new Date(order.approvalDate);
             const startMatch = startDateFilter ? new Date(startDateFilter) <= date : true;
+            
             const end = endDateFilter ? new Date(endDateFilter) : null;
-            if (end) end.setHours(23, 59, 59, 999);
-            const endMatch = end ? date <= end : true;
+            if (end) {
+                // Set to the beginning of the next day in UTC to include the entire selected end day
+                end.setUTCDate(end.getUTCDate() + 1);
+            }
+            const endMatch = end ? date < end : true;
             
             const salespersonMatch = salespersonFilter ? order.salespersonId === salespersonFilter : true;
             return orderIdMatch && clientMatch && startMatch && endMatch && salespersonMatch;
@@ -248,47 +255,60 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
             <p className="mt-2 text-text-secondary dark:text-slate-400">Gerencie os pedidos e gere as Ordens de Serviço (OS) para a produção.</p>
 
             <Card className="mt-8 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <input
-                        type="text"
-                        placeholder="Filtrar por ID do Pedido..."
-                        value={orderIdFilter}
-                        onChange={(e) => setOrderIdFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700 h-[42px]"
-                        aria-label="Filtrar por ID do Pedido"
-                    />
-                    <input
-                        type="text"
-                        placeholder="Filtrar por Cliente..."
-                        value={clientFilter}
-                        onChange={(e) => setClientFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700 h-[42px]"
-                        aria-label="Filtrar por nome do cliente"
-                    />
-                    <input
-                        type="date"
-                        value={startDateFilter}
-                        onChange={(e) => setStartDateFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
-                        aria-label="Filtrar por data de início"
-                    />
-                     <input
-                        type="date"
-                        value={endDateFilter}
-                        onChange={(e) => setEndDateFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
-                        aria-label="Filtrar por data final"
-                    />
-                    <Select
-                        value={salespersonFilter}
-                        onChange={(e) => setSalespersonFilter(e.target.value)}
-                        aria-label="Filtrar por vendedor"
-                    >
-                        <option value="">Todos os Vendedores</option>
-                        {salespeople.map(user => (
-                            <option key={user.id} value={user.id}>{user.name}</option>
-                        ))}
-                    </Select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div>
+                        <Input
+                            id="order-id-filter-orders"
+                            label="ID do Pedido"
+                            type="text"
+                            placeholder="PED-..."
+                            value={orderIdFilter}
+                            onChange={(e) => setOrderIdFilter(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <Input
+                            id="client-filter-orders"
+                            label="Cliente"
+                            type="text"
+                            placeholder="Nome do cliente..."
+                            value={clientFilter}
+                            onChange={(e) => setClientFilter(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <Input
+                            id="start-date-filter-orders"
+                            label="Data Início"
+                            type="date"
+                            value={startDateFilter}
+                            onChange={(e) => setStartDateFilter(e.target.value)}
+                            className="text-text-secondary dark:text-slate-300"
+                        />
+                    </div>
+                    <div>
+                        <Input
+                            id="end-date-filter-orders"
+                            label="Data Final"
+                            type="date"
+                            value={endDateFilter}
+                            onChange={(e) => setEndDateFilter(e.target.value)}
+                            className="text-text-secondary dark:text-slate-300"
+                        />
+                    </div>
+                    <div>
+                        <Select
+                            id="salesperson-filter-orders"
+                            label="Vendedor"
+                            value={salespersonFilter}
+                            onChange={(e) => setSalespersonFilter(e.target.value)}
+                        >
+                            <option value="">Todos os Vendedores</option>
+                            {salespeople.map(user => (
+                                <option key={user.id} value={user.id}>{user.name}</option>
+                            ))}
+                        </Select>
+                    </div>
                 </div>
             </Card>
 

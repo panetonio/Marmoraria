@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import type { 
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem, 
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address 
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType 
 } from '../types';
 import { 
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers, 
@@ -48,11 +48,14 @@ interface DataContextType {
     addNote: (clientId: string, content: string) => void;
     saveQuote: (quote: Quote) => void;
     createServiceOrder: (newOsData: Omit<ServiceOrder, 'id'>) => void;
+    updateServiceOrderPriority: (serviceOrderId: string, priority: Priority) => void;
+    updateServiceOrderObservations: (serviceOrderId: string, observations: string) => void;
     saveInvoice: (invoice: Invoice) => void;
     issueInvoice: (invoiceId: string) => void;
     saveSupplier: (supplier: Supplier) => void;
     addEvent: (event: Omit<AgendaEvent, 'id'>) => void;
     markTransactionAsPaid: (transactionId: string) => void;
+    updateFinancialTransaction: (transaction: FinancialTransaction) => void;
     addReceipt: (receiptData: Omit<Receipt, 'id' | 'createdAt'>) => void;
     saveMaterial: (material: Material) => void;
     deleteMaterial: (materialId: string) => void;
@@ -61,6 +64,15 @@ interface DataContextType {
     saveProduct: (product: Product) => void;
     deleteProduct: (productId: string) => void;
     allocateSlabToOrder: (serviceOrderId: string, slabId: string) => void;
+    addAttachmentToServiceOrder: (serviceOrderId: string, file: File) => void;
+    removeAttachmentFromServiceOrder: (serviceOrderId: string) => void;
+    scheduleDelivery: (serviceOrderId: string, deliveryDate: string, teamIds: string[]) => void;
+    updateDepartureChecklist: (serviceOrderId: string, checklist: { id: string; text: string; checked: boolean }[]) => void;
+    updateServiceOrderStatus: (serviceOrderId: string, status: ProductionStatus) => void;
+    completeProductionStep: (serviceOrderId: string, requiresInstallation: boolean) => void;
+    setFinalizationType: (orderId: string, type: FinalizationType) => void;
+    confirmDelivery: (orderId: string) => void;
+    confirmInstallation: (orderId: string) => void;
 }
 
 // Create the context
@@ -202,13 +214,30 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const createServiceOrder = (newOsData: Omit<ServiceOrder, 'id'>) => {
         const newOsId = `OS-2024-${(serviceOrders.length + mockServiceOrders.length + 1).toString().padStart(3, '0')}`;
-        const newOs: ServiceOrder = { ...newOsData, id: newOsId };
+        const newOs: ServiceOrder = { 
+            ...newOsData, 
+            id: newOsId, 
+            priority: 'normal',
+            deliveryAddress: orders.find(o => o.id === newOsData.orderId)?.deliveryAddress as Address
+        };
         
         setServiceOrders(prev => [...prev, newOs]);
         setOrders(prev => prev.map(o => 
             o.id === newOs.orderId 
                 ? { ...o, serviceOrderIds: [...o.serviceOrderIds, newOs.id] } 
                 : o
+        ));
+    };
+
+    const updateServiceOrderPriority = (serviceOrderId: string, priority: Priority) => {
+        setServiceOrders(prev => prev.map(so => 
+            so.id === serviceOrderId ? { ...so, priority } : so
+        ));
+    };
+
+    const updateServiceOrderObservations = (serviceOrderId: string, observations: string) => {
+        setServiceOrders(prev => prev.map(so => 
+            so.id === serviceOrderId ? { ...so, observations } : so
         ));
     };
     
@@ -248,6 +277,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 t.id === transactionId
                     ? { ...t, status: 'pago', paymentDate: new Date().toISOString() }
                     : t
+            )
+        );
+    };
+
+    const updateFinancialTransaction = (transactionToUpdate: FinancialTransaction) => {
+        setFinancialTransactions(prev =>
+            prev.map(t =>
+                t.id === transactionToUpdate.id ? transactionToUpdate : t
             )
         );
     };
@@ -306,6 +343,86 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         ));
     };
 
+    const addAttachmentToServiceOrder = (serviceOrderId: string, file: File) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const url = event.target?.result as string;
+            setServiceOrders(prev => prev.map(so => 
+                so.id === serviceOrderId 
+                ? { ...so, attachment: { name: file.name, url } } 
+                : so
+            ));
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const removeAttachmentFromServiceOrder = (serviceOrderId: string) => {
+        setServiceOrders(prev => prev.map(so => {
+            if (so.id === serviceOrderId) {
+                const { attachment, ...rest } = so; // a safe way to remove the property
+                return rest;
+            }
+            return so;
+        }));
+    };
+    
+    const scheduleDelivery = (serviceOrderId: string, deliveryDate: string, teamIds: string[]) => {
+        setServiceOrders(prev => prev.map(so => 
+            so.id === serviceOrderId 
+            ? { ...so, status: 'scheduled', deliveryScheduledDate: deliveryDate, deliveryTeamIds: teamIds } 
+            : so
+        ));
+    };
+
+    const updateDepartureChecklist = (serviceOrderId: string, checklist: { id: string; text: string; checked: boolean }[]) => {
+        setServiceOrders(prev => prev.map(so => 
+            so.id === serviceOrderId ? { ...so, departureChecklist: checklist } : so
+        ));
+    };
+    
+    const updateServiceOrderStatus = (serviceOrderId: string, status: ProductionStatus) => {
+        setServiceOrders(prev => prev.map(so =>
+            so.id === serviceOrderId ? { ...so, status } : so
+        ));
+    };
+
+    const completeProductionStep = (serviceOrderId: string, requiresInstallation: boolean) => {
+        setServiceOrders(prev => prev.map(so => 
+            so.id === serviceOrderId ? { ...so, status: 'ready_for_logistics', requiresInstallation } : so
+        ));
+    };
+    
+    const setFinalizationType = (orderId: string, type: FinalizationType) => {
+        setServiceOrders(prev => prev.map(so => {
+            if (so.id === orderId) {
+                const newStatus = type === 'pickup' ? 'awaiting_pickup' : 'ready_for_logistics';
+                return { ...so, finalizationType: type, status: newStatus };
+            }
+            return so;
+        }));
+    };
+
+    const confirmDelivery = (orderId: string) => {
+        setServiceOrders(prev => prev.map(so => {
+            if (so.id === orderId) {
+                const isComplete = so.finalizationType === 'delivery_only';
+                return { ...so, delivery_confirmed: true, status: isComplete ? 'completed' : so.status };
+            }
+            return so;
+        }));
+    };
+    
+    const confirmInstallation = (orderId: string) => {
+        setServiceOrders(prev => prev.map(so => {
+            if (so.id === orderId) {
+                // An installation can only be completed if the delivery was also confirmed.
+                const isComplete = so.delivery_confirmed;
+                return { ...so, installation_confirmed: true, status: isComplete ? 'completed' : so.status };
+            }
+            return so;
+        }));
+    };
+
 
     const value = {
         clients, setClients,
@@ -330,11 +447,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addNote,
         saveQuote,
         createServiceOrder,
+        updateServiceOrderPriority,
+        updateServiceOrderObservations,
         saveInvoice,
         issueInvoice,
         saveSupplier,
         addEvent,
         markTransactionAsPaid,
+        updateFinancialTransaction,
         addReceipt,
         saveMaterial,
         deleteMaterial,
@@ -343,6 +463,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         saveProduct,
         deleteProduct,
         allocateSlabToOrder,
+        addAttachmentToServiceOrder,
+        removeAttachmentFromServiceOrder,
+        scheduleDelivery,
+        updateDepartureChecklist,
+        updateServiceOrderStatus,
+        completeProductionStep,
+        setFinalizationType,
+        confirmDelivery,
+        confirmInstallation,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

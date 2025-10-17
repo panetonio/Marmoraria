@@ -1,4 +1,4 @@
-import React, { useState, FC, useMemo } from 'react';
+import React, { useState, FC, useMemo, useEffect } from 'react';
 import type { Material, Service, Product } from '../types';
 import { useData } from '../context/DataContext';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
@@ -38,6 +38,13 @@ const MaterialFormModal: FC<{
     const { suppliers } = useData();
     const [material, setMaterial] = useState(initialMaterial);
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        setMaterial(initialMaterial);
+        if (!isOpen) {
+            setErrors({});
+        }
+    }, [initialMaterial, isOpen]);
 
     const handleChange = (field: keyof Material, value: any) => {
         setMaterial(prev => prev ? { ...prev, [field]: value } : null);

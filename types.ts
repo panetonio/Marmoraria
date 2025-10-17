@@ -1,9 +1,10 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
+export type Priority = 'normal' | 'alta' | 'urgente';
 
 export interface Address {
   cep: string;
@@ -150,7 +151,7 @@ export interface Quote {
   salespersonId?: string;
 }
 
-export type ProductionStatus = 'cutting' | 'finishing' | 'assembly' | 'ready_for_delivery' | 'delivered';
+export type ProductionStatus = 'cutting' | 'finishing' | 'awaiting_pickup' | 'ready_for_logistics' | 'scheduled' | 'in_transit' | 'realizado' | 'completed';
 
 export interface Order {
   id: string; // PED-
@@ -169,16 +170,32 @@ export interface Order {
   salespersonId?: string;
 }
 
+export type FinalizationType = 'pickup' | 'delivery_only' | 'delivery_installation';
+
 export interface ServiceOrder {
   id: string; // OS-
   orderId: string; // PED-
   clientName: string;
+  deliveryAddress: Address; // Copied from order for logistics use
   items: QuoteItem[];
   total: number;
   deliveryDate: string;
   assignedToIds: string[];
   status: ProductionStatus;
   allocatedSlabId?: string;
+  priority?: Priority;
+  requiresInstallation?: boolean; // Legacy, replaced by finalizationType
+  finalizationType?: FinalizationType;
+  delivery_confirmed?: boolean;
+  installation_confirmed?: boolean;
+  attachment?: {
+    name: string;
+    url: string;
+  };
+  deliveryScheduledDate?: string;
+  deliveryTeamIds?: string[];
+  departureChecklist?: { id: string; text: string; checked: boolean; }[];
+  observations?: string;
 }
 
 export type InvoiceStatus = 'pending' | 'issued' | 'canceled';
@@ -222,6 +239,10 @@ export interface FinancialTransaction {
   relatedOrderId?: string;
   relatedClientId?: string;
   paymentMethod?: PaymentMethod;
+  attachment?: {
+    name: string;
+    url: string;
+  };
 }
 
 export interface Receipt {

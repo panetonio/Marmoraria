@@ -80,52 +80,66 @@ const QuoteList: React.FC<{
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
-                     <input
-                        type="text"
-                        placeholder="Filtrar por Cliente..."
-                        value={clientFilter}
-                        onChange={(e) => onClientFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full bg-slate-50 dark:bg-slate-700 md:col-span-2 h-[42px]"
-                        aria-label="Filtrar por nome do cliente"
-                    />
-                     <input
-                        type="date"
-                        value={startDateFilter}
-                        onChange={(e) => onStartDateFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
-                        aria-label="Filtrar por data de início"
-                    />
-                    <input
-                        type="date"
-                        value={endDateFilter}
-                        onChange={(e) => onEndDateFilterChange(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
-                        aria-label="Filtrar por data final"
-                    />
-                    <Select
-                        value={statusFilter}
-                        onChange={(e) => onStatusFilterChange(e.target.value as QuoteStatus | '')}
-                        aria-label="Filtrar por status"
-                    >
-                        <option value="">Todos os Status</option>
-                        {Object.entries(statusLabels)
-                            .filter(([value]) => showArchived ? value === 'archived' : value !== 'archived')
-                            .map(([value, label]) => (
-                            <option key={value} value={value}>{label}</option>
-                        ))}
-                    </Select>
-                    <Select
-                        value={salespersonFilter}
-                        onChange={(e) => onSalespersonFilterChange(e.target.value)}
-                        aria-label="Filtrar por vendedor"
-                    >
-                        <option value="">Todos os Vendedores</option>
-                        {salespeople.map(user => (
-                            <option key={user.id} value={user.id}>{user.name}</option>
-                        ))}
-                    </Select>
-                    <div className="flex items-center justify-start md:col-span-6 md:justify-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-border dark:border-slate-700">
+                    <div className="sm:col-span-2 lg:col-span-1">
+                        <Input
+                            id="client-filter-quotes"
+                            label="Cliente"
+                            type="text"
+                            placeholder="Filtrar por Cliente..."
+                            value={clientFilter}
+                            onChange={(e) => onClientFilterChange(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <Input
+                            id="start-date-filter-quotes"
+                            label="Data Início"
+                            type="date"
+                            value={startDateFilter}
+                            onChange={(e) => onStartDateFilterChange(e.target.value)}
+                            className="text-text-secondary dark:text-slate-300"
+                        />
+                    </div>
+                    <div>
+                        <Input
+                            id="end-date-filter-quotes"
+                            label="Data Final"
+                            type="date"
+                            value={endDateFilter}
+                            onChange={(e) => onEndDateFilterChange(e.target.value)}
+                            className="text-text-secondary dark:text-slate-300"
+                        />
+                    </div>
+                    <div>
+                        <Select
+                            id="status-filter-quotes"
+                            label="Status"
+                            value={statusFilter}
+                            onChange={(e) => onStatusFilterChange(e.target.value as QuoteStatus | '')}
+                        >
+                            <option value="">Todos os Status</option>
+                            {Object.entries(statusLabels)
+                                .filter(([value]) => showArchived ? value === 'archived' : value !== 'archived')
+                                .map(([value, label]) => (
+                                <option key={value} value={value}>{label}</option>
+                            ))}
+                        </Select>
+                    </div>
+                    <div>
+                        <Select
+                            id="salesperson-filter-quotes"
+                            label="Vendedor"
+                            value={salespersonFilter}
+                            onChange={(e) => onSalespersonFilterChange(e.target.value)}
+                        >
+                            <option value="">Todos os Vendedores</option>
+                            {salespeople.map(user => (
+                                <option key={user.id} value={user.id}>{user.name}</option>
+                            ))}
+                        </Select>
+                    </div>
+                    <div className="flex items-end justify-start sm:col-span-2 lg:col-span-5 lg:justify-end">
                          <Button variant={showArchived ? 'primary' : 'ghost'} onClick={() => onShowArchivedChange(!showArchived)}>
                             {showArchived ? 'Ver Ativos' : 'Ver Arquivados'}
                         </Button>
@@ -846,8 +860,11 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
             const startMatch = startDateFilter ? new Date(startDateFilter) <= date : true;
             
             const end = endDateFilter ? new Date(endDateFilter) : null;
-            if (end) end.setHours(23, 59, 59, 999); // Include the whole end day
-            const endMatch = end ? date <= end : true;
+            if (end) {
+                // Set to the beginning of the next day in UTC to include the entire selected end day
+                end.setUTCDate(end.getUTCDate() + 1);
+            }
+            const endMatch = end ? date < end : true;
 
 
             const statusMatch = statusFilter 

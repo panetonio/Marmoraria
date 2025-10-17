@@ -1,4 +1,4 @@
-import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod } from '../types';
+import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address } from '../types';
 
 export const mockUsers: User[] = [
     { id: 'user-1', name: 'Admin', role: 'admin' },
@@ -16,6 +16,7 @@ export const mockProductionProfessionals: ProductionProfessional[] = [
     { id: 'prof-4', name: 'Sérgio Lima', role: 'acabador' },
     { id: 'prof-5', name: 'Luiz Pereira', role: 'montador' },
     { id: 'prof-6', name: 'Fernando Souza', role: 'entregador' },
+    { id: 'prof-7', name: 'Roberto Carlos', role: 'entregador' },
 ];
 
 export const mockClients: Client[] = [
@@ -222,21 +223,40 @@ export const mockServiceOrders: ServiceOrder[] = [
         id: 'OS-2024-001',
         orderId: 'PED-2024-001',
         clientName: 'João da Silva',
+        deliveryAddress: mockOrders[0].deliveryAddress,
         items: mockOrders[0].items,
         total: 2250,
         deliveryDate: '2024-08-15T17:00:00Z',
-        assignedToIds: ['prof-1'],
-        status: 'cutting'
+        assignedToIds: ['prof-1', 'prof-3'],
+        status: 'cutting',
+        requiresInstallation: true, // Bancada de cozinha precisa de instalação
+        observations: 'Cliente pediu para ter cuidado extra com o acabamento da pia da cozinha. Verificar medidas no local antes do corte final.'
     },
     {
         id: 'OS-2024-002',
         orderId: 'PED-2024-002',
         clientName: 'Carlos Souza',
+        deliveryAddress: mockOrders[1].deliveryAddress,
         items: mockOrders[1].items,
         total: 920,
         deliveryDate: '2024-08-20T17:00:00Z',
+        assignedToIds: ['prof-2'],
+        status: 'finishing',
+        requiresInstallation: false, // Soleira é apenas entrega
+        observations: ''
+    },
+    {
+        id: 'OS-2024-003',
+        orderId: 'PED-2024-002', // Another OS for the same order, maybe?
+        clientName: 'Maria Oliveira',
+        deliveryAddress: mockClients[1].address,
+        items: [mockQuotes[1].items[0]], // just one item
+        total: 216,
+        deliveryDate: '2024-08-22T17:00:00Z',
         assignedToIds: [],
-        status: 'assembly'
+        status: 'ready_for_logistics',
+        requiresInstallation: true,
+        observations: 'Atenção: Lavatório de Mármore Carrara. Frágil.'
     }
 ];
 

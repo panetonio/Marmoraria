@@ -11,6 +11,7 @@ const PAGE_LABELS: Record<Page, string> = {
   quotes: 'Orçamentos',
   orders: 'Pedidos',
   production: 'Produção',
+  logistics: 'Logística',
   stock: 'Estoque',
   suppliers: 'Fornecedores',
   crm: 'CRM',
