@@ -1,4 +1,4 @@
-import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, Equipment, MaintenanceLog, ProductionEmployee } from '../types';
+import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog } from '../types';
 
 export const mockUsers: User[] = [
     { id: 'user-1', name: 'Admin', role: 'admin' },
@@ -631,5 +631,176 @@ export const mockMaintenanceLogs: MaintenanceLog[] = [
         maintenanceWarrantyDate: '2025-03-15',
         warrantyClaim: false,
         createdAt: '2024-03-15T11:30:00Z'
+    }
+];
+
+export const mockActivityLogs: ActivityLog[] = [
+    {
+        id: 'act-1',
+        timestamp: '2024-08-01T10:30:00Z',
+        userId: 'user-2',
+        userName: 'João (Vendedor)',
+        activityType: 'quote_created',
+        activityTypeLabel: 'Orçamento Criado',
+        relatedEntityType: 'quote',
+        relatedEntityId: 'ORC-2024-001',
+        relatedEntityName: 'Orçamento para João da Silva',
+        details: {
+            clientName: 'João da Silva',
+            totalValue: 2250,
+            itemsCount: 2
+        },
+        createdAt: '2024-08-01T10:30:00Z'
+    },
+    {
+        id: 'act-2',
+        timestamp: '2024-08-01T11:15:00Z',
+        userId: 'user-2',
+        userName: 'João (Vendedor)',
+        activityType: 'quote_sent',
+        activityTypeLabel: 'Orçamento Enviado',
+        relatedEntityType: 'quote',
+        relatedEntityId: 'ORC-2024-001',
+        relatedEntityName: 'Orçamento para João da Silva',
+        details: {
+            sentTo: 'joao.silva@example.com',
+            method: 'email'
+        },
+        createdAt: '2024-08-01T11:15:00Z'
+    },
+    {
+        id: 'act-3',
+        timestamp: '2024-08-01T14:20:00Z',
+        userId: 'user-1',
+        userName: 'Admin',
+        activityType: 'quote_approved',
+        activityTypeLabel: 'Orçamento Aprovado',
+        relatedEntityType: 'quote',
+        relatedEntityId: 'ORC-2024-001',
+        relatedEntityName: 'Orçamento para João da Silva',
+        details: {
+            approvedBy: 'Admin',
+            approvedAt: '2024-08-01T14:20:00Z'
+        },
+        createdAt: '2024-08-01T14:20:00Z'
+    },
+    {
+        id: 'act-4',
+        timestamp: '2024-08-01T14:25:00Z',
+        userId: 'user-1',
+        userName: 'Admin',
+        activityType: 'order_created',
+        activityTypeLabel: 'Pedido Criado',
+        relatedEntityType: 'order',
+        relatedEntityId: 'PED-2024-001',
+        relatedEntityName: 'Pedido PED-2024-001',
+        details: {
+            originalQuoteId: 'ORC-2024-001',
+            clientName: 'João da Silva',
+            totalValue: 2250
+        },
+        createdAt: '2024-08-01T14:25:00Z'
+    },
+    {
+        id: 'act-5',
+        timestamp: '2024-08-02T09:00:00Z',
+        userId: 'user-3',
+        userName: 'Maria (Produção)',
+        activityType: 'equipment_created',
+        activityTypeLabel: 'Equipamento Adicionado',
+        relatedEntityType: 'equipment',
+        relatedEntityId: 'eq-1',
+        relatedEntityName: 'Máquina de Corte CNC',
+        details: {
+            serialNumber: 'CNC-2023-001',
+            category: 'maquina',
+            assignedTo: 'Marcos Silva'
+        },
+        createdAt: '2024-08-02T09:00:00Z'
+    },
+    {
+        id: 'act-6',
+        timestamp: '2024-08-02T10:30:00Z',
+        userId: 'user-3',
+        userName: 'Maria (Produção)',
+        activityType: 'maintenance_created',
+        activityTypeLabel: 'Manutenção Registrada',
+        relatedEntityType: 'maintenance',
+        relatedEntityId: 'maint-1',
+        relatedEntityName: 'Manutenção CNC-2023-001',
+        details: {
+            equipmentName: 'Máquina de Corte CNC',
+            cost: 850,
+            performedBy: 'Técnica Industrial Ltda',
+            warrantyClaim: false
+        },
+        createdAt: '2024-08-02T10:30:00Z'
+    },
+    {
+        id: 'act-7',
+        timestamp: '2024-08-02T11:45:00Z',
+        userId: 'user-1',
+        userName: 'Admin',
+        activityType: 'employee_created',
+        activityTypeLabel: 'Funcionário Adicionado',
+        relatedEntityType: 'employee',
+        relatedEntityId: 'emp-1',
+        relatedEntityName: 'Marcos Silva',
+        details: {
+            role: 'cortador',
+            phone: '(11) 99999-1111',
+            hireDate: '2023-01-15'
+        },
+        createdAt: '2024-08-02T11:45:00Z'
+    },
+    {
+        id: 'act-8',
+        timestamp: '2024-08-02T14:00:00Z',
+        userId: 'user-3',
+        userName: 'Maria (Produção)',
+        activityType: 'delivery_scheduled',
+        activityTypeLabel: 'Entrega Agendada',
+        relatedEntityType: 'service_order',
+        relatedEntityId: 'OS-2024-001',
+        relatedEntityName: 'OS-2024-001',
+        details: {
+            clientName: 'João da Silva',
+            scheduledDate: '2024-08-15',
+            teamMembers: ['Fernando Souza', 'Roberto Carlos']
+        },
+        createdAt: '2024-08-02T14:00:00Z'
+    },
+    {
+        id: 'act-9',
+        timestamp: '2024-08-03T08:30:00Z',
+        userId: 'user-2',
+        userName: 'João (Vendedor)',
+        activityType: 'client_created',
+        activityTypeLabel: 'Cliente Criado',
+        relatedEntityType: 'client',
+        relatedEntityId: 'cli-5',
+        relatedEntityName: 'Ana Costa',
+        details: {
+            type: 'pessoa_fisica',
+            email: 'ana.costa@example.com',
+            phone: '(11) 99999-5555'
+        },
+        createdAt: '2024-08-03T08:30:00Z'
+    },
+    {
+        id: 'act-10',
+        timestamp: '2024-08-03T16:20:00Z',
+        userId: 'user-1',
+        userName: 'Admin',
+        activityType: 'user_login',
+        activityTypeLabel: 'Login Realizado',
+        relatedEntityType: 'user',
+        relatedEntityId: 'user-1',
+        relatedEntityName: 'Admin',
+        details: {
+            loginTime: '2024-08-03T16:20:00Z',
+            ipAddress: '192.168.1.100'
+        },
+        createdAt: '2024-08-03T16:20:00Z'
     }
 ];

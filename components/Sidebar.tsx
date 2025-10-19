@@ -57,6 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage }) => {
           {hasAccessToPage('finance') && <NavLink page="finance" label="Financeiro" icon={ICONS.finance} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasAccessToPage('equipment') && <NavLink page="equipment" label="Equipamentos" icon={ICONS.equipment} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
         {hasAccessToPage('production_employees') && <NavLink page="production_employees" label="Funcionários" icon={ICONS.production_employees} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
+        {hasAccessToPage('activity_log') && <NavLink page="activity_log" label="Histórico" icon={ICONS.activity_log} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
           {hasAccessToPage('users') && <NavLink page="users" label="Usuários" icon={ICONS.users} currentPage={currentPage} setCurrentPage={setCurrentPage} />}
         </nav>
       </div>

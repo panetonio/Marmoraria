@@ -15,6 +15,7 @@ export const PERMISSIONS: Record<Page, string> = {
   catalog: 'manage_catalog',
   equipment: 'manage_equipment',
   production_employees: 'manage_production_employees',
+  activity_log: 'view_activity_log',
   users: 'manage_users',
 };
 
@@ -26,7 +27,7 @@ export const ROLES = {
         'view_production', 'view_logistics', 'manage_stock', 'view_stock', 'manage_suppliers',
         'manage_crm', 'manage_finance', 'manage_invoices', 'view_receipts',
         'manage_catalog', 'manage_stock_levels', 'assign_production_resources', 'manage_users',
-        'manage_equipment', 'manage_production_employees'
+        'manage_equipment', 'manage_production_employees', 'view_activity_log'
     ],
   },
   vendedor: {

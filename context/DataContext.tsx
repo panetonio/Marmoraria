@@ -1,13 +1,13 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type { 
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem, 
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee 
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType 
 } from '../types';
 import { 
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers, 
     mockMaterials, mockStockItems, mockServices, mockProducts, mockQuotes, 
     mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions,
-    mockEquipment, mockMaintenanceLogs, mockProductionEmployees 
+    mockEquipment, mockMaintenanceLogs, mockProductionEmployees, mockActivityLogs 
 } from '../data/mockData';
 import { api } from '../utils/api';
 
@@ -50,6 +50,8 @@ interface DataContextType {
     setMaintenanceLogs: React.Dispatch<React.SetStateAction<MaintenanceLog[]>>;
     productionEmployees: ProductionEmployee[];
     setProductionEmployees: React.Dispatch<React.SetStateAction<ProductionEmployee[]>>;
+    activityLogs: ActivityLog[];
+    setActivityLogs: React.Dispatch<React.SetStateAction<ActivityLog[]>>;
 
 
     // Add specific data manipulation functions here
@@ -96,6 +98,12 @@ interface DataContextType {
     addProductionEmployee: (employee: ProductionEmployee) => void;
     updateProductionEmployee: (employee: ProductionEmployee) => void;
     deleteProductionEmployee: (employeeId: string) => void;
+    
+    // Activity log management functions
+    addActivityLog: (activity: Omit<ActivityLog, 'id' | 'timestamp' | 'createdAt'>) => void;
+    getActivityLogsByEntity: (entityType: string, entityId: string) => ActivityLog[];
+    getActivityLogsByUser: (userId: string) => ActivityLog[];
+    getActivityLogsByType: (activityType: ActivityType) => ActivityLog[];
 }
 
 // Create the context
@@ -124,6 +132,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [equipment, setEquipment] = useState<Equipment[]>(mockEquipment);
     const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(mockMaintenanceLogs);
     const [productionEmployees, setProductionEmployees] = useState<ProductionEmployee[]>(mockProductionEmployees);
+    const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(mockActivityLogs);
 
     // Carregar dados do backend
     useEffect(() => {
@@ -639,6 +648,41 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         ));
     };
 
+    // Activity log management functions
+    const addActivityLog = (activity: Omit<ActivityLog, 'id' | 'timestamp' | 'createdAt'>) => {
+        const now = new Date().toISOString();
+        const newActivity: ActivityLog = {
+            ...activity,
+            id: `act-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: now,
+            createdAt: now
+        };
+        setActivityLogs(prev => [newActivity, ...prev]);
+        
+        // Persist to localStorage for demo purposes
+        try {
+            const stored = localStorage.getItem('activityLogs');
+            const existing = stored ? JSON.parse(stored) : [];
+            localStorage.setItem('activityLogs', JSON.stringify([newActivity, ...existing]));
+        } catch (error) {
+            console.warn('Failed to persist activity log to localStorage:', error);
+        }
+    };
+
+    const getActivityLogsByEntity = (entityType: string, entityId: string): ActivityLog[] => {
+        return activityLogs.filter(log => 
+            log.relatedEntityType === entityType && log.relatedEntityId === entityId
+        );
+    };
+
+    const getActivityLogsByUser = (userId: string): ActivityLog[] => {
+        return activityLogs.filter(log => log.userId === userId);
+    };
+
+    const getActivityLogsByType = (activityType: ActivityType): ActivityLog[] => {
+        return activityLogs.filter(log => log.activityType === activityType);
+    };
+
 
     const value = {
         clients, setClients,
@@ -661,6 +705,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         equipment, setEquipment,
         maintenanceLogs, setMaintenanceLogs,
         productionEmployees, setProductionEmployees,
+        activityLogs, setActivityLogs,
         
         addClient,
         updateClient,
@@ -705,6 +750,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addProductionEmployee,
         updateProductionEmployee,
         deleteProductionEmployee,
+        
+        // Activity log management functions
+        addActivityLog,
+        getActivityLogsByEntity,
+        getActivityLogsByUser,
+        getActivityLogsByType,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

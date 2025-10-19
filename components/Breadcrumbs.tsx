@@ -21,6 +21,7 @@ const PAGE_LABELS: Record<Page, string> = {
   catalog: 'Catálogo',
   equipment: 'Equipamentos',
   production_employees: 'Funcionários',
+  activity_log: 'Histórico',
   users: 'Usuários',
 };
 

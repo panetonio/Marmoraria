@@ -1,6 +1,6 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'production_employees';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'production_employees' | 'activity_log';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
@@ -304,5 +304,34 @@ export interface MaintenanceLog {
   nextMaintenanceDate?: string;
   maintenanceWarrantyDate?: string; // Data de garantia da manutenção (opcional)
   warrantyClaim: boolean; // indica se foi coberto pela garantia do equipamento
+  createdAt: string;
+}
+
+export type ActivityType = 
+  | 'quote_created' | 'quote_updated' | 'quote_sent' | 'quote_approved' | 'quote_rejected'
+  | 'order_created' | 'order_updated' | 'order_approved' | 'order_cancelled'
+  | 'client_created' | 'client_updated' | 'client_deleted'
+  | 'equipment_created' | 'equipment_updated' | 'equipment_deleted' | 'equipment_assigned'
+  | 'maintenance_created' | 'maintenance_updated' | 'maintenance_completed'
+  | 'employee_created' | 'employee_updated' | 'employee_deleted'
+  | 'invoice_created' | 'invoice_updated' | 'invoice_paid' | 'invoice_cancelled'
+  | 'delivery_scheduled' | 'delivery_started' | 'delivery_completed'
+  | 'installation_scheduled' | 'installation_completed'
+  | 'user_login' | 'user_logout' | 'user_created' | 'user_updated'
+  | 'system_backup' | 'system_restore' | 'data_export' | 'data_import';
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string; // Nome do usuário para facilitar exibição
+  activityType: ActivityType;
+  activityTypeLabel: string; // Label legível em português
+  relatedEntityType?: string; // Tipo da entidade relacionada (quote, order, client, etc.)
+  relatedEntityId?: string; // ID da entidade relacionada
+  relatedEntityName?: string; // Nome da entidade para facilitar exibição
+  details?: Record<string, any>; // Detalhes específicos da atividade em JSON
+  ipAddress?: string; // IP do usuário (para auditoria)
+  userAgent?: string; // User agent do navegador
   createdAt: string;
 }

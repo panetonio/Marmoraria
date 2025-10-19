@@ -15,6 +15,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import ReceiptsPage from './pages/ReceiptsPage';
 import EquipmentPage from './pages/EquipmentPage';
 import ProductionEmployeesPage from './pages/ProductionEmployeesPage';
+import ActivityLogPage from './pages/ActivityLogPage';
 import UsersPage from './pages/UsersPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -135,6 +136,8 @@ const MainApp: React.FC = () => {
             return <EquipmentPage />;
         case 'production_employees':
             return <ProductionEmployeesPage />;
+        case 'activity_log':
+            return <ActivityLogPage />;
       case 'users':
         return <UsersPage />;
       default:
