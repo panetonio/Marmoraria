@@ -88,6 +88,7 @@ const MainApp: React.FC = () => {
   
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [searchTarget, setSearchTarget] = useState<{ page: Page; id: string } | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     // When accessing a page, check if user has permission
@@ -154,8 +155,13 @@ const MainApp: React.FC = () => {
 
   return (
     <DataProvider>
-      <div className="flex h-screen font-sans">
-        <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
+      <div className="flex h-screen font-sans overflow-hidden">
+        <Sidebar 
+          currentPage={currentPage} 
+          setCurrentPage={setCurrentPage} 
+          theme={theme} 
+          onCollapseChange={setSidebarCollapsed}
+        />
         <div className="flex-1 flex flex-col overflow-hidden">
           <header className="bg-background dark:bg-slate-900 p-4 flex justify-end items-center space-x-4 border-b border-border dark:border-slate-700">
               <GlobalSearch onNavigate={handleSearchNavigate} />
