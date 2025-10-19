@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import QuotesPage from './pages/QuotesPage';
 import OrdersPage from './pages/OrdersPage';
 import ProductionPage from './pages/ProductionPage';
+import AssemblyPage from './pages/AssemblyPage';
 import LogisticsPage from './pages/LogisticsPage';
 import StockPage from './pages/StockPage';
 import CatalogPage from './pages/CatalogPage';
@@ -116,6 +117,8 @@ const MainApp: React.FC = () => {
         return <OrdersPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'production':
         return <ProductionPage />;
+      case 'assembly':
+        return <AssemblyPage />;
       case 'logistics':
         return <LogisticsPage />;
       case 'stock':

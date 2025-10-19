@@ -5,6 +5,7 @@ export const PERMISSIONS: Record<Page, string> = {
   quotes: 'view_quotes',
   orders: 'view_orders',
   production: 'view_production',
+  assembly: 'view_assembly',
   logistics: 'view_logistics',
   stock: 'view_stock',
   suppliers: 'manage_suppliers',
@@ -24,7 +25,7 @@ export const ROLES = {
     displayName: 'Administrador',
     permissions: [
         'view_dashboard', 'manage_quotes', 'view_quotes', 'view_orders',
-        'view_production', 'view_logistics', 'manage_stock', 'view_stock', 'manage_suppliers',
+        'view_production', 'view_assembly', 'view_logistics', 'manage_stock', 'view_stock', 'manage_suppliers',
         'manage_crm', 'manage_finance', 'manage_invoices', 'view_receipts',
         'manage_catalog', 'manage_stock_levels', 'assign_production_resources', 'manage_users',
         'manage_equipment', 'manage_production_employees', 'view_activity_log'
@@ -47,6 +48,7 @@ export const ROLES = {
       PERMISSIONS.dashboard,
       PERMISSIONS.orders,
       PERMISSIONS.production,
+      PERMISSIONS.assembly,
       PERMISSIONS.logistics,
       PERMISSIONS.stock, // Permite ver a página de estoque
       'manage_stock',   // Permite ações como alocar chapas
