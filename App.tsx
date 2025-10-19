@@ -13,6 +13,8 @@ import CrmPage from './pages/CrmPage';
 import FinancePage from './pages/FinancePage';
 import InvoicesPage from './pages/InvoicesPage';
 import ReceiptsPage from './pages/ReceiptsPage';
+import EquipmentPage from './pages/EquipmentPage';
+import ProductionEmployeesPage from './pages/ProductionEmployeesPage';
 import UsersPage from './pages/UsersPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -129,6 +131,10 @@ const MainApp: React.FC = () => {
         return <FinancePage />;
       case 'receipts':
         return <ReceiptsPage />;
+        case 'equipment':
+            return <EquipmentPage />;
+        case 'production_employees':
+            return <ProductionEmployeesPage />;
       case 'users':
         return <UsersPage />;
       default:

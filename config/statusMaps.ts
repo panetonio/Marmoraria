@@ -1,4 +1,4 @@
-import type { QuoteStatus, ProductionStatus, StockItemStatus, InvoiceStatus, TransactionStatus } from '../types';
+import type { QuoteStatus, ProductionStatus, StockItemStatus, InvoiceStatus, TransactionStatus, EquipmentStatus, EquipmentCategory } from '../types';
 import type { StatusMap } from '../components/ui/StatusBadge';
 
 export const quoteStatusMap: StatusMap<QuoteStatus> = {
@@ -36,4 +36,15 @@ export const invoiceStatusMap: StatusMap<InvoiceStatus> = {
 export const transactionStatusMap: StatusMap<TransactionStatus> = {
     pago: { label: "Pago", variant: 'success' },
     pendente: { label: "Pendente", variant: 'warning' },
+};
+
+export const equipmentStatusMap: StatusMap<EquipmentStatus> = {
+    operacional: { label: "Operacional", variant: "success" },
+    em_manutencao: { label: "Em Manutenção", variant: "warning" },
+    desativado: { label: "Desativado", variant: "error" },
+};
+
+export const equipmentCategoryMap: StatusMap<EquipmentCategory> = {
+    maquina: { label: "Máquina", variant: "primary" },
+    veiculo: { label: "Veículo", variant: "secondary" },
 };

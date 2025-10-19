@@ -1,6 +1,6 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'production_employees';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
@@ -33,13 +33,22 @@ export interface AuthUser {
   createdAt: string;
 }
 
-export type ProductionProfessionalRole = 'cortador' | 'acabador' | 'montador' | 'entregador';
+export type ProductionEmployeeRole = 'cortador' | 'acabador' | 'montador' | 'entregador' | 'supervisor' | 'auxiliar';
 
-export interface ProductionProfessional {
+export interface ProductionEmployee {
   id: string;
   name: string;
-  role: ProductionProfessionalRole;
+  role: ProductionEmployeeRole;
+  phone: string;
+  email?: string;
+  isActive: boolean;
+  hireDate: string;
+  createdAt: string;
 }
+
+// Manter compatibilidade com o sistema antigo
+export type ProductionProfessionalRole = ProductionEmployeeRole;
+export interface ProductionProfessional extends ProductionEmployee {}
 
 export interface Client {
   id: string;
@@ -263,5 +272,37 @@ export interface Receipt {
   cpfCnpj: string;
   amount: number;
   description: string;
+  createdAt: string;
+}
+
+export type EquipmentStatus = 'operacional' | 'em_manutencao' | 'desativado';
+export type EquipmentCategory = 'maquina' | 'veiculo';
+
+export interface Equipment {
+  id: string;
+  name: string;
+  serialNumber: string;
+  category: EquipmentCategory;
+  purchaseDate: string;
+  warrantyEndDate: string;
+  purchaseInvoiceId?: string; // Link para Invoice de compra
+  assignedTo: string; // ID do funcionário de produção (obrigatório)
+  status: EquipmentStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MaintenanceLog {
+  id: string;
+  equipmentId: string;
+  maintenanceDate: string;
+  description: string;
+  cost: number;
+  performedBy: string; // Nome da empresa terceirizada
+  companyCnpj: string; // CNPJ da empresa terceirizada
+  invoiceNumber: string; // Número da NF da manutenção
+  nextMaintenanceDate?: string;
+  maintenanceWarrantyDate?: string; // Data de garantia da manutenção (opcional)
+  warrantyClaim: boolean; // indica se foi coberto pela garantia do equipamento
   createdAt: string;
 }

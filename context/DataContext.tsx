@@ -1,12 +1,13 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type { 
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem, 
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User 
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee 
 } from '../types';
 import { 
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers, 
     mockMaterials, mockStockItems, mockServices, mockProducts, mockQuotes, 
-    mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions 
+    mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions,
+    mockEquipment, mockMaintenanceLogs, mockProductionEmployees 
 } from '../data/mockData';
 import { api } from '../utils/api';
 
@@ -43,6 +44,12 @@ interface DataContextType {
     setUsers: React.Dispatch<React.SetStateAction<User[]>>;
     freightCostPerKm: number;
     setFreightCostPerKm: React.Dispatch<React.SetStateAction<number>>;
+    equipment: Equipment[];
+    setEquipment: React.Dispatch<React.SetStateAction<Equipment[]>>;
+    maintenanceLogs: MaintenanceLog[];
+    setMaintenanceLogs: React.Dispatch<React.SetStateAction<MaintenanceLog[]>>;
+    productionEmployees: ProductionEmployee[];
+    setProductionEmployees: React.Dispatch<React.SetStateAction<ProductionEmployee[]>>;
 
 
     // Add specific data manipulation functions here
@@ -76,6 +83,19 @@ interface DataContextType {
     setFinalizationType: (orderId: string, type: FinalizationType) => void;
     confirmDelivery: (orderId: string) => void;
     confirmInstallation: (orderId: string) => void;
+    
+    // Equipment management functions
+    addEquipment: (equipment: Equipment) => void;
+    updateEquipment: (equipment: Equipment) => void;
+    deleteEquipment: (equipmentId: string) => void;
+    addMaintenanceLog: (maintenanceLog: MaintenanceLog) => void;
+    updateMaintenanceLog: (maintenanceLog: MaintenanceLog) => void;
+    deleteMaintenanceLog: (maintenanceLogId: string) => void;
+    
+    // Production employee management functions
+    addProductionEmployee: (employee: ProductionEmployee) => void;
+    updateProductionEmployee: (employee: ProductionEmployee) => void;
+    deleteProductionEmployee: (employeeId: string) => void;
 }
 
 // Create the context
@@ -101,6 +121,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [receipts, setReceipts] = useState<Receipt[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [freightCostPerKm, setFreightCostPerKm] = useState<number>(8);
+    const [equipment, setEquipment] = useState<Equipment[]>(mockEquipment);
+    const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(mockMaintenanceLogs);
+    const [productionEmployees, setProductionEmployees] = useState<ProductionEmployee[]>(mockProductionEmployees);
 
     // Carregar dados do backend
     useEffect(() => {
@@ -572,6 +595,50 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }));
     };
 
+    // Equipment management functions
+    const addEquipment = (equipment: Equipment) => {
+        setEquipment(prev => [...prev, equipment]);
+    };
+
+    const updateEquipment = (equipment: Equipment) => {
+        setEquipment(prev => prev.map(eq => eq.id === equipment.id ? equipment : eq));
+    };
+
+    const deleteEquipment = (equipmentId: string) => {
+        setEquipment(prev => prev.filter(eq => eq.id !== equipmentId));
+        // Also delete related maintenance logs
+        setMaintenanceLogs(prev => prev.filter(log => log.equipmentId !== equipmentId));
+    };
+
+    const addMaintenanceLog = (maintenanceLog: MaintenanceLog) => {
+        setMaintenanceLogs(prev => [...prev, maintenanceLog]);
+    };
+
+    const updateMaintenanceLog = (maintenanceLog: MaintenanceLog) => {
+        setMaintenanceLogs(prev => prev.map(log => log.id === maintenanceLog.id ? maintenanceLog : log));
+    };
+
+    const deleteMaintenanceLog = (maintenanceLogId: string) => {
+        setMaintenanceLogs(prev => prev.filter(log => log.id !== maintenanceLogId));
+    };
+
+    // Production employee management functions
+    const addProductionEmployee = (employee: ProductionEmployee) => {
+        setProductionEmployees(prev => [...prev, employee]);
+    };
+
+    const updateProductionEmployee = (employee: ProductionEmployee) => {
+        setProductionEmployees(prev => prev.map(emp => emp.id === employee.id ? employee : emp));
+    };
+
+    const deleteProductionEmployee = (employeeId: string) => {
+        setProductionEmployees(prev => prev.filter(emp => emp.id !== employeeId));
+        // Remove assignment from equipment if this employee was assigned
+        setEquipment(prev => prev.map(eq => 
+            eq.assignedTo === employeeId ? { ...eq, assignedTo: '' } : eq
+        ));
+    };
+
 
     const value = {
         clients, setClients,
@@ -591,6 +658,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         receipts, setReceipts,
         users, setUsers,
         freightCostPerKm, setFreightCostPerKm,
+        equipment, setEquipment,
+        maintenanceLogs, setMaintenanceLogs,
+        productionEmployees, setProductionEmployees,
         
         addClient,
         updateClient,
@@ -622,6 +692,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setFinalizationType,
         confirmDelivery,
         confirmInstallation,
+        
+        // Equipment management functions
+        addEquipment,
+        updateEquipment,
+        deleteEquipment,
+        addMaintenanceLog,
+        updateMaintenanceLog,
+        deleteMaintenanceLog,
+        
+        // Production employee management functions
+        addProductionEmployee,
+        updateProductionEmployee,
+        deleteProductionEmployee,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

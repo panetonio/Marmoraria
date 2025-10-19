@@ -13,6 +13,8 @@ export const PERMISSIONS: Record<Page, string> = {
   invoices: 'manage_invoices',
   receipts: 'view_receipts',
   catalog: 'manage_catalog',
+  equipment: 'manage_equipment',
+  production_employees: 'manage_production_employees',
   users: 'manage_users',
 };
 
@@ -23,7 +25,8 @@ export const ROLES = {
         'view_dashboard', 'manage_quotes', 'view_quotes', 'view_orders',
         'view_production', 'view_logistics', 'manage_stock', 'view_stock', 'manage_suppliers',
         'manage_crm', 'manage_finance', 'manage_invoices', 'view_receipts',
-        'manage_catalog', 'manage_stock_levels', 'assign_production_resources', 'manage_users'
+        'manage_catalog', 'manage_stock_levels', 'assign_production_resources', 'manage_users',
+        'manage_equipment', 'manage_production_employees'
     ],
   },
   vendedor: {
@@ -48,7 +51,9 @@ export const ROLES = {
       'manage_stock',   // Permite ações como alocar chapas
       PERMISSIONS.suppliers,
       'manage_stock_levels',
-      'assign_production_resources'
+      'assign_production_resources',
+      PERMISSIONS.equipment, // Produção precisa gerenciar equipamentos
+      PERMISSIONS.production_employees // Produção precisa gerenciar funcionários
     ],
   },
   aux_administrativo: {
@@ -64,6 +69,8 @@ export const ROLES = {
       PERMISSIONS.invoices,
       PERMISSIONS.receipts,
       PERMISSIONS.catalog,
+      PERMISSIONS.equipment, // Auxiliar administrativo pode gerenciar equipamentos
+      PERMISSIONS.production_employees // Auxiliar administrativo pode gerenciar funcionários
     ],
   },
 };

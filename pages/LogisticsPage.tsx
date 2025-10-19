@@ -7,6 +7,7 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
+import Calendar from '../components/ui/Calendar';
 import InstallationTermModal from '../components/InstallationTermModal';
 import ReceiptTermModal from '../components/ReceiptTermModal';
 
@@ -25,11 +26,18 @@ const ScheduleModal: FC<{
     onClose: () => void;
     onSave: (orderId: string, date: string, teamIds: string[]) => void;
 }> = ({ isOpen, order, onClose, onSave }) => {
+    const { clients } = useData();
     const [date, setDate] = useState('');
     const [teamIds, setTeamIds] = useState<string[]>([]);
     const [error, setError] = useState('');
+    const [showCalendar, setShowCalendar] = useState(false);
 
     const deliveryTeam = useMemo(() => mockProductionProfessionals.filter(p => p.role === 'entregador'), []);
+    
+    // Buscar informações do cliente
+    const client = useMemo(() => {
+        return clients.find(c => c.name === order.clientName);
+    }, [clients, order.clientName]);
 
     const handleSave = () => {
         if (!date || teamIds.length === 0) {
@@ -40,26 +48,135 @@ const ScheduleModal: FC<{
         onSave(order.id, date, teamIds);
     };
 
+    const handleDateChange = (newDate: string) => {
+        setDate(newDate);
+        setShowCalendar(false);
+    };
+
+    const formatWhatsAppLink = (phone: string) => {
+        // Remove todos os caracteres não numéricos
+        const cleanPhone = phone.replace(/\D/g, '');
+        // Adiciona o código do país se não tiver
+        const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+        return `https://wa.me/${fullPhone}`;
+    };
+
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`Agendar Entrega/Instalação: ${order.id}`}>
-            <div className="space-y-4">
-                <Input label="Data" type="date" value={date} onChange={e => setDate(e.target.value)} />
-                <div>
-                    <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Equipe</label>
-                    <div className="space-y-2 p-2 border border-border dark:border-slate-600 rounded-md">
-                        {deliveryTeam.map(p => (
-                            <label key={p.id} className="flex items-center">
-                                <input type="checkbox" className="h-4 w-4 rounded" checked={teamIds.includes(p.id)} onChange={() => setTeamIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])} />
-                                <span className="ml-2">{p.name}</span>
-                            </label>
-                        ))}
+            <div className="space-y-6">
+                {/* Informações do Cliente */}
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-border dark:border-slate-700">
+                    <h3 className="font-semibold text-text-primary dark:text-slate-100 mb-3">📋 Informações do Cliente</h3>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-text-secondary dark:text-slate-400">Nome:</span>
+                            <span className="text-sm text-text-primary dark:text-slate-100">{order.clientName}</span>
+                        </div>
+                        {client?.phone && (
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-text-secondary dark:text-slate-400">WhatsApp:</span>
+                                <div className="flex items-center space-x-2">
+                                    <span className="text-sm text-text-primary dark:text-slate-100">{client.phone}</span>
+                                    <a
+                                        href={formatWhatsAppLink(client.phone)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
+                                        title="Abrir WhatsApp"
+                                    >
+                                        📱 WhatsApp
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-text-secondary dark:text-slate-400">Endereço:</span>
+                            <span className="text-sm text-text-primary dark:text-slate-100 text-right">
+                                {order.deliveryAddress.address}, {order.deliveryAddress.number}
+                                {order.deliveryAddress.complement && `, ${order.deliveryAddress.complement}`}
+                                <br />
+                                {order.deliveryAddress.neighborhood} - {order.deliveryAddress.city}/{order.deliveryAddress.uf}
+                                <br />
+                                CEP: {order.deliveryAddress.cep}
+                            </span>
+                        </div>
                     </div>
                 </div>
-                {error && <p className="text-error text-sm text-center">{error}</p>}
+
+                {/* Seleção de Data */}
+                <div>
+                    <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-2">
+                        📅 Data da Entrega/Instalação
+                    </label>
+                    <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                            <Input 
+                                label="" 
+                                type="date" 
+                                value={date} 
+                                onChange={e => setDate(e.target.value)}
+                                min={new Date().toISOString().split('T')[0]}
+                                className="flex-1"
+                            />
+                            <Button 
+                                type="button"
+                                variant="ghost" 
+                                onClick={() => setShowCalendar(!showCalendar)}
+                                className="whitespace-nowrap"
+                            >
+                                📅 Calendário
+                            </Button>
+                        </div>
+                        {showCalendar && (
+                            <div className="flex justify-center">
+                                <Calendar
+                                    value={date}
+                                    onChange={handleDateChange}
+                                    minDate={new Date().toISOString().split('T')[0]}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Seleção da Equipe */}
+                <div>
+                    <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-2">
+                        👥 Equipe de Entrega/Instalação
+                    </label>
+                    <div className="space-y-2 p-3 border border-border dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-800/50">
+                        {deliveryTeam.length > 0 ? (
+                            deliveryTeam.map(p => (
+                                <label key={p.id} className="flex items-center p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500" 
+                                        checked={teamIds.includes(p.id)} 
+                                        onChange={() => setTeamIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id])} 
+                                    />
+                                    <span className="ml-3 text-sm text-text-primary dark:text-slate-100">{p.name}</span>
+                                </label>
+                            ))
+                        ) : (
+                            <p className="text-sm text-text-secondary dark:text-slate-400 text-center py-4">
+                                Nenhum entregador disponível. Adicione funcionários de produção com função "entregador".
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                        <p className="text-red-600 dark:text-red-400 text-sm text-center">{error}</p>
+                    </div>
+                )}
             </div>
+            
             <div className="flex justify-end mt-6 space-x-3">
                 <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleSave}>Agendar</Button>
+                <Button onClick={handleSave} disabled={!date || teamIds.length === 0}>
+                    Agendar Entrega
+                </Button>
             </div>
         </Modal>
     );

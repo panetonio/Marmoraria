@@ -1,4 +1,4 @@
-import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address } from '../types';
+import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, Equipment, MaintenanceLog, ProductionEmployee } from '../types';
 
 export const mockUsers: User[] = [
     { id: 'user-1', name: 'Admin', role: 'admin' },
@@ -9,15 +9,101 @@ export const mockUsers: User[] = [
     { id: 'user-6', name: 'Ana (Produção)', role: 'producao' },
 ];
 
-export const mockProductionProfessionals: ProductionProfessional[] = [
-    { id: 'prof-1', name: 'Marcos Silva', role: 'cortador' },
-    { id: 'prof-2', name: 'Paulo Costa', role: 'cortador' },
-    { id: 'prof-3', name: 'Ricardo Alves', role: 'acabador' },
-    { id: 'prof-4', name: 'Sérgio Lima', role: 'acabador' },
-    { id: 'prof-5', name: 'Luiz Pereira', role: 'montador' },
-    { id: 'prof-6', name: 'Fernando Souza', role: 'entregador' },
-    { id: 'prof-7', name: 'Roberto Carlos', role: 'entregador' },
+export const mockProductionEmployees: ProductionEmployee[] = [
+    { 
+        id: 'emp-1', 
+        name: 'Marcos Silva', 
+        role: 'cortador',
+        phone: '(11) 99999-1111',
+        email: 'marcos.silva@marmoraria.com',
+        isActive: true,
+        hireDate: '2023-01-15',
+        createdAt: '2023-01-15T08:00:00Z'
+    },
+    { 
+        id: 'emp-2', 
+        name: 'Paulo Costa', 
+        role: 'cortador',
+        phone: '(11) 99999-2222',
+        email: 'paulo.costa@marmoraria.com',
+        isActive: true,
+        hireDate: '2023-02-20',
+        createdAt: '2023-02-20T08:00:00Z'
+    },
+    { 
+        id: 'emp-3', 
+        name: 'Ricardo Alves', 
+        role: 'acabador',
+        phone: '(11) 99999-3333',
+        email: 'ricardo.alves@marmoraria.com',
+        isActive: true,
+        hireDate: '2023-03-10',
+        createdAt: '2023-03-10T08:00:00Z'
+    },
+    { 
+        id: 'emp-4', 
+        name: 'Sérgio Lima', 
+        role: 'acabador',
+        phone: '(11) 99999-4444',
+        email: 'sergio.lima@marmoraria.com',
+        isActive: true,
+        hireDate: '2023-04-05',
+        createdAt: '2023-04-05T08:00:00Z'
+    },
+    { 
+        id: 'emp-5', 
+        name: 'Luiz Pereira', 
+        role: 'montador',
+        phone: '(11) 99999-5555',
+        email: 'luiz.pereira@marmoraria.com',
+        isActive: true,
+        hireDate: '2023-05-12',
+        createdAt: '2023-05-12T08:00:00Z'
+    },
+    { 
+        id: 'emp-6', 
+        name: 'Fernando Souza', 
+        role: 'entregador',
+        phone: '(11) 99999-6666',
+        email: 'fernando.souza@marmoraria.com',
+        isActive: true,
+        hireDate: '2023-06-18',
+        createdAt: '2023-06-18T08:00:00Z'
+    },
+    { 
+        id: 'emp-7', 
+        name: 'Roberto Carlos', 
+        role: 'entregador',
+        phone: '(11) 99999-7777',
+        email: 'roberto.carlos@marmoraria.com',
+        isActive: true,
+        hireDate: '2023-07-25',
+        createdAt: '2023-07-25T08:00:00Z'
+    },
+    { 
+        id: 'emp-8', 
+        name: 'Carlos Eduardo', 
+        role: 'supervisor',
+        phone: '(11) 99999-8888',
+        email: 'carlos.eduardo@marmoraria.com',
+        isActive: true,
+        hireDate: '2022-12-01',
+        createdAt: '2022-12-01T08:00:00Z'
+    },
+    { 
+        id: 'emp-9', 
+        name: 'Ana Paula', 
+        role: 'auxiliar',
+        phone: '(11) 99999-9999',
+        email: 'ana.paula@marmoraria.com',
+        isActive: true,
+        hireDate: '2023-08-10',
+        createdAt: '2023-08-10T08:00:00Z'
+    }
 ];
+
+// Manter compatibilidade com o sistema antigo
+export const mockProductionProfessionals: ProductionProfessional[] = mockProductionEmployees;
 
 export const mockClients: Client[] = [
     { id: 'cli-1', name: 'João da Silva', type: 'pessoa_fisica', email: 'joao.silva@example.com', phone: '(11) 98765-4321', address: { address: 'Rua das Flores', number: '123', complement: 'Apto 10', neighborhood: 'Jardins', city: 'São Paulo', uf: 'SP', cep: '01234-567' }, cpfCnpj: '111.222.333-44', createdAt: '2023-11-10T10:00:00Z' },
@@ -368,4 +454,182 @@ export const mockFinancialTransactions: FinancialTransaction[] = [
         relatedClientId: 'cli-4',
         paymentMethod: 'pix',
     },
+];
+
+export const mockEquipment: Equipment[] = [
+    {
+        id: 'eq-1',
+        name: 'Máquina de Corte CNC',
+        serialNumber: 'CNC-2023-001',
+        category: 'maquina',
+        purchaseDate: '2023-01-15',
+        warrantyEndDate: '2025-01-15',
+        purchaseInvoiceId: 'NF-2023-001',
+        assignedTo: 'emp-1', // Marcos Silva - Cortador
+        status: 'operacional',
+        createdAt: '2023-01-15T10:00:00Z',
+        updatedAt: '2023-01-15T10:00:00Z'
+    },
+    {
+        id: 'eq-2',
+        name: 'Polimento Automático',
+        serialNumber: 'POL-2023-002',
+        category: 'maquina',
+        purchaseDate: '2023-03-20',
+        warrantyEndDate: '2025-03-20',
+        purchaseInvoiceId: 'NF-2023-015',
+        assignedTo: 'emp-3', // Ricardo Alves - Acabador
+        status: 'operacional',
+        createdAt: '2023-03-20T14:30:00Z',
+        updatedAt: '2023-03-20T14:30:00Z'
+    },
+    {
+        id: 'eq-3',
+        name: 'Furadeira Industrial',
+        serialNumber: 'FUR-2022-008',
+        category: 'maquina',
+        purchaseDate: '2022-08-10',
+        warrantyEndDate: '2024-08-10',
+        purchaseInvoiceId: 'NF-2022-045',
+        assignedTo: 'emp-5', // Luiz Pereira - Montador
+        status: 'em_manutencao',
+        createdAt: '2022-08-10T09:15:00Z',
+        updatedAt: '2024-07-25T16:20:00Z'
+    },
+    {
+        id: 'eq-4',
+        name: 'Serra Circular',
+        serialNumber: 'SER-2021-003',
+        category: 'maquina',
+        purchaseDate: '2021-12-05',
+        warrantyEndDate: '2023-12-05',
+        purchaseInvoiceId: 'NF-2021-089',
+        assignedTo: 'emp-2', // Paulo Costa - Cortador
+        status: 'operacional',
+        createdAt: '2021-12-05T11:45:00Z',
+        updatedAt: '2021-12-05T11:45:00Z'
+    },
+    {
+        id: 'eq-5',
+        name: 'Compressor de Ar',
+        serialNumber: 'COM-2023-005',
+        category: 'maquina',
+        purchaseDate: '2023-06-12',
+        warrantyEndDate: '2025-06-12',
+        purchaseInvoiceId: 'NF-2023-032',
+        assignedTo: 'emp-8', // Carlos Eduardo - Supervisor
+        status: 'operacional',
+        createdAt: '2023-06-12T13:20:00Z',
+        updatedAt: '2023-06-12T13:20:00Z'
+    },
+    {
+        id: 'eq-6',
+        name: 'Van de Entrega',
+        serialNumber: 'VAN-2023-001',
+        category: 'veiculo',
+        purchaseDate: '2023-02-10',
+        warrantyEndDate: '2025-02-10',
+        purchaseInvoiceId: 'NF-2023-008',
+        assignedTo: 'emp-6', // Fernando Souza - Entregador
+        status: 'operacional',
+        createdAt: '2023-02-10T08:00:00Z',
+        updatedAt: '2023-02-10T08:00:00Z'
+    },
+    {
+        id: 'eq-7',
+        name: 'Caminhão Pequeno',
+        serialNumber: 'CAM-2022-003',
+        category: 'veiculo',
+        purchaseDate: '2022-11-15',
+        warrantyEndDate: '2024-11-15',
+        purchaseInvoiceId: 'NF-2022-078',
+        assignedTo: 'emp-7', // Roberto Carlos - Entregador
+        status: 'operacional',
+        createdAt: '2022-11-15T10:30:00Z',
+        updatedAt: '2022-11-15T10:30:00Z'
+    },
+    {
+        id: 'eq-8',
+        name: 'Moto de Entrega',
+        serialNumber: 'MOT-2023-002',
+        category: 'veiculo',
+        purchaseDate: '2023-04-20',
+        warrantyEndDate: '2025-04-20',
+        purchaseInvoiceId: 'NF-2023-025',
+        assignedTo: 'emp-6', // Fernando Souza - Entregador
+        status: 'em_manutencao',
+        createdAt: '2023-04-20T14:15:00Z',
+        updatedAt: '2024-08-01T09:00:00Z'
+    }
+];
+
+export const mockMaintenanceLogs: MaintenanceLog[] = [
+    {
+        id: 'maint-1',
+        equipmentId: 'eq-1',
+        maintenanceDate: '2024-06-15',
+        description: 'Manutenção preventiva - limpeza e lubrificação dos eixos',
+        cost: 250.00,
+        performedBy: 'Técnica Industrial Ltda',
+        companyCnpj: '12.345.678/0001-90',
+        invoiceNumber: 'NF-MAN-2024-001',
+        nextMaintenanceDate: '2024-12-15',
+        maintenanceWarrantyDate: '2025-06-15',
+        warrantyClaim: false,
+        createdAt: '2024-06-15T10:00:00Z'
+    },
+    {
+        id: 'maint-2',
+        equipmentId: 'eq-2',
+        maintenanceDate: '2024-05-20',
+        description: 'Troca de discos de polimento e ajuste da pressão',
+        cost: 180.00,
+        performedBy: 'Equipamentos Industriais S.A.',
+        companyCnpj: '98.765.432/0001-10',
+        invoiceNumber: 'NF-MAN-2024-002',
+        nextMaintenanceDate: '2024-11-20',
+        maintenanceWarrantyDate: '2025-05-20',
+        warrantyClaim: false,
+        createdAt: '2024-05-20T14:30:00Z'
+    },
+    {
+        id: 'maint-3',
+        equipmentId: 'eq-3',
+        maintenanceDate: '2024-07-25',
+        description: 'Reparo no motor - substituição de rolamentos',
+        cost: 450.00,
+        performedBy: 'Manutenção Express Ltda',
+        companyCnpj: '11.222.333/0001-44',
+        invoiceNumber: 'NF-MAN-2024-003',
+        warrantyClaim: true,
+        createdAt: '2024-07-25T16:20:00Z'
+    },
+    {
+        id: 'maint-4',
+        equipmentId: 'eq-1',
+        maintenanceDate: '2024-01-10',
+        description: 'Calibração da precisão de corte',
+        cost: 320.00,
+        performedBy: 'Técnica Industrial Ltda',
+        companyCnpj: '12.345.678/0001-90',
+        invoiceNumber: 'NF-MAN-2024-004',
+        nextMaintenanceDate: '2024-07-10',
+        maintenanceWarrantyDate: '2025-01-10',
+        warrantyClaim: false,
+        createdAt: '2024-01-10T09:00:00Z'
+    },
+    {
+        id: 'maint-5',
+        equipmentId: 'eq-4',
+        maintenanceDate: '2024-03-15',
+        description: 'Troca de lâmina e verificação do sistema de segurança',
+        cost: 95.00,
+        performedBy: 'Ferramentas & Manutenção Ltda',
+        companyCnpj: '55.666.777/0001-88',
+        invoiceNumber: 'NF-MAN-2024-005',
+        nextMaintenanceDate: '2024-09-15',
+        maintenanceWarrantyDate: '2025-03-15',
+        warrantyClaim: false,
+        createdAt: '2024-03-15T11:30:00Z'
+    }
 ];
