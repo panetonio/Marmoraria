@@ -1,4 +1,4 @@
-import React, { useState, useMemo, FC } from 'react';
+import React, { useState, useMemo, FC, useRef } from 'react';
 import type { StockItem, StockItemStatus } from '../types';
 import { useData } from '../context/DataContext';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
@@ -8,6 +8,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import { stockStatusMap } from '../config/statusMaps';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import { QRCode } from 'qrcode.react';
 
 const StockAlerts: FC<{ lowStockMaterials: {name: string, current: number, min: number}[] }> = ({ lowStockMaterials }) => {
     if (lowStockMaterials.length === 0) return null;
@@ -56,24 +57,52 @@ const StockItemCard: FC<{ item: StockItem, onSelect: (item: StockItem) => void }
 const StockDetailModal: FC<{ item: StockItem, isOpen: boolean, onClose: () => void }> = ({ item, isOpen, onClose }) => {
      const { materials } = useData();
      const material = materials.find(m => m.id === item.materialId);
-     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(item.id)}&size=200x200&bgcolor=f1f5f9`;
+     const qrCodeRef = useRef<HTMLCanvasElement | null>(null);
 
      const handlePrint = () => {
+        const canvas = qrCodeRef.current;
+        if (!canvas) {
+            console.warn('QR code ainda não foi renderizado para impressão.');
+            return;
+        }
+
+        const dataUrl = canvas.toDataURL('image/png');
+        if (!dataUrl) {
+            console.warn('Não foi possível gerar a imagem do QR code.');
+            return;
+        }
+
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
         printWindow.document.write(`
+            <!DOCTYPE html>
             <html><head><title>Etiqueta de Chapa</title>
-            <style> body { font-family: sans-serif; text-align: center; } img { margin-bottom: 10px; } </style>
+            <style>
+                body { font-family: sans-serif; text-align: center; padding: 24px; color: #0f172a; }
+                .qr-img { margin: 16px auto; width: 180px; height: 180px; }
+                @media print { body { margin: 0; } }
+            </style>
             </head><body>
-            <h2>${material?.name}</h2>
+            <h2>${material?.name ?? 'Chapa'}</h2>
             <p>ID: <strong>${item.id}</strong></p>
             <p>${item.width}m x ${item.height}m x ${item.thickness}cm</p>
-            <img src="${qrCodeUrl}" alt="QR Code" />
+            <img id="print-qr" src="${dataUrl}" alt="QR code do item ${item.id}" class="qr-img" />
             <p>Local: ${item.location}</p>
+            <script>
+                const img = document.getElementById('print-qr');
+                if (img && img.complete) {
+                    window.focus();
+                    window.print();
+                } else if (img) {
+                    img.addEventListener('load', () => {
+                        window.focus();
+                        window.print();
+                    });
+                }
+            </script>
             </body></html>
         `);
         printWindow.document.close();
-        printWindow.print();
      };
 
      return (
@@ -84,7 +113,14 @@ const StockDetailModal: FC<{ item: StockItem, isOpen: boolean, onClose: () => vo
                      <div className="mt-6 bg-slate-100 dark:bg-dark p-4 rounded-lg text-center">
                         <h4 className="font-semibold mb-2">QR Code de Identificação</h4>
                         <div className="flex justify-center">
-                            <img src={qrCodeUrl} alt={`QR Code for ${item.id}`} />
+                            <QRCode
+                                ref={qrCodeRef}
+                                value={item.id}
+                                size={180}
+                                includeMargin
+                                aria-label={`QR code para ${item.id}`}
+                                style={{ width: 180, height: 180 }}
+                            />
                         </div>
                         <Button onClick={handlePrint} className="mt-4" size="sm">Imprimir Etiqueta</Button>
                     </div>

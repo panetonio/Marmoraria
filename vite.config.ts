@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
+          'qrcode.react': path.resolve(__dirname, 'lib/qrcode-react.tsx'),
         }
       }
     };
