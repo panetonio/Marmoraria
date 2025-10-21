@@ -21,6 +21,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "qrcode.react": [
+        "./lib/qrcode-react.tsx"
       ]
     },
     "allowImportingTsExtensions": true,
