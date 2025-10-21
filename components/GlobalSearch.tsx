@@ -115,7 +115,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
     const hasResults = Object.values(results).some(arr => (arr as unknown[]).length > 0);
 
     return (
-        <div className="relative" ref={searchRef}>
+        <div className="relative min-w-[16rem]" ref={searchRef}>
             <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3">
                     <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none">
@@ -133,7 +133,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
                 />
             </div>
             {isOpen && hasResults && (
-                <div className="absolute mt-2 w-96 rounded-md shadow-lg bg-surface dark:bg-dark ring-1 ring-black ring-opacity-5 z-10 right-0">
+                <div className="absolute left-0 right-0 mt-2 w-full max-w-sm md:max-w-md rounded-md shadow-lg bg-surface dark:bg-dark ring-1 ring-black ring-opacity-5 z-10">
                     <div className="py-1 max-h-96 overflow-y-auto">
                         {results.clients.length > 0 && (
                             <div>
