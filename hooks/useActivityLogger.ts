@@ -1,7 +1,25 @@
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { getActivityTypeLabel, getActivityTypeIcon } from '../config/activityLabels';
-import type { ActivityType } from '../types';
+import { getActivityTypeLabel } from '../config/activityLabels';
+import type {
+    ActivityMetadata,
+    ActivityType,
+    AssetActivityMetadata,
+    AssetActivityType
+} from '../types';
+
+interface AssetLogTarget {
+    id: string;
+    type: string;
+    name?: string;
+    status?: string;
+    location?: string;
+}
+
+interface LogAssetActivityOptions {
+    details?: Record<string, any>;
+    metadata?: Partial<AssetActivityMetadata>;
+}
 
 export const useActivityLogger = () => {
     const { addActivityLog } = useData();
@@ -12,7 +30,9 @@ export const useActivityLogger = () => {
         relatedEntityType?: string,
         relatedEntityId?: string,
         relatedEntityName?: string,
-        details?: Record<string, any>
+        details?: Record<string, any>,
+        metadata?: ActivityMetadata,
+        assetType?: string
     ) => {
         if (!currentUser) {
             console.warn('Cannot log activity: no current user');
@@ -28,6 +48,10 @@ export const useActivityLogger = () => {
             relatedEntityId,
             relatedEntityName,
             details,
+            metadata,
+            assetType: assetType ?? (metadata && 'assetType' in metadata
+                ? String((metadata as AssetActivityMetadata).assetType)
+                : undefined),
             ipAddress: '127.0.0.1', // Em produção, obter do request
             userAgent: navigator.userAgent
         });
@@ -45,6 +69,53 @@ export const useActivityLogger = () => {
                 totalValue: quote.total,
                 itemsCount: quote.items?.length || 0
             }
+        );
+    };
+
+    const logAssetActivity = (
+        activityType: AssetActivityType,
+        asset: AssetLogTarget,
+        options?: LogAssetActivityOptions
+    ) => {
+        const normalizedType = asset.type;
+        const metadata: AssetActivityMetadata = {
+            assetType: normalizedType,
+            assetId: asset.id,
+            ...options?.metadata
+        } as AssetActivityMetadata;
+
+        if (metadata.previousStatus === undefined && asset.status !== undefined) {
+            metadata.previousStatus = asset.status;
+        }
+
+        if (metadata.newStatus === undefined && asset.status !== undefined) {
+            metadata.newStatus = asset.status;
+        }
+
+        if (metadata.previousLocation === undefined && asset.location !== undefined) {
+            metadata.previousLocation = asset.location;
+        }
+
+        if (metadata.newLocation === undefined && asset.location !== undefined) {
+            metadata.newLocation = asset.location;
+        }
+
+        const details = {
+            assetType: normalizedType,
+            assetName: asset.name,
+            assetStatus: metadata.newStatus ?? asset.status,
+            assetLocation: metadata.newLocation ?? asset.location,
+            ...options?.details
+        };
+
+        logActivity(
+            activityType,
+            normalizedType,
+            asset.id,
+            asset.name,
+            details,
+            metadata,
+            normalizedType
         );
     };
 
@@ -158,6 +229,7 @@ export const useActivityLogger = () => {
         logMaintenanceActivity,
         logEmployeeActivity,
         logDeliveryActivity,
-        logUserActivity
+        logUserActivity,
+        logAssetActivity
     };
 };

@@ -360,6 +360,12 @@ export interface MaintenanceLog {
   createdAt: string;
 }
 
+export type AssetActivityType =
+  | 'asset_scanned'
+  | 'asset_status_updated'
+  | 'asset_location_updated'
+  | 'asset_status_location_updated';
+
 export type ActivityType =
   | 'quote_created' | 'quote_updated' | 'quote_sent' | 'quote_approved' | 'quote_rejected'
   | 'order_created' | 'order_updated' | 'order_approved' | 'order_cancelled'
@@ -371,9 +377,22 @@ export type ActivityType =
   | 'delivery_scheduled' | 'delivery_started' | 'delivery_completed'
   | 'installation_scheduled' | 'installation_completed'
   | 'service_order_checklist_updated' | 'service_order_checklist_item_checked'
+  | AssetActivityType
   | 'stock_scanned' | 'stock_status_updated' | 'stock_location_updated' | 'stock_status_location_updated'
   | 'user_login' | 'user_logout' | 'user_created' | 'user_updated'
   | 'system_backup' | 'system_restore' | 'data_export' | 'data_import';
+
+export type ActivityMetadata = Record<string, any>;
+
+export interface AssetActivityMetadata extends ActivityMetadata {
+  assetType: string;
+  assetId: string;
+  previousStatus?: string;
+  newStatus?: string;
+  previousLocation?: string;
+  newLocation?: string;
+  qrData?: string;
+}
 
 export interface ActivityLog {
   id: string;
@@ -385,6 +404,8 @@ export interface ActivityLog {
   relatedEntityType?: string; // Tipo da entidade relacionada (quote, order, client, etc.)
   relatedEntityId?: string; // ID da entidade relacionada
   relatedEntityName?: string; // Nome da entidade para facilitar exibição
+  assetType?: string; // Tipo específico de asset quando aplicável
+  metadata?: ActivityMetadata; // Metadados adicionais enviados pelo backend
   details?: Record<string, any>; // Detalhes específicos da atividade em JSON
   ipAddress?: string; // IP do usuário (para auditoria)
   userAgent?: string; // User agent do navegador
