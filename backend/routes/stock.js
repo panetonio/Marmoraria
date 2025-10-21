@@ -34,7 +34,15 @@ router.put(
     param('id').isMongoId().withMessage('ID inválido para item de estoque'),
     body('status')
       .optional()
-      .isIn(['disponivel', 'reservada', 'em_uso', 'consumida'])
+      .isIn([
+        'disponivel',
+        'reservada',
+        'em_uso',
+        'consumida',
+        'em_corte',
+        'em_acabamento',
+        'pronto_para_expedicao',
+      ])
       .withMessage('Status inválido'),
     body('location')
       .optional()

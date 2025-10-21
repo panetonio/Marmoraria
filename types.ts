@@ -247,7 +247,14 @@ export interface Invoice {
   createdAt: string;
 }
 
-export type StockItemStatus = 'disponivel' | 'reservada' | 'em_uso' | 'consumida';
+export type StockItemStatus =
+  | 'disponivel'
+  | 'reservada'
+  | 'em_uso'
+  | 'consumida'
+  | 'em_corte'
+  | 'em_acabamento'
+  | 'pronto_para_expedicao';
 
 export interface StockItem {
   id: string; // Unique ID, could be what the QR code holds
