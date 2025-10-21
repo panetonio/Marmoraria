@@ -39,6 +39,7 @@ const activityLogSchema = new mongoose.Schema({
   newLocation: String,
   relatedEntityType: String,
   relatedEntityId: String,
+  assetType: String,
   metadata: mongoose.Schema.Types.Mixed,
   user: {
     id: {
