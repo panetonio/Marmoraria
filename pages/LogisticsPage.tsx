@@ -302,6 +302,122 @@ const ScheduleModal: FC<{
     );
 };
 
+const DepartureChecklistModal: FC<{
+    isOpen: boolean;
+    order: ServiceOrder;
+    onClose: () => void;
+    onSave: (orderId: string, checklist: { id: string; text: string; checked: boolean }[]) => Promise<{ success: boolean; message?: string }>;
+}> = ({ isOpen, order, onClose, onSave }) => {
+    const [checklistItems, setChecklistItems] = useState<{ id: string; text: string; checked: boolean }[]>(order.departureChecklist || []);
+    const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+        setChecklistItems(order.departureChecklist || []);
+        setError('');
+        setSuccessMessage('');
+    }, [isOpen, order]);
+
+    const toggleItem = (itemId: string) => {
+        setChecklistItems(prev => prev.map(item => item.id === itemId ? { ...item, checked: !item.checked } : item));
+    };
+
+    const handleMarkAll = (checked: boolean) => {
+        setChecklistItems(prev => prev.map(item => ({ ...item, checked })));
+    };
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        setError('');
+        setSuccessMessage('');
+        try {
+            const result = await onSave(order.id, checklistItems);
+            if (result.success) {
+                setSuccessMessage(result.message || 'Checklist atualizado com sucesso.');
+            } else {
+                setError(result.message || 'Não foi possível atualizar o checklist.');
+            }
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Checklist de Saída • ${order.id}`} className="max-w-3xl">
+            <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                        <p className="text-sm text-text-secondary dark:text-slate-400">Cliente</p>
+                        <p className="text-base font-semibold text-text-primary dark:text-slate-100">{order.clientName}</p>
+                    </div>
+                    <div className="text-sm text-text-secondary dark:text-slate-400">
+                        <span className="font-semibold text-text-primary dark:text-slate-100">Itens selecionados:</span>{' '}
+                        {checklistItems.filter(item => item.checked).length}/{checklistItems.length}
+                    </div>
+                </div>
+
+                {checklistItems.length === 0 ? (
+                    <div className="p-4 border border-dashed border-border dark:border-slate-700 rounded-lg text-center text-sm text-text-secondary dark:text-slate-400">
+                        Nenhum checklist configurado para esta OS. Defina um modelo na geração ou adicione manualmente pelo backend.
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="secondary" size="sm" onClick={() => handleMarkAll(true)}>
+                                Marcar tudo
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => handleMarkAll(false)}>
+                                Desmarcar tudo
+                            </Button>
+                        </div>
+                        <div className="space-y-2">
+                            {checklistItems.map((item, index) => (
+                                <label
+                                    key={item.id}
+                                    className={`flex items-center gap-3 p-3 rounded-lg border transition ${item.checked
+                                        ? 'border-green-400 bg-green-50 dark:bg-green-900/20'
+                                        : 'border-border dark:border-slate-700 hover:border-primary/50'}`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        className="h-5 w-5 rounded text-primary focus:ring-primary"
+                                        checked={item.checked}
+                                        onChange={() => toggleItem(item.id)}
+                                    />
+                                    <span className="flex-1 text-sm text-text-primary dark:text-slate-100">{index + 1}. {item.text}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300">
+                        {error}
+                    </div>
+                )}
+
+                {successMessage && (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-700 dark:text-green-300">
+                        {successMessage}
+                    </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+                    <Button variant="ghost" onClick={onClose}>Fechar</Button>
+                    <Button onClick={handleSave} disabled={checklistItems.length === 0 || isSaving}>
+                        {isSaving ? 'Salvando...' : 'Salvar Checklist'}
+                    </Button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 const LogisticsKanbanCard: FC<{
     order: ServiceOrder,
     onSchedule: (order: ServiceOrder) => void,
@@ -312,9 +428,10 @@ const LogisticsKanbanCard: FC<{
     onGenerateReceiptTerm: (order: ServiceOrder) => void,
     onGenerateInstallTerm: (order: ServiceOrder) => void,
     vehicles: Vehicle[],
+    onOpenChecklist: (order: ServiceOrder) => void,
 }> = ({
     order, onSchedule, onStartRoute, onArrive, onConfirmDelivery, onConfirmInstallation,
-    onGenerateReceiptTerm, onGenerateInstallTerm, vehicles
+    onGenerateReceiptTerm, onGenerateInstallTerm, vehicles, onOpenChecklist
 }) => {
 
     const assignedVehicle = order.vehicleId ? vehicles.find(vehicle => vehicle.id === order.vehicleId) : undefined;
@@ -326,9 +443,14 @@ const LogisticsKanbanCard: FC<{
         <Card className="p-3 mt-3 shadow-sm border border-border dark:border-slate-700">
             <div className="flex justify-between items-start gap-2">
                 <p className="font-bold text-sm font-mono">{order.id}</p>
-                <div className="flex gap-1">
-                    {order.finalizationType === 'delivery_installation' && <Badge variant="primary">Instalação</Badge>}
-                    {order.finalizationType !== 'pickup' && <Badge variant="success">Entrega</Badge>}
+                <div className="flex gap-2 items-center">
+                    <div className="flex gap-1">
+                        {order.finalizationType === 'delivery_installation' && <Badge variant="primary">Instalação</Badge>}
+                        {order.finalizationType !== 'pickup' && <Badge variant="success">Entrega</Badge>}
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => onOpenChecklist(order)}>
+                        Checklist
+                    </Button>
                 </div>
             </div>
             <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{order.clientName}</p>
@@ -400,19 +522,38 @@ const LogisticsKanbanCard: FC<{
 
 
 const LogisticsPage: FC = () => {
-    const { serviceOrders, scheduleDelivery, updateServiceOrderStatus, confirmDelivery, confirmInstallation, vehicles } = useData();
+    const { serviceOrders, scheduleDelivery, updateServiceOrderStatus, confirmDelivery, confirmInstallation, vehicles, updateDepartureChecklist } = useData();
     const [schedulingOrder, setSchedulingOrder] = useState<ServiceOrder | null>(null);
     const [generatingReceiptTermOrder, setGeneratingReceiptTermOrder] = useState<ServiceOrder | null>(null);
     const [generatingInstallTermOrder, setGeneratingInstallTermOrder] = useState<ServiceOrder | null>(null);
+    const [activeChecklistOrder, setActiveChecklistOrder] = useState<ServiceOrder | null>(null);
 
     const logisticsOrders = useMemo(() => {
         const logisticsStatuses: ProductionStatus[] = ['ready_for_logistics', 'scheduled', 'in_transit', 'realizado', 'completed'];
         return serviceOrders.filter(o => logisticsStatuses.includes(o.status));
     }, [serviceOrders]);
 
+    useEffect(() => {
+        if (!activeChecklistOrder) {
+            return;
+        }
+        const updated = serviceOrders.find(order => order.id === activeChecklistOrder.id);
+        if (updated && updated !== activeChecklistOrder) {
+            setActiveChecklistOrder(updated);
+        }
+    }, [serviceOrders, activeChecklistOrder]);
+
     return (
         <div>
             {schedulingOrder && <ScheduleModal isOpen={!!schedulingOrder} order={schedulingOrder} onClose={() => setSchedulingOrder(null)} onSave={scheduleDelivery} />}
+            {activeChecklistOrder && (
+                <DepartureChecklistModal
+                    isOpen={!!activeChecklistOrder}
+                    order={activeChecklistOrder}
+                    onClose={() => setActiveChecklistOrder(null)}
+                    onSave={updateDepartureChecklist}
+                />
+            )}
             {generatingReceiptTermOrder && (
                 <ReceiptTermModal
                     isOpen={!!generatingReceiptTermOrder}
@@ -459,6 +600,7 @@ const LogisticsPage: FC = () => {
                                     onGenerateReceiptTerm={setGeneratingReceiptTermOrder}
                                     onGenerateInstallTerm={setGeneratingInstallTermOrder}
                                     vehicles={vehicles}
+                                    onOpenChecklist={setActiveChecklistOrder}
                                 />
                             ))}
                         </div>

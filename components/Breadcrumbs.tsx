@@ -25,6 +25,7 @@ const PAGE_LABELS: Record<Page, string> = {
   production_employees: 'Funcionários',
   activity_log: 'Histórico',
   users: 'Usuários',
+  checklist_templates: 'Checklists',
 };
 
 const Breadcrumbs: React.FC<BreadcrumbProps> = ({ currentPage, setCurrentPage }) => {

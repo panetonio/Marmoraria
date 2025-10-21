@@ -36,8 +36,19 @@ const itemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const checklistItemSchema = new mongoose.Schema({
-  text: String,
-  checked: Boolean,
+  id: {
+    type: String,
+    default: () => new mongoose.Types.ObjectId().toString(),
+  },
+  text: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  checked: {
+    type: Boolean,
+    default: false,
+  },
 }, { _id: false });
 
 const serviceOrderSchema = new mongoose.Schema({

@@ -23,6 +23,7 @@ import {
   HistoryOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  CheckSquareOutlined,
 } from '@ant-design/icons';
 import type { Page } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -77,6 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
       production_employees: <UsergroupAddOutlined />,
       activity_log: <HistoryOutlined />,
       users: <UserOutlined />,
+      checklist_templates: <CheckSquareOutlined />,
     };
     return iconMap[page] || <DashboardOutlined />;
   };
@@ -102,6 +104,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
       production_employees: 'Funcionários',
       activity_log: 'Histórico',
       users: 'Usuários',
+      checklist_templates: 'Checklists',
     };
     return labelMap[page] || page;
   };
@@ -114,6 +117,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
     { key: 'production', icon: getIcon('production'), label: getLabel('production') },
     { key: 'assembly', icon: getIcon('assembly'), label: getLabel('assembly') },
     { key: 'logistics', icon: getIcon('logistics'), label: getLabel('logistics') },
+    { key: 'checklist_templates', icon: getIcon('checklist_templates'), label: getLabel('checklist_templates') },
     { key: 'stock', icon: getIcon('stock'), label: getLabel('stock') },
     { key: 'catalog', icon: getIcon('catalog'), label: getLabel('catalog') },
     { key: 'suppliers', icon: getIcon('suppliers'), label: getLabel('suppliers') },

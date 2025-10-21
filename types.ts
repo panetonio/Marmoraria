@@ -1,6 +1,6 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log' | 'checklist_templates';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
@@ -221,6 +221,20 @@ export interface ServiceOrder {
   observations?: string;
 }
 
+export interface ChecklistTemplateItem {
+  id?: string;
+  text: string;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  name: string;
+  type: 'entrega' | 'montagem';
+  items: ChecklistTemplateItem[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export type InvoiceStatus = 'pending' | 'issued' | 'canceled';
 
 export type DeliveryRouteStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -356,7 +370,8 @@ export type ActivityType =
   | 'invoice_created' | 'invoice_updated' | 'invoice_paid' | 'invoice_cancelled'
   | 'delivery_scheduled' | 'delivery_started' | 'delivery_completed'
   | 'installation_scheduled' | 'installation_completed'
-  | 'stock_scanned' | 'stock_status_updated'
+  | 'service_order_checklist_updated' | 'service_order_checklist_item_checked'
+  | 'stock_scanned' | 'stock_status_updated' | 'stock_location_updated' | 'stock_status_location_updated'
   | 'user_login' | 'user_logout' | 'user_created' | 'user_updated'
   | 'system_backup' | 'system_restore' | 'data_export' | 'data_import';
 

@@ -189,8 +189,38 @@ const ServiceOrderDetailModal: FC<{
                 )}
             </CardContent>
           </Card>
+
+          <Card className="p-0">
+            <CardHeader>Checklist de Saída</CardHeader>
+            <CardContent>
+              {order.departureChecklist && order.departureChecklist.length > 0 ? (
+                <ul className="space-y-2">
+                  {order.departureChecklist.map(item => (
+                    <li
+                      key={item.id}
+                      className={`flex items-center gap-3 rounded-lg border p-2 text-sm ${item.checked
+                        ? 'border-green-400 bg-green-50 dark:bg-green-900/20 text-text-primary dark:text-slate-100'
+                        : 'border-border dark:border-slate-700 text-text-secondary dark:text-slate-300'}`}
+                    >
+                      <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${item.checked
+                        ? 'bg-green-500 text-white'
+                        : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'}`}
+                      >
+                        {item.checked ? '✔' : '•'}
+                      </span>
+                      <span className="flex-1">{item.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-text-secondary dark:text-slate-400">
+                  Nenhum checklist associado a esta ordem de serviço.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
-        
+
         <div className="md:col-span-1">
           <Card className="p-0">
             <CardHeader>Alocar Equipe</CardHeader>

@@ -5,7 +5,7 @@ import Button from './ui/Button';
 import Select from './ui/Select';
 import StatusBadge from './ui/StatusBadge';
 import { stockStatusMap } from '../config/statusMaps';
-import type { StockItem, StockItemStatus } from '../types';
+import type { ActivityType, StockItem, StockItemStatus } from '../types';
 import { useData } from '../context/DataContext';
 import { api } from '../utils/api';
 import { useActivityLogger } from '../hooks/useActivityLogger';
@@ -139,7 +139,12 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
       return;
     }
 
-    if (status === scannedItem.status && (location ?? '') === (scannedItem.location ?? '')) {
+    const locationToCompare = location ?? '';
+    const currentLocation = scannedItem.location ?? '';
+    const statusChanged = status !== scannedItem.status;
+    const locationChanged = locationToCompare !== currentLocation;
+
+    if (!statusChanged && !locationChanged) {
       setSuccessMessage('Nenhuma alteração detectada para atualizar.');
       return;
     }
@@ -161,7 +166,13 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
         setLocation(normalized.location ?? '');
         updateLocalStock(normalized);
         setSuccessMessage('Status e localização atualizados com sucesso!');
-        logActivity('stock_status_updated', 'stock_item', normalized.id, `Chapa ${normalized.id}`, {
+        const activityType: ActivityType = statusChanged && locationChanged
+          ? 'stock_status_location_updated'
+          : statusChanged
+            ? 'stock_status_updated'
+            : 'stock_location_updated';
+
+        logActivity(activityType, 'stock_item', normalized.id, `Chapa ${normalized.id}`, {
           status: normalized.status,
           location: normalized.location,
         });
