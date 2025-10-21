@@ -52,6 +52,12 @@ export const activityTypeLabels: Record<ActivityType, string> = {
   service_order_checklist_updated: 'Checklist de OS Atualizado',
   service_order_checklist_item_checked: 'Item de Checklist Concluído',
 
+  // Ativos
+  asset_scanned: 'Ativo Escaneado via QR Code',
+  asset_status_updated: 'Status do Ativo Atualizado',
+  asset_location_updated: 'Localização do Ativo Atualizada',
+  asset_status_location_updated: 'Status e Localização do Ativo Atualizados',
+
   // Estoque
   stock_scanned: 'QR Code de Chapa Escaneado',
   stock_status_updated: 'Status do Estoque Atualizado',
@@ -128,6 +134,12 @@ export const getActivityTypeIcon = (activityType: ActivityType): string => {
     service_order_checklist_updated: '🗒️',
     service_order_checklist_item_checked: '✅',
 
+    // Ativos
+    asset_scanned: '📷',
+    asset_status_updated: '🔄',
+    asset_location_updated: '📍',
+    asset_status_location_updated: '🧭',
+
     // Estoque
     stock_scanned: '📷',
     stock_status_updated: '🔄',
@@ -181,6 +193,8 @@ export const getActivityTypeColor = (activityType: ActivityType): string => {
     installation_completed: 'text-green-600 dark:text-green-400',
     service_order_checklist_item_checked: 'text-green-600 dark:text-green-400',
     invoice_paid: 'text-green-600 dark:text-green-400',
+    asset_status_updated: 'text-green-600 dark:text-green-400',
+    asset_status_location_updated: 'text-green-600 dark:text-green-400',
     stock_status_updated: 'text-green-600 dark:text-green-400',
     stock_location_updated: 'text-blue-600 dark:text-blue-400',
     stock_status_location_updated: 'text-green-600 dark:text-green-400',
@@ -203,6 +217,8 @@ export const getActivityTypeColor = (activityType: ActivityType): string => {
     // Início - Azul
     delivery_started: 'text-blue-600 dark:text-blue-400',
     stock_scanned: 'text-blue-600 dark:text-blue-400',
+    asset_scanned: 'text-blue-600 dark:text-blue-400',
+    asset_location_updated: 'text-blue-600 dark:text-blue-400',
 
     // Atribuição - Roxo
     equipment_assigned: 'text-purple-600 dark:text-purple-400',

@@ -443,4 +443,31 @@ export const api = {
     });
     return response.json();
   },
+
+  // Ativos
+  async scanAssetQrCode(data: string) {
+    const query = new URLSearchParams({ data });
+    const response = await fetch(`${API_URL}/assets/qrcode-scan?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async updateAssetStatus(type: string, id: string, payload: { status: string }) {
+    const response = await fetch(`${API_URL}/assets/${encodeURIComponent(type)}/${encodeURIComponent(id)}/status`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return response.json();
+  },
+
+  async updateAssetLocation(type: string, id: string, payload: { location: string }) {
+    const response = await fetch(`${API_URL}/assets/${encodeURIComponent(type)}/${encodeURIComponent(id)}/location`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return response.json();
+  },
 };
