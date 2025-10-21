@@ -16,6 +16,10 @@ const activityLogSchema = new mongoose.Schema({
       'status_update',
       'location_update',
       'status_location_update',
+      'asset_scanned',
+      'asset_status_updated',
+      'asset_location_updated',
+      'asset_status_location_updated',
       'stock_scanned',
       'stock_status_updated',
       'stock_location_updated',
@@ -33,6 +37,8 @@ const activityLogSchema = new mongoose.Schema({
   newStatus: String,
   previousLocation: String,
   newLocation: String,
+  relatedEntityType: String,
+  relatedEntityId: String,
   metadata: mongoose.Schema.Types.Mixed,
   user: {
     id: {
