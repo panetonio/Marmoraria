@@ -18,6 +18,7 @@ export const PERMISSIONS: Record<Page, string> = {
   production_employees: 'manage_production_employees',
   activity_log: 'view_activity_log',
   users: 'manage_users',
+  checklist_templates: 'manage_checklists',
 };
 
 export const ROLES = {
@@ -28,7 +29,8 @@ export const ROLES = {
         'view_production', 'view_assembly', 'view_logistics', 'manage_stock', 'view_stock', 'manage_suppliers',
         'manage_crm', 'manage_finance', 'manage_invoices', 'view_receipts',
         'manage_catalog', 'manage_stock_levels', 'assign_production_resources', 'manage_users',
-        'manage_equipment', 'manage_production_employees', 'view_activity_log'
+        'manage_equipment', 'manage_production_employees', 'view_activity_log',
+        'manage_checklists'
     ],
   },
   vendedor: {
@@ -56,7 +58,8 @@ export const ROLES = {
       'manage_stock_levels',
       'assign_production_resources',
       PERMISSIONS.equipment, // Produção precisa gerenciar equipamentos
-      PERMISSIONS.production_employees // Produção precisa gerenciar funcionários
+      PERMISSIONS.production_employees, // Produção precisa gerenciar funcionários
+      PERMISSIONS.checklist_templates,
     ],
   },
   aux_administrativo: {
@@ -73,7 +76,8 @@ export const ROLES = {
       PERMISSIONS.receipts,
       PERMISSIONS.catalog,
       PERMISSIONS.equipment, // Auxiliar administrativo pode gerenciar equipamentos
-      PERMISSIONS.production_employees // Auxiliar administrativo pode gerenciar funcionários
+      PERMISSIONS.production_employees, // Auxiliar administrativo pode gerenciar funcionários
+      PERMISSIONS.checklist_templates,
     ],
   },
 };

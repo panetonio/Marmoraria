@@ -30,7 +30,7 @@ exports.getStockItemById = async (req, res) => {
 
     await ActivityLog.create({
       stockItem: stockItem._id,
-      action: 'read',
+      action: 'stock_scanned',
       description: 'Consulta de item de estoque via QR Code',
       previousStatus: stockItem.status,
       newStatus: stockItem.status,
@@ -92,10 +92,10 @@ exports.updateStockItemStatus = async (req, res) => {
     await stockItem.save();
 
     const action = statusChanged && locationChanged
-      ? 'status_location_update'
+      ? 'stock_status_location_updated'
       : statusChanged
-        ? 'status_update'
-        : 'location_update';
+        ? 'stock_status_updated'
+        : 'stock_location_updated';
 
     const descriptionParts = [];
 

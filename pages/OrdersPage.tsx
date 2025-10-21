@@ -54,10 +54,11 @@ const CreateServiceOrderModal: FC<{
     onClose: () => void;
     onCreate: (newOs: Omit<ServiceOrder, 'id'>) => void;
 }> = ({ isOpen, order, onClose, onCreate }) => {
-    const { serviceOrders } = useData();
+    const { serviceOrders, checklistTemplates } = useData();
     const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
     const [deliveryDate, setDeliveryDate] = useState('');
     const [error, setError] = useState<string>('');
+    const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
     const availableItems = useMemo(() => {
         const assignedItemIds = new Set(
@@ -80,6 +81,17 @@ const CreateServiceOrderModal: FC<{
         setSelectedItemIds(prev => 
             prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
         );
+    };
+
+    const selectedTemplate = useMemo(() => {
+        return checklistTemplates.find(template => template.id === selectedTemplateId) || null;
+    }, [checklistTemplates, selectedTemplateId]);
+
+    const generateChecklistItemId = () => {
+        if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+            return crypto.randomUUID();
+        }
+        return `chk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     };
 
     const handleCreate = () => {
@@ -108,7 +120,14 @@ const CreateServiceOrderModal: FC<{
             total: selectedItemsTotal,
             deliveryDate: new Date(deliveryDate).toISOString(),
             assignedToIds: [],
-            status: 'cutting'
+            status: 'cutting',
+            departureChecklist: selectedTemplate
+                ? selectedTemplate.items.map(item => ({
+                    id: item.id || generateChecklistItemId(),
+                    text: item.text,
+                    checked: false,
+                }))
+                : undefined,
         };
         onCreate(newOsData);
     };
@@ -154,6 +173,38 @@ const CreateServiceOrderModal: FC<{
                     onChange={e => setDeliveryDate(e.target.value)}
                     className={`p-2 border rounded w-full text-text-primary bg-slate-50 dark:bg-slate-700 dark:text-slate-200 ${error && !deliveryDate ? 'border-error' : 'border-border dark:border-slate-700'} h-[42px]`}
                 />
+            </div>
+            <div className="mb-6">
+                <Select
+                    id="checklist-template-select"
+                    label="Modelo de Checklist Inicial (opcional)"
+                    value={selectedTemplateId}
+                    onChange={(event) => setSelectedTemplateId(event.target.value)}
+                >
+                    <option value="">Sem checklist padrão</option>
+                    {checklistTemplates.map(template => (
+                        <option key={template.id} value={template.id}>
+                            {template.name} • {template.items.length} item{template.items.length === 1 ? '' : 's'}
+                        </option>
+                    ))}
+                </Select>
+                {selectedTemplate ? (
+                    <div className="mt-3 p-3 bg-slate-100 dark:bg-slate-700/40 border border-border dark:border-slate-600 rounded-lg">
+                        <h4 className="text-sm font-semibold text-text-primary dark:text-slate-100 mb-2">Itens do Checklist Selecionado</h4>
+                        <ul className="space-y-1 text-sm text-text-secondary dark:text-slate-300">
+                            {selectedTemplate.items.map((item, index) => (
+                                <li key={item.id || `${selectedTemplate.id}-preview-${index}`} className="flex items-center gap-2">
+                                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs">{index + 1}</span>
+                                    <span>{item.text}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : (
+                    <p className="mt-2 text-xs text-text-secondary dark:text-slate-400">
+                        Escolha um modelo para preencher automaticamente o checklist de saída da equipe.
+                    </p>
+                )}
             </div>
             {error && <p className="text-error text-center text-sm mb-4">{error}</p>}
             <div className="flex justify-end space-x-3">

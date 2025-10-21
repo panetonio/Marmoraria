@@ -344,6 +344,11 @@ export const mockServiceOrders: ServiceOrder[] = [
         deliveryEnd: '2024-08-03T18:00:00Z',
         vehicleId: 'veh-3',
         deliveryTeamIds: ['emp-6', 'emp-7'],
+        departureChecklist: [
+            { id: 'chk-001', text: 'Conferir itens carregados', checked: true },
+            { id: 'chk-002', text: 'Validar documentação de entrega', checked: true },
+            { id: 'chk-003', text: 'Registrar fotos antes da saída', checked: false },
+        ],
     },
     {
         id: 'OS-2024-002',
@@ -360,7 +365,11 @@ export const mockServiceOrders: ServiceOrder[] = [
         deliveryStart: '2024-07-28T12:00:00Z',
         deliveryEnd: '2024-07-28T15:00:00Z',
         vehicleId: 'veh-1',
-        deliveryTeamIds: ['emp-6']
+        deliveryTeamIds: ['emp-6'],
+        departureChecklist: [
+            { id: 'chk-004', text: 'Verificar embalagem', checked: true },
+            { id: 'chk-005', text: 'Coletar assinatura do responsável', checked: true },
+        ],
     },
     {
         id: 'OS-2024-003',
@@ -377,7 +386,11 @@ export const mockServiceOrders: ServiceOrder[] = [
         deliveryStart: '2024-08-05T13:00:00Z',
         deliveryEnd: '2024-08-05T17:00:00Z',
         vehicleId: 'veh-1',
-        deliveryTeamIds: ['emp-7']
+        deliveryTeamIds: ['emp-7'],
+        departureChecklist: [
+            { id: 'chk-006', text: 'Separar kit de instalação', checked: false },
+            { id: 'chk-007', text: 'Revisar medidas no pedido', checked: false },
+        ],
     }
 ];
 

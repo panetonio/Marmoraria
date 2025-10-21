@@ -4,11 +4,25 @@ const activityLogSchema = new mongoose.Schema({
   stockItem: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'StockItem',
-    required: true,
+  },
+  serviceOrder: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ServiceOrder',
   },
   action: {
     type: String,
-    enum: ['read', 'status_update', 'location_update', 'status_location_update'],
+    enum: [
+      'read',
+      'status_update',
+      'location_update',
+      'status_location_update',
+      'stock_scanned',
+      'stock_status_updated',
+      'stock_location_updated',
+      'stock_status_location_updated',
+      'service_order_checklist_update',
+      'service_order_checklist_item_checked',
+    ],
     required: true,
   },
   description: {
@@ -19,6 +33,7 @@ const activityLogSchema = new mongoose.Schema({
   newStatus: String,
   previousLocation: String,
   newLocation: String,
+  metadata: mongoose.Schema.Types.Mixed,
   user: {
     id: {
       type: mongoose.Schema.Types.ObjectId,

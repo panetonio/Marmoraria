@@ -19,6 +19,7 @@ import VehiclesPage from './pages/VehiclesPage';
 import ProductionEmployeesPage from './pages/ProductionEmployeesPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import UsersPage from './pages/UsersPage';
+import ChecklistTemplatesPage from './pages/ChecklistTemplatesPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import type { Page } from './types';
@@ -143,10 +144,12 @@ const MainApp: React.FC = () => {
         return <VehiclesPage />;
         case 'production_employees':
             return <ProductionEmployeesPage />;
-        case 'activity_log':
-            return <ActivityLogPage />;
+      case 'activity_log':
+        return <ActivityLogPage />;
       case 'users':
         return <UsersPage />;
+      case 'checklist_templates':
+        return <ChecklistTemplatesPage />;
       default:
         return <Dashboard />;
     }

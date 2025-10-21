@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type {
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem,
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType, Vehicle, DeliveryRoute
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType, Vehicle, DeliveryRoute, ChecklistTemplate
 } from '../types';
 import {
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers,
@@ -69,6 +69,7 @@ interface DataContextType {
     setVehicles: React.Dispatch<React.SetStateAction<Vehicle[]>>;
     deliveryRoutes: DeliveryRoute[];
     setDeliveryRoutes: React.Dispatch<React.SetStateAction<DeliveryRoute[]>>;
+    checklistTemplates: ChecklistTemplate[];
 
 
     // Add specific data manipulation functions here
@@ -97,7 +98,7 @@ interface DataContextType {
     removeAttachmentFromServiceOrder: (serviceOrderId: string) => void;
     scheduleDelivery: (serviceOrderId: string, schedule: DeliveryScheduleInput) => DeliveryScheduleResult;
     isVehicleAvailable: (vehicleId: string, start: string, end: string, excludeRouteId?: string) => boolean;
-    updateDepartureChecklist: (serviceOrderId: string, checklist: { id: string; text: string; checked: boolean }[]) => void;
+    updateDepartureChecklist: (serviceOrderId: string, checklist: { id: string; text: string; checked: boolean }[]) => Promise<{ success: boolean; message?: string }>;
     updateServiceOrderStatus: (serviceOrderId: string, status: ProductionStatus) => void;
     completeProductionStep: (serviceOrderId: string, requiresInstallation: boolean) => void;
     setFinalizationType: (orderId: string, type: FinalizationType) => void;
@@ -114,6 +115,11 @@ interface DataContextType {
     addMaintenanceLog: (maintenanceLog: MaintenanceLog) => void;
     updateMaintenanceLog: (maintenanceLog: MaintenanceLog) => void;
     deleteMaintenanceLog: (maintenanceLogId: string) => void;
+
+    // Checklist templates
+    createChecklistTemplate: (template: { name: string; type: 'entrega' | 'montagem'; items: { text: string }[] }) => Promise<{ success: boolean; message?: string }>;
+    updateChecklistTemplate: (templateId: string, template: { name: string; type: 'entrega' | 'montagem'; items: { text: string }[] }) => Promise<{ success: boolean; message?: string }>;
+    deleteChecklistTemplate: (templateId: string) => Promise<{ success: boolean; message?: string }>;
     
     // Production employee management functions
     addProductionEmployee: (employee: ProductionEmployee) => void;
@@ -156,6 +162,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(mockMaintenanceLogs);
     const [productionEmployees, setProductionEmployees] = useState<ProductionEmployee[]>(mockProductionEmployees);
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(mockActivityLogs);
+    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
 
     // Carregar dados do backend
     useEffect(() => {
@@ -164,7 +171,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loadQuotes();
         loadOrders();
         loadUsers();
+        loadChecklistTemplates();
     }, []);
+
+    const generateChecklistItemId = () => {
+        if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+            return crypto.randomUUID();
+        }
+        return `chk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    };
 
     const loadClients = async () => {
         try {
@@ -253,6 +268,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } catch (error) {
             console.error('❌ Erro ao carregar usuários:', error);
             setUsers([]);
+        }
+    };
+
+    const loadChecklistTemplates = async () => {
+        try {
+            const result = await api.getChecklistTemplates();
+            if (result.success && Array.isArray(result.data)) {
+                const mappedTemplates: ChecklistTemplate[] = result.data.map((template: any) => ({
+                    ...template,
+                    id: template._id || template.id,
+                    items: Array.isArray(template.items)
+                        ? template.items.map((item: any) => ({
+                            id: item.id || item._id,
+                            text: item.text,
+                        }))
+                        : [],
+                }));
+                setChecklistTemplates(mappedTemplates);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar modelos de checklist:', error);
         }
     };
 
@@ -660,10 +696,50 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { success: true, message: 'Entrega agendada com sucesso.', route: scheduledRoute };
     };
 
-    const updateDepartureChecklist = (serviceOrderId: string, checklist: { id: string; text: string; checked: boolean }[]) => {
-        setServiceOrders(prev => prev.map(so => 
-            so.id === serviceOrderId ? { ...so, departureChecklist: checklist } : so
-        ));
+    const updateDepartureChecklist = async (
+        serviceOrderId: string,
+        checklist: { id: string; text: string; checked: boolean }[]
+    ): Promise<{ success: boolean; message?: string }> => {
+        const normalized = checklist.map(item => ({
+            id: item.id && item.id.trim().length > 0 ? item.id : generateChecklistItemId(),
+            text: item.text,
+            checked: item.checked,
+        }));
+
+        const applyLocalUpdate = (updatedChecklist: typeof normalized) => {
+            setServiceOrders(prev => prev.map(so =>
+                so.id === serviceOrderId ? { ...so, departureChecklist: updatedChecklist } : so
+            ));
+        };
+
+        const isMongoId = /^[a-fA-F0-9]{24}$/.test(serviceOrderId);
+
+        if (!isMongoId) {
+            applyLocalUpdate(normalized);
+            return { success: true, message: 'Checklist atualizado localmente.' };
+        }
+
+        try {
+            const result = await api.updateServiceOrderChecklist(serviceOrderId, normalized);
+            if (result?.success) {
+                const updatedChecklist = Array.isArray(result.data?.departureChecklist)
+                    ? result.data.departureChecklist.map((item: any) => ({
+                        id: item.id || item._id || generateChecklistItemId(),
+                        text: item.text,
+                        checked: Boolean(item.checked),
+                    }))
+                    : normalized;
+
+                applyLocalUpdate(updatedChecklist);
+                return { success: true, message: result.message };
+            }
+
+            applyLocalUpdate(normalized);
+            return { success: false, message: result?.message || 'Não foi possível atualizar o checklist.' };
+        } catch (error) {
+            console.error('Erro ao atualizar checklist da OS:', error);
+            return { success: false, message: 'Erro inesperado ao atualizar o checklist.' };
+        }
     };
     
     const updateServiceOrderStatus = (serviceOrderId: string, status: ProductionStatus) => {
@@ -764,6 +840,65 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setMaintenanceLogs(prev => prev.filter(log => log.id !== maintenanceLogId));
     };
 
+    const createChecklistTemplate = async (template: { name: string; type: 'entrega' | 'montagem'; items: { text: string }[] }) => {
+        try {
+            const result = await api.createChecklistTemplate(template);
+            if (result.success && result.data) {
+                const mapped: ChecklistTemplate = {
+                    ...result.data,
+                    id: result.data._id || result.data.id,
+                    items: Array.isArray(result.data.items)
+                        ? result.data.items.map((item: any) => ({ id: item.id || item._id, text: item.text }))
+                        : [],
+                };
+                setChecklistTemplates(prev => [mapped, ...prev]);
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Não foi possível criar o modelo de checklist.' };
+        } catch (error) {
+            console.error('Erro ao criar modelo de checklist:', error);
+            return { success: false, message: 'Erro inesperado ao criar modelo de checklist.' };
+        }
+    };
+
+    const updateChecklistTemplate = async (
+        templateId: string,
+        template: { name: string; type: 'entrega' | 'montagem'; items: { text: string }[] }
+    ) => {
+        try {
+            const result = await api.updateChecklistTemplate(templateId, template);
+            if (result.success && result.data) {
+                const mapped: ChecklistTemplate = {
+                    ...result.data,
+                    id: result.data._id || result.data.id,
+                    items: Array.isArray(result.data.items)
+                        ? result.data.items.map((item: any) => ({ id: item.id || item._id, text: item.text }))
+                        : [],
+                };
+                setChecklistTemplates(prev => prev.map(t => (t.id === mapped.id ? mapped : t)));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Não foi possível atualizar o modelo de checklist.' };
+        } catch (error) {
+            console.error('Erro ao atualizar modelo de checklist:', error);
+            return { success: false, message: 'Erro inesperado ao atualizar modelo de checklist.' };
+        }
+    };
+
+    const deleteChecklistTemplate = async (templateId: string) => {
+        try {
+            const result = await api.deleteChecklistTemplate(templateId);
+            if (result.success) {
+                setChecklistTemplates(prev => prev.filter(template => template.id !== templateId));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Não foi possível remover o modelo de checklist.' };
+        } catch (error) {
+            console.error('Erro ao remover modelo de checklist:', error);
+            return { success: false, message: 'Erro inesperado ao remover modelo de checklist.' };
+        }
+    };
+
     // Production employee management functions
     const addProductionEmployee = (employee: ProductionEmployee) => {
         setProductionEmployees(prev => [...prev, employee]);
@@ -839,6 +974,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         maintenanceLogs, setMaintenanceLogs,
         vehicles, setVehicles,
         deliveryRoutes, setDeliveryRoutes,
+        checklistTemplates,
         productionEmployees, setProductionEmployees,
         activityLogs, setActivityLogs,
         
@@ -884,7 +1020,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addMaintenanceLog,
         updateMaintenanceLog,
         deleteMaintenanceLog,
-        
+        createChecklistTemplate,
+        updateChecklistTemplate,
+        deleteChecklistTemplate,
+
         // Production employee management functions
         addProductionEmployee,
         updateProductionEmployee,

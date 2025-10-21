@@ -49,10 +49,14 @@ export const activityTypeLabels: Record<ActivityType, string> = {
   // Instalações
   installation_scheduled: 'Instalação Agendada',
   installation_completed: 'Instalação Concluída',
+  service_order_checklist_updated: 'Checklist de OS Atualizado',
+  service_order_checklist_item_checked: 'Item de Checklist Concluído',
 
   // Estoque
   stock_scanned: 'QR Code de Chapa Escaneado',
   stock_status_updated: 'Status do Estoque Atualizado',
+  stock_location_updated: 'Localização do Estoque Atualizada',
+  stock_status_location_updated: 'Status e Localização do Estoque Atualizados',
 
   // Usuários
   user_login: 'Login Realizado',
@@ -121,10 +125,14 @@ export const getActivityTypeIcon = (activityType: ActivityType): string => {
     // Instalações
     installation_scheduled: '📅',
     installation_completed: '✅',
+    service_order_checklist_updated: '🗒️',
+    service_order_checklist_item_checked: '✅',
 
     // Estoque
     stock_scanned: '📷',
     stock_status_updated: '🔄',
+    stock_location_updated: '📍',
+    stock_status_location_updated: '🧭',
 
     // Usuários
     user_login: '🔐',
@@ -158,6 +166,7 @@ export const getActivityTypeColor = (activityType: ActivityType): string => {
     quote_updated: 'text-blue-600 dark:text-blue-400',
     order_updated: 'text-blue-600 dark:text-blue-400',
     client_updated: 'text-blue-600 dark:text-blue-400',
+    service_order_checklist_updated: 'text-blue-600 dark:text-blue-400',
     equipment_updated: 'text-blue-600 dark:text-blue-400',
     employee_updated: 'text-blue-600 dark:text-blue-400',
     invoice_updated: 'text-blue-600 dark:text-blue-400',
@@ -170,8 +179,11 @@ export const getActivityTypeColor = (activityType: ActivityType): string => {
     maintenance_completed: 'text-green-600 dark:text-green-400',
     delivery_completed: 'text-green-600 dark:text-green-400',
     installation_completed: 'text-green-600 dark:text-green-400',
+    service_order_checklist_item_checked: 'text-green-600 dark:text-green-400',
     invoice_paid: 'text-green-600 dark:text-green-400',
     stock_status_updated: 'text-green-600 dark:text-green-400',
+    stock_location_updated: 'text-blue-600 dark:text-blue-400',
+    stock_status_location_updated: 'text-green-600 dark:text-green-400',
 
     // Rejeição/Cancelamento - Vermelho
     quote_rejected: 'text-red-600 dark:text-red-400',

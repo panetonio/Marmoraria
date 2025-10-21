@@ -177,6 +177,48 @@ export const api = {
     return response.json();
   },
 
+  async getChecklistTemplates() {
+    const response = await fetch(`${API_URL}/checklist-templates`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async createChecklistTemplate(template: { name: string; type: 'entrega' | 'montagem'; items: { text: string }[] }) {
+    const response = await fetch(`${API_URL}/checklist-templates`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(template),
+    });
+    return response.json();
+  },
+
+  async updateChecklistTemplate(id: string, template: { name: string; type: 'entrega' | 'montagem'; items: { text: string }[] }) {
+    const response = await fetch(`${API_URL}/checklist-templates/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(template),
+    });
+    return response.json();
+  },
+
+  async deleteChecklistTemplate(id: string) {
+    const response = await fetch(`${API_URL}/checklist-templates/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async updateServiceOrderChecklist(id: string, checklist: { id: string; text: string; checked: boolean }[]) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/checklist`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ checklist }),
+    });
+    return response.json();
+  },
+
   // Fornecedores
   async getSuppliers() {
     const response = await fetch(`${API_URL}/suppliers`, {
