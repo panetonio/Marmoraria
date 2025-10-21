@@ -11,6 +11,7 @@ import Select from '../components/ui/Select';
 import Textarea from '../components/ui/Textarea';
 import Input from '../components/ui/Input';
 import FinalizationTypeModal from '../components/FinalizationTypeModal';
+import QrCodeScanner from '../components/QrCodeScanner';
 
 
 const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
@@ -705,7 +706,11 @@ const ProductionPage: FC = () => {
             </div>
         </div>
       </div>
-      
+
+      <div className="mt-6">
+        <QrCodeScanner />
+      </div>
+
       {viewMode === 'kanban' ? (
         <div className="grid grid-cols-3 gap-5 mt-6 h-[75vh]">
           {KANBAN_COLUMNS.map(column => (

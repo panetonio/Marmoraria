@@ -50,6 +50,10 @@ export const activityTypeLabels: Record<ActivityType, string> = {
   installation_scheduled: 'Instalação Agendada',
   installation_completed: 'Instalação Concluída',
 
+  // Estoque
+  stock_scanned: 'QR Code de Chapa Escaneado',
+  stock_status_updated: 'Status do Estoque Atualizado',
+
   // Usuários
   user_login: 'Login Realizado',
   user_logout: 'Logout Realizado',
@@ -118,6 +122,10 @@ export const getActivityTypeIcon = (activityType: ActivityType): string => {
     installation_scheduled: '📅',
     installation_completed: '✅',
 
+    // Estoque
+    stock_scanned: '📷',
+    stock_status_updated: '🔄',
+
     // Usuários
     user_login: '🔐',
     user_logout: '🚪',
@@ -163,6 +171,7 @@ export const getActivityTypeColor = (activityType: ActivityType): string => {
     delivery_completed: 'text-green-600 dark:text-green-400',
     installation_completed: 'text-green-600 dark:text-green-400',
     invoice_paid: 'text-green-600 dark:text-green-400',
+    stock_status_updated: 'text-green-600 dark:text-green-400',
 
     // Rejeição/Cancelamento - Vermelho
     quote_rejected: 'text-red-600 dark:text-red-400',
@@ -181,6 +190,7 @@ export const getActivityTypeColor = (activityType: ActivityType): string => {
 
     // Início - Azul
     delivery_started: 'text-blue-600 dark:text-blue-400',
+    stock_scanned: 'text-blue-600 dark:text-blue-400',
 
     // Atribuição - Roxo
     equipment_assigned: 'text-purple-600 dark:text-purple-400',
