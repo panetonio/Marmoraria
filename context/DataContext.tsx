@@ -1,14 +1,27 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import type { 
-    Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem, 
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType 
+import type {
+    Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem,
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType, Vehicle, DeliveryRoute
 } from '../types';
-import { 
-    mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers, 
-    mockMaterials, mockStockItems, mockServices, mockProducts, mockQuotes, 
+import {
+    mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers,
+    mockMaterials, mockStockItems, mockServices, mockProducts, mockQuotes,
     mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions,
-    mockEquipment, mockMaintenanceLogs, mockProductionEmployees, mockActivityLogs 
+    mockEquipment, mockMaintenanceLogs, mockProductionEmployees, mockActivityLogs, mockVehicles, mockDeliveryRoutes
 } from '../data/mockData';
+
+type DeliveryScheduleInput = {
+    vehicleId: string;
+    start: string;
+    end: string;
+    teamIds: string[];
+};
+
+type DeliveryScheduleResult = {
+    success: boolean;
+    message?: string;
+    route?: DeliveryRoute;
+};
 import { api } from '../utils/api';
 
 // Define the shape of the context data
@@ -52,6 +65,10 @@ interface DataContextType {
     setProductionEmployees: React.Dispatch<React.SetStateAction<ProductionEmployee[]>>;
     activityLogs: ActivityLog[];
     setActivityLogs: React.Dispatch<React.SetStateAction<ActivityLog[]>>;
+    vehicles: Vehicle[];
+    setVehicles: React.Dispatch<React.SetStateAction<Vehicle[]>>;
+    deliveryRoutes: DeliveryRoute[];
+    setDeliveryRoutes: React.Dispatch<React.SetStateAction<DeliveryRoute[]>>;
 
 
     // Add specific data manipulation functions here
@@ -78,7 +95,8 @@ interface DataContextType {
     allocateSlabToOrder: (serviceOrderId: string, slabId: string) => void;
     addAttachmentToServiceOrder: (serviceOrderId: string, file: File) => void;
     removeAttachmentFromServiceOrder: (serviceOrderId: string) => void;
-    scheduleDelivery: (serviceOrderId: string, deliveryDate: string, teamIds: string[]) => void;
+    scheduleDelivery: (serviceOrderId: string, schedule: DeliveryScheduleInput) => DeliveryScheduleResult;
+    isVehicleAvailable: (vehicleId: string, start: string, end: string, excludeRouteId?: string) => boolean;
     updateDepartureChecklist: (serviceOrderId: string, checklist: { id: string; text: string; checked: boolean }[]) => void;
     updateServiceOrderStatus: (serviceOrderId: string, status: ProductionStatus) => void;
     completeProductionStep: (serviceOrderId: string, requiresInstallation: boolean) => void;
@@ -90,6 +108,9 @@ interface DataContextType {
     addEquipment: (equipment: Equipment) => void;
     updateEquipment: (equipment: Equipment) => void;
     deleteEquipment: (equipmentId: string) => void;
+    addVehicle: (vehicle: Vehicle) => void;
+    updateVehicle: (vehicle: Vehicle) => void;
+    deleteVehicle: (vehicleId: string) => void;
     addMaintenanceLog: (maintenanceLog: MaintenanceLog) => void;
     updateMaintenanceLog: (maintenanceLog: MaintenanceLog) => void;
     deleteMaintenanceLog: (maintenanceLogId: string) => void;
@@ -129,6 +150,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [receipts, setReceipts] = useState<Receipt[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [freightCostPerKm, setFreightCostPerKm] = useState<number>(8);
+    const [vehicles, setVehicles] = useState<Vehicle[]>(mockVehicles);
+    const [deliveryRoutes, setDeliveryRoutes] = useState<DeliveryRoute[]>(mockDeliveryRoutes);
     const [equipment, setEquipment] = useState<Equipment[]>(mockEquipment);
     const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(mockMaintenanceLogs);
     const [productionEmployees, setProductionEmployees] = useState<ProductionEmployee[]>(mockProductionEmployees);
@@ -546,13 +569,95 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return so;
         }));
     };
-    
-    const scheduleDelivery = (serviceOrderId: string, deliveryDate: string, teamIds: string[]) => {
-        setServiceOrders(prev => prev.map(so => 
-            so.id === serviceOrderId 
-            ? { ...so, status: 'scheduled', deliveryScheduledDate: deliveryDate, deliveryTeamIds: teamIds } 
-            : so
+
+    const isVehicleAvailable = (vehicleId: string, start: string, end: string, excludeRouteId?: string): boolean => {
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate >= endDate) {
+            return false;
+        }
+
+        return !deliveryRoutes.some(route => {
+            if (route.vehicleId !== vehicleId) {
+                return false;
+            }
+            if (excludeRouteId && route.id === excludeRouteId) {
+                return false;
+            }
+
+            const routeStart = new Date(route.start);
+            const routeEnd = new Date(route.end);
+            return routeStart < endDate && routeEnd > startDate;
+        });
+    };
+
+    const scheduleDelivery = (serviceOrderId: string, schedule: DeliveryScheduleInput): DeliveryScheduleResult => {
+        const { vehicleId, start, end, teamIds } = schedule;
+
+        const startDate = new Date(start);
+        const endDate = new Date(end);
+
+        if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+            return { success: false, message: 'Data ou horário inválido.' };
+        }
+
+        if (startDate >= endDate) {
+            return { success: false, message: 'O horário final deve ser posterior ao horário inicial.' };
+        }
+
+        const existingRoute = deliveryRoutes.find(route => route.serviceOrderId === serviceOrderId);
+        if (!isVehicleAvailable(vehicleId, start, end, existingRoute?.id)) {
+            return { success: false, message: 'Veículo indisponível para o período selecionado.' };
+        }
+
+        const nowIso = new Date().toISOString();
+        let scheduledRoute: DeliveryRoute | undefined = existingRoute;
+
+        setDeliveryRoutes(prev => {
+            const currentRoute = prev.find(route => route.serviceOrderId === serviceOrderId);
+            if (currentRoute) {
+                const updatedRoute: DeliveryRoute = {
+                    ...currentRoute,
+                    vehicleId,
+                    start,
+                    end,
+                    status: 'scheduled',
+                    updatedAt: nowIso,
+                };
+                scheduledRoute = updatedRoute;
+                return prev.map(route => route.id === currentRoute.id ? updatedRoute : route);
+            }
+
+            const newRoute: DeliveryRoute = {
+                id: `route-${Date.now()}`,
+                vehicleId,
+                serviceOrderId,
+                start,
+                end,
+                status: 'scheduled',
+                createdAt: nowIso,
+                updatedAt: nowIso,
+            };
+            scheduledRoute = newRoute;
+            return [...prev, newRoute];
+        });
+
+        setServiceOrders(prev => prev.map(so =>
+            so.id === serviceOrderId
+                ? {
+                    ...so,
+                    status: 'scheduled',
+                    deliveryScheduledDate: start,
+                    deliveryStart: start,
+                    deliveryEnd: end,
+                    vehicleId,
+                    deliveryTeamIds: teamIds,
+                }
+                : so
         ));
+
+        return { success: true, message: 'Entrega agendada com sucesso.', route: scheduledRoute };
     };
 
     const updateDepartureChecklist = (serviceOrderId: string, checklist: { id: string; text: string; checked: boolean }[]) => {
@@ -599,6 +704,34 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 // An installation can only be completed if the delivery was also confirmed.
                 const isComplete = so.delivery_confirmed;
                 return { ...so, installation_confirmed: true, status: isComplete ? 'completed' : so.status };
+            }
+            return so;
+        }));
+    };
+
+    const addVehicle = (vehicle: Vehicle) => {
+        setVehicles(prev => [...prev, vehicle]);
+    };
+
+    const updateVehicle = (vehicle: Vehicle) => {
+        setVehicles(prev => prev.map(v => v.id === vehicle.id ? vehicle : v));
+    };
+
+    const deleteVehicle = (vehicleId: string) => {
+        setVehicles(prev => prev.filter(v => v.id !== vehicleId));
+        setDeliveryRoutes(prev => prev.filter(route => route.vehicleId !== vehicleId));
+        setServiceOrders(prev => prev.map(so => {
+            if (so.vehicleId === vehicleId) {
+                const updated: ServiceOrder = {
+                    ...so,
+                    status: 'ready_for_logistics',
+                    vehicleId: undefined,
+                    deliveryStart: undefined,
+                    deliveryEnd: undefined,
+                    deliveryScheduledDate: undefined,
+                    deliveryTeamIds: undefined,
+                };
+                return updated;
             }
             return so;
         }));
@@ -704,6 +837,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         freightCostPerKm, setFreightCostPerKm,
         equipment, setEquipment,
         maintenanceLogs, setMaintenanceLogs,
+        vehicles, setVehicles,
+        deliveryRoutes, setDeliveryRoutes,
         productionEmployees, setProductionEmployees,
         activityLogs, setActivityLogs,
         
@@ -731,6 +866,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addAttachmentToServiceOrder,
         removeAttachmentFromServiceOrder,
         scheduleDelivery,
+        isVehicleAvailable,
         updateDepartureChecklist,
         updateServiceOrderStatus,
         completeProductionStep,
@@ -742,6 +878,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addEquipment,
         updateEquipment,
         deleteEquipment,
+        addVehicle,
+        updateVehicle,
+        deleteVehicle,
         addMaintenanceLog,
         updateMaintenanceLog,
         deleteMaintenanceLog,

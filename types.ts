@@ -1,6 +1,6 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'production_employees' | 'activity_log';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
@@ -213,12 +213,29 @@ export interface ServiceOrder {
     url: string;
   };
   deliveryScheduledDate?: string;
+  deliveryStart?: string;
+  deliveryEnd?: string;
+  vehicleId?: string;
   deliveryTeamIds?: string[];
   departureChecklist?: { id: string; text: string; checked: boolean; }[];
   observations?: string;
 }
 
 export type InvoiceStatus = 'pending' | 'issued' | 'canceled';
+
+export type DeliveryRouteStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface DeliveryRoute {
+  id: string;
+  vehicleId: string;
+  serviceOrderId: string;
+  start: string;
+  end: string;
+  status: DeliveryRouteStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Invoice {
   id: string;
@@ -277,6 +294,21 @@ export interface Receipt {
 
 export type EquipmentStatus = 'operacional' | 'em_manutencao' | 'desativado';
 export type EquipmentCategory = 'maquina' | 'veiculo';
+
+export type VehicleType = 'van' | 'caminhao';
+export type VehicleStatus = 'disponivel' | 'em_uso' | 'em_manutencao';
+
+export interface Vehicle {
+  id: string;
+  name: string;
+  licensePlate: string;
+  capacity: number;
+  type: VehicleType;
+  status: VehicleStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Equipment {
   id: string;
