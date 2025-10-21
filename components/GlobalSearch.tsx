@@ -20,11 +20,14 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResults>({ clients: [], quotes: [], orders: [], invoices: [] });
     const [isOpen, setIsOpen] = useState(false);
+    const [searchedTerm, setSearchedTerm] = useState('');
     const searchRef = useRef<HTMLDivElement>(null);
 
     const performSearch = useCallback((searchTerm: string) => {
         if (searchTerm.length < 2) {
             setResults({ clients: [], quotes: [], orders: [], invoices: [] });
+            setSearchedTerm('');
+            setIsOpen(false);
             return;
         }
 
@@ -70,9 +73,8 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
         };
         
         setResults(newResults);
-        // FIX: Use a type assertion to inform TypeScript that `arr` is an array and has a `length` property.
-        // This resolves an issue where TypeScript might infer `arr` as `unknown` from `Object.values`.
-        setIsOpen(Object.values(newResults).some(arr => (arr as unknown[]).length > 0));
+        setSearchedTerm(searchTerm);
+        setIsOpen(true);
     }, [clients, allQuotes, orders, invoices]);
 
     useEffect(() => {
@@ -113,6 +115,7 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
     };
 
     const hasResults = Object.values(results).some(arr => (arr as unknown[]).length > 0);
+    const showEmptyState = searchedTerm.length >= 2 && !hasResults;
 
     return (
         <div className="relative" ref={searchRef}>
@@ -126,13 +129,13 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    onFocus={() => hasResults && setIsOpen(true)}
+                    onFocus={() => searchedTerm.length >= 2 && setIsOpen(true)}
                     className="w-full max-w-xs py-2 pl-10 pr-4 text-text-primary dark:text-slate-100 bg-slate-50 dark:bg-slate-700 border border-border dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="Buscar clientes, pedidos..."
                     aria-label="Busca global"
                 />
             </div>
-            {isOpen && hasResults && (
+            {isOpen && (hasResults || showEmptyState) && (
                 <div className="absolute mt-2 w-96 rounded-md shadow-lg bg-surface dark:bg-dark ring-1 ring-black ring-opacity-5 z-10 right-0">
                     <div className="py-1 max-h-96 overflow-y-auto">
                         {results.clients.length > 0 && (
@@ -186,6 +189,28 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ onNavigate }) => {
                                         <p className="text-xs text-text-secondary dark:text-slate-400">{invoice.clientName} (Pedido: {invoice.orderId})</p>
                                     </button>
                                 ))}
+                            </div>
+                        )}
+                        {showEmptyState && (
+                            <div className="px-4 py-6 text-center text-sm text-text-secondary dark:text-slate-400 border-t border-border dark:border-slate-700">
+                                <p className="font-medium text-text-primary dark:text-slate-100">Nenhum resultado encontrado</p>
+                                <p className="mt-2">Tente ajustar os termos da busca ou acessar rapidamente:</p>
+                                <div className="mt-3 space-y-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleNavigate('crm', '')}
+                                        className="w-full text-sm text-primary hover:underline"
+                                    >
+                                        Ver todos os clientes
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleNavigate('orders', '')}
+                                        className="w-full text-sm text-primary hover:underline"
+                                    >
+                                        Acessar pedidos recentes
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
