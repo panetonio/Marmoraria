@@ -1,4 +1,4 @@
-import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog } from '../types';
+import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, Vehicle, DeliveryRoute } from '../types';
 
 export const mockUsers: User[] = [
     { id: 'user-1', name: 'Admin', role: 'admin' },
@@ -314,9 +314,13 @@ export const mockServiceOrders: ServiceOrder[] = [
         total: 2250,
         deliveryDate: '2024-08-15T17:00:00Z',
         assignedToIds: ['prof-1', 'prof-3'],
-        status: 'cutting',
+        status: 'scheduled',
         requiresInstallation: true, // Bancada de cozinha precisa de instalação
-        observations: 'Cliente pediu para ter cuidado extra com o acabamento da pia da cozinha. Verificar medidas no local antes do corte final.'
+        observations: 'Cliente pediu para ter cuidado extra com o acabamento da pia da cozinha. Verificar medidas no local antes do corte final.',
+        deliveryStart: '2024-08-03T12:00:00Z',
+        deliveryEnd: '2024-08-03T18:00:00Z',
+        vehicleId: 'veh-3',
+        deliveryTeamIds: ['emp-6', 'emp-7'],
     },
     {
         id: 'OS-2024-002',
@@ -327,9 +331,13 @@ export const mockServiceOrders: ServiceOrder[] = [
         total: 920,
         deliveryDate: '2024-08-20T17:00:00Z',
         assignedToIds: ['prof-2'],
-        status: 'finishing',
+        status: 'completed',
         requiresInstallation: false, // Soleira é apenas entrega
-        observations: ''
+        observations: '',
+        deliveryStart: '2024-07-28T12:00:00Z',
+        deliveryEnd: '2024-07-28T15:00:00Z',
+        vehicleId: 'veh-1',
+        deliveryTeamIds: ['emp-6']
     },
     {
         id: 'OS-2024-003',
@@ -340,9 +348,48 @@ export const mockServiceOrders: ServiceOrder[] = [
         total: 216,
         deliveryDate: '2024-08-22T17:00:00Z',
         assignedToIds: [],
-        status: 'ready_for_logistics',
+        status: 'scheduled',
         requiresInstallation: true,
-        observations: 'Atenção: Lavatório de Mármore Carrara. Frágil.'
+        observations: 'Atenção: Lavatório de Mármore Carrara. Frágil.',
+        deliveryStart: '2024-08-05T13:00:00Z',
+        deliveryEnd: '2024-08-05T17:00:00Z',
+        vehicleId: 'veh-1',
+        deliveryTeamIds: ['emp-7']
+    }
+];
+
+export const mockDeliveryRoutes: DeliveryRoute[] = [
+    {
+        id: 'route-1',
+        vehicleId: 'veh-3',
+        serviceOrderId: 'OS-2024-001',
+        start: '2024-08-03T12:00:00Z',
+        end: '2024-08-03T18:00:00Z',
+        status: 'scheduled',
+        notes: 'Separar equipe para instalação completa na residência.',
+        createdAt: '2024-07-30T09:00:00Z',
+        updatedAt: '2024-07-30T09:00:00Z'
+    },
+    {
+        id: 'route-2',
+        vehicleId: 'veh-1',
+        serviceOrderId: 'OS-2024-003',
+        start: '2024-08-05T13:00:00Z',
+        end: '2024-08-05T17:00:00Z',
+        status: 'scheduled',
+        notes: 'Entrega com instalação leve. Confirmar acesso ao elevador.',
+        createdAt: '2024-08-01T08:00:00Z',
+        updatedAt: '2024-08-01T08:00:00Z'
+    },
+    {
+        id: 'route-3',
+        vehicleId: 'veh-1',
+        serviceOrderId: 'OS-2024-002',
+        start: '2024-07-28T12:00:00Z',
+        end: '2024-07-28T15:00:00Z',
+        status: 'completed',
+        createdAt: '2024-07-20T10:00:00Z',
+        updatedAt: '2024-07-28T16:00:00Z'
     }
 ];
 
@@ -560,6 +607,42 @@ export const mockEquipment: Equipment[] = [
         status: 'em_manutencao',
         createdAt: '2023-04-20T14:15:00Z',
         updatedAt: '2024-08-01T09:00:00Z'
+    }
+];
+
+export const mockVehicles: Vehicle[] = [
+    {
+        id: 'veh-1',
+        name: 'Van 01',
+        licensePlate: 'ABC1D23',
+        capacity: 1200,
+        type: 'van',
+        status: 'disponivel',
+        notes: 'Ideal para entregas urbanas e clientes com acesso limitado.',
+        createdAt: '2024-01-10T12:00:00Z',
+        updatedAt: '2024-07-01T10:00:00Z'
+    },
+    {
+        id: 'veh-2',
+        name: 'Caminhão Grande',
+        licensePlate: 'XYZ4E56',
+        capacity: 3600,
+        type: 'caminhao',
+        status: 'em_manutencao',
+        notes: 'Revisão completa agendada para a próxima semana.',
+        createdAt: '2023-11-04T08:30:00Z',
+        updatedAt: '2024-07-25T09:00:00Z'
+    },
+    {
+        id: 'veh-3',
+        name: 'Van 02',
+        licensePlate: 'JKL7M89',
+        capacity: 1400,
+        type: 'van',
+        status: 'em_uso',
+        notes: 'Reservada para rotas na região metropolitana.',
+        createdAt: '2024-03-18T14:10:00Z',
+        updatedAt: '2024-07-29T16:45:00Z'
     }
 ];
 

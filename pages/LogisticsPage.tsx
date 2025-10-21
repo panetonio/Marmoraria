@@ -1,11 +1,12 @@
-import React, { useState, useMemo, FC, DragEvent } from 'react';
-import type { ServiceOrder, ProductionStatus } from '../types';
+import React, { useState, useMemo, FC, DragEvent, useEffect } from 'react';
+import type { ServiceOrder, ProductionStatus, Vehicle } from '../types';
 import { mockProductionProfessionals } from '../data/mockData';
 import { useData } from '../context/DataContext';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
 import Badge from '../components/ui/Badge';
 import Calendar from '../components/ui/Calendar';
 import InstallationTermModal from '../components/InstallationTermModal';
@@ -24,28 +25,107 @@ const ScheduleModal: FC<{
     isOpen: boolean;
     order: ServiceOrder;
     onClose: () => void;
-    onSave: (orderId: string, date: string, teamIds: string[]) => void;
+    onSave: (orderId: string, schedule: { vehicleId: string; start: string; end: string; teamIds: string[] }) => { success: boolean; message?: string };
 }> = ({ isOpen, order, onClose, onSave }) => {
-    const { clients } = useData();
+    const { clients, vehicles, deliveryRoutes, isVehicleAvailable } = useData();
     const [date, setDate] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
     const [teamIds, setTeamIds] = useState<string[]>([]);
+    const [selectedVehicleId, setSelectedVehicleId] = useState('');
     const [error, setError] = useState('');
     const [showCalendar, setShowCalendar] = useState(false);
 
     const deliveryTeam = useMemo(() => mockProductionProfessionals.filter(p => p.role === 'entregador'), []);
-    
-    // Buscar informações do cliente
-    const client = useMemo(() => {
-        return clients.find(c => c.name === order.clientName);
-    }, [clients, order.clientName]);
+
+    const existingRoute = useMemo(() => deliveryRoutes.find(route => route.serviceOrderId === order.id), [deliveryRoutes, order.id]);
+
+    const client = useMemo(() => clients.find(c => c.name === order.clientName), [clients, order.clientName]);
+
+    const formatDateInput = (value: Date) => {
+        const year = value.getFullYear();
+        const month = `${value.getMonth() + 1}`.padStart(2, '0');
+        const day = `${value.getDate()}`.padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const formatTimeInput = (value: Date) => `${value.getHours().toString().padStart(2, '0')}:${value.getMinutes().toString().padStart(2, '0')}`;
+
+    const combineDateTime = (dateValue: string, timeValue: string) => new Date(`${dateValue}T${timeValue}`).toISOString();
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
+        setTeamIds(order.deliveryTeamIds || []);
+
+        if (order.deliveryStart) {
+            const start = new Date(order.deliveryStart);
+            setDate(formatDateInput(start));
+            setStartTime(formatTimeInput(start));
+        } else if (existingRoute) {
+            const start = new Date(existingRoute.start);
+            setDate(formatDateInput(start));
+            setStartTime(formatTimeInput(start));
+        } else {
+            setDate('');
+            setStartTime('');
+        }
+
+        if (order.deliveryEnd) {
+            const end = new Date(order.deliveryEnd);
+            setEndTime(formatTimeInput(end));
+        } else if (existingRoute) {
+            const end = new Date(existingRoute.end);
+            setEndTime(formatTimeInput(end));
+        } else {
+            setEndTime('');
+        }
+
+        setSelectedVehicleId(order.vehicleId || existingRoute?.vehicleId || '');
+        setError('');
+    }, [isOpen, order, existingRoute]);
+
+    const startIso = useMemo(() => (date && startTime ? combineDateTime(date, startTime) : ''), [date, startTime]);
+    const endIso = useMemo(() => (date && endTime ? combineDateTime(date, endTime) : ''), [date, endTime]);
+
+    const availableVehicles = useMemo(() => {
+        if (!startIso || !endIso) {
+            return vehicles.filter(vehicle => vehicle.status !== 'em_manutencao');
+        }
+        return vehicles.filter(vehicle => {
+            if (vehicle.status === 'em_manutencao') {
+                return false;
+            }
+            return isVehicleAvailable(vehicle.id, startIso, endIso, existingRoute?.id);
+        });
+    }, [vehicles, startIso, endIso, isVehicleAvailable, existingRoute?.id]);
 
     const handleSave = () => {
-        if (!date || teamIds.length === 0) {
-            setError('Data e equipe são obrigatórios.');
+        if (!date || !startTime || !endTime) {
+            setError('Data e horários são obrigatórios.');
+            return;
+        }
+        if (!selectedVehicleId) {
+            setError('Selecione um veículo disponível.');
+            return;
+        }
+        if (teamIds.length === 0) {
+            setError('Selecione ao menos um membro da equipe.');
+            return;
+        }
+        if (!startIso || !endIso || new Date(startIso) >= new Date(endIso)) {
+            setError('O horário final deve ser posterior ao horário inicial.');
+            return;
+        }
+        const result = onSave(order.id, { vehicleId: selectedVehicleId, start: startIso, end: endIso, teamIds });
+        if (!result.success) {
+            setError(result.message || 'Não foi possível agendar a entrega.');
             return;
         }
         setError('');
-        onSave(order.id, date, teamIds);
+        onClose();
     };
 
     const handleDateChange = (newDate: string) => {
@@ -103,39 +183,78 @@ const ScheduleModal: FC<{
                     </div>
                 </div>
 
-                {/* Seleção de Data */}
-                <div>
-                    <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-2">
-                        📅 Data da Entrega/Instalação
-                    </label>
-                    <div className="space-y-3">
-                        <div className="flex items-center space-x-3">
-                            <Input 
-                                label="" 
-                                type="date" 
-                                value={date} 
-                                onChange={e => setDate(e.target.value)}
-                                min={new Date().toISOString().split('T')[0]}
-                                className="flex-1"
-                            />
-                            <Button 
-                                type="button"
-                                variant="ghost" 
-                                onClick={() => setShowCalendar(!showCalendar)}
-                                className="whitespace-nowrap"
-                            >
-                                📅 Calendário
-                            </Button>
-                        </div>
-                        {showCalendar && (
-                            <div className="flex justify-center">
-                                <Calendar
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-2">
+                            📅 Data da Entrega/Instalação
+                        </label>
+                        <div className="space-y-3">
+                            <div className="flex items-center space-x-3">
+                                <Input
+                                    label=""
+                                    type="date"
                                     value={date}
-                                    onChange={handleDateChange}
-                                    minDate={new Date().toISOString().split('T')[0]}
+                                    onChange={e => setDate(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    className="flex-1"
                                 />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setShowCalendar(!showCalendar)}
+                                    className="whitespace-nowrap"
+                                >
+                                    📅 Calendário
+                                </Button>
                             </div>
+                            {showCalendar && (
+                                <div className="flex justify-center">
+                                    <Calendar
+                                        value={date}
+                                        onChange={handleDateChange}
+                                        minDate={new Date().toISOString().split('T')[0]}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <Input
+                            label="Horário de início"
+                            type="time"
+                            value={startTime}
+                            onChange={e => setStartTime(e.target.value)}
+                        />
+                        <Input
+                            label="Horário de término"
+                            type="time"
+                            value={endTime}
+                            onChange={e => setEndTime(e.target.value)}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-2">
+                            🚚 Veículo
+                        </label>
+                        {availableVehicles.length > 0 ? (
+                            <Select value={selectedVehicleId} onChange={e => setSelectedVehicleId(e.target.value)}>
+                                <option value="">Selecione um veículo</option>
+                                {availableVehicles.map(vehicle => (
+                                    <option key={vehicle.id} value={vehicle.id}>
+                                        {vehicle.name} • Placa {vehicle.licensePlate} • {vehicle.capacity.toLocaleString('pt-BR')} kg
+                                    </option>
+                                ))}
+                            </Select>
+                        ) : (
+                            <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                                Nenhum veículo disponível para o período selecionado. Ajuste a data/horário ou libere um veículo.
+                            </p>
                         )}
+                        <p className="text-xs text-text-secondary dark:text-slate-500 mt-2">
+                            Veículos em manutenção são ocultados automaticamente.
+                        </p>
                     </div>
                 </div>
 
@@ -174,7 +293,7 @@ const ScheduleModal: FC<{
             
             <div className="flex justify-end mt-6 space-x-3">
                 <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleSave} disabled={!date || teamIds.length === 0}>
+                <Button onClick={handleSave} disabled={!date || !startTime || !endTime || !selectedVehicleId || teamIds.length === 0}>
                     Agendar Entrega
                 </Button>
             </div>
@@ -191,11 +310,17 @@ const LogisticsKanbanCard: FC<{
     onConfirmInstallation: (orderId: string) => void,
     onGenerateReceiptTerm: (order: ServiceOrder) => void,
     onGenerateInstallTerm: (order: ServiceOrder) => void,
-}> = ({ 
-    order, onSchedule, onStartRoute, onArrive, onConfirmDelivery, onConfirmInstallation, 
-    onGenerateReceiptTerm, onGenerateInstallTerm 
+    vehicles: Vehicle[],
+}> = ({
+    order, onSchedule, onStartRoute, onArrive, onConfirmDelivery, onConfirmInstallation,
+    onGenerateReceiptTerm, onGenerateInstallTerm, vehicles
 }) => {
-    
+
+    const assignedVehicle = order.vehicleId ? vehicles.find(vehicle => vehicle.id === order.vehicleId) : undefined;
+    const deliveryStart = order.deliveryStart || order.deliveryScheduledDate;
+    const startDate = deliveryStart ? new Date(deliveryStart) : null;
+    const endDate = order.deliveryEnd ? new Date(order.deliveryEnd) : null;
+
     return (
         <Card className="p-3 mt-3 shadow-sm border border-border dark:border-slate-700">
             <div className="flex justify-between items-start gap-2">
@@ -206,12 +331,25 @@ const LogisticsKanbanCard: FC<{
                 </div>
             </div>
             <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{order.clientName}</p>
-            {(order.status === 'scheduled' || order.status === 'in_transit') && order.deliveryScheduledDate && (
-                <div className="mt-2 text-sm font-semibold text-primary">
-                    {new Date(order.deliveryScheduledDate).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' })}
+            {startDate && (
+                <div className="mt-2 text-sm text-text-secondary dark:text-slate-300">
+                    <div className="font-semibold text-primary">
+                        {startDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' })}
+                        {' '}•{' '}
+                        {startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {endDate && (
+                            <span className="text-xs text-text-secondary dark:text-slate-400"> — {endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        )}
+                    </div>
+                    {assignedVehicle && (
+                        <div className="flex items-center gap-2 mt-1 text-xs text-text-secondary dark:text-slate-400">
+                            <span className="font-medium text-text-primary dark:text-slate-200">Veículo:</span>
+                            <span>{assignedVehicle.name} ({assignedVehicle.licensePlate})</span>
+                        </div>
+                    )}
                 </div>
             )}
-            
+
             <div className="mt-3 pt-3 border-t border-border dark:border-slate-700 space-y-2">
                 {/* Primary Status-Changing Actions */}
                 {order.status === 'ready_for_logistics' && <Button size="sm" className="w-full" onClick={() => onSchedule(order)}>Agendar</Button>}
@@ -261,7 +399,7 @@ const LogisticsKanbanCard: FC<{
 
 
 const LogisticsPage: FC = () => {
-    const { serviceOrders, scheduleDelivery, updateServiceOrderStatus, confirmDelivery, confirmInstallation } = useData();
+    const { serviceOrders, scheduleDelivery, updateServiceOrderStatus, confirmDelivery, confirmInstallation, vehicles } = useData();
     const [schedulingOrder, setSchedulingOrder] = useState<ServiceOrder | null>(null);
     const [generatingReceiptTermOrder, setGeneratingReceiptTermOrder] = useState<ServiceOrder | null>(null);
     const [generatingInstallTermOrder, setGeneratingInstallTermOrder] = useState<ServiceOrder | null>(null);
@@ -305,9 +443,9 @@ const LogisticsPage: FC = () => {
                         </div>
                             <div className="flex-1 overflow-y-auto pr-1">
                             {logisticsOrders.filter(o => o.status === column.id).map(order => (
-                                <LogisticsKanbanCard 
-                                    key={order.id} 
-                                    order={order} 
+                                <LogisticsKanbanCard
+                                    key={order.id}
+                                    order={order}
                                     onSchedule={setSchedulingOrder}
                                     onStartRoute={(id) => updateServiceOrderStatus(id, 'in_transit')}
                                     onArrive={(id) => updateServiceOrderStatus(id, 'realizado')}
@@ -315,6 +453,7 @@ const LogisticsPage: FC = () => {
                                     onConfirmInstallation={confirmInstallation}
                                     onGenerateReceiptTerm={setGeneratingReceiptTermOrder}
                                     onGenerateInstallTerm={setGeneratingInstallTermOrder}
+                                    vehicles={vehicles}
                                 />
                             ))}
                         </div>

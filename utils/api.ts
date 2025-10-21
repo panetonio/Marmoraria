@@ -299,4 +299,89 @@ export const api = {
     });
     return response.json();
   },
+
+  // Veículos
+  async getVehicles() {
+    const response = await fetch(`${API_URL}/vehicles`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async createVehicle(vehicleData: any) {
+    const response = await fetch(`${API_URL}/vehicles`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(vehicleData),
+    });
+    return response.json();
+  },
+
+  async updateVehicle(id: string, vehicleData: any) {
+    const response = await fetch(`${API_URL}/vehicles/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(vehicleData),
+    });
+    return response.json();
+  },
+
+  async deleteVehicle(id: string) {
+    const response = await fetch(`${API_URL}/vehicles/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  // Rotas de entrega
+  async getDeliveryRoutes(params: { vehicleId?: string; start?: string; end?: string } = {}) {
+    const query = new URLSearchParams();
+    if (params.vehicleId) query.append('vehicleId', params.vehicleId);
+    if (params.start) query.append('start', params.start);
+    if (params.end) query.append('end', params.end);
+
+    const qs = query.toString();
+    const response = await fetch(`${API_URL}/delivery-routes${qs ? `?${qs}` : ''}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async createDeliveryRoute(routeData: any) {
+    const response = await fetch(`${API_URL}/delivery-routes`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(routeData),
+    });
+    return response.json();
+  },
+
+  async updateDeliveryRoute(id: string, routeData: any) {
+    const response = await fetch(`${API_URL}/delivery-routes/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(routeData),
+    });
+    return response.json();
+  },
+
+  async deleteDeliveryRoute(id: string) {
+    const response = await fetch(`${API_URL}/delivery-routes/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async checkVehicleAvailability(vehicleId: string, start: string, end: string, routeId?: string) {
+    const query = new URLSearchParams({ vehicleId, start, end });
+    if (routeId) {
+      query.append('routeId', routeId);
+    }
+    const response = await fetch(`${API_URL}/delivery-routes/availability/check?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
 };
