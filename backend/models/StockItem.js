@@ -25,7 +25,15 @@ const stockItemSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['disponivel', 'reservada', 'em_uso', 'consumida'],
+    enum: [
+      'disponivel',
+      'reservada',
+      'em_uso',
+      'consumida',
+      'em_corte',
+      'em_acabamento',
+      'pronto_para_expedicao',
+    ],
     default: 'disponivel',
   },
   parentSlabId: {
