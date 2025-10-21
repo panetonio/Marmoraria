@@ -346,7 +346,7 @@ export interface MaintenanceLog {
   createdAt: string;
 }
 
-export type ActivityType = 
+export type ActivityType =
   | 'quote_created' | 'quote_updated' | 'quote_sent' | 'quote_approved' | 'quote_rejected'
   | 'order_created' | 'order_updated' | 'order_approved' | 'order_cancelled'
   | 'client_created' | 'client_updated' | 'client_deleted'
@@ -356,6 +356,7 @@ export type ActivityType =
   | 'invoice_created' | 'invoice_updated' | 'invoice_paid' | 'invoice_cancelled'
   | 'delivery_scheduled' | 'delivery_started' | 'delivery_completed'
   | 'installation_scheduled' | 'installation_completed'
+  | 'stock_scanned' | 'stock_status_updated'
   | 'user_login' | 'user_logout' | 'user_created' | 'user_updated'
   | 'system_backup' | 'system_restore' | 'data_export' | 'data_import';
 

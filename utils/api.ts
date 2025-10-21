@@ -384,4 +384,21 @@ export const api = {
     });
     return response.json();
   },
+
+  // Estoque
+  async getStockItemByQrCode(id: string) {
+    const response = await fetch(`${API_URL}/stock/qrcode/${encodeURIComponent(id)}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async updateStockItemStatus(id: string, data: { status?: string; location?: string }) {
+    const response = await fetch(`${API_URL}/stock/qrcode/${encodeURIComponent(id)}/status`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return response.json();
+  },
 };

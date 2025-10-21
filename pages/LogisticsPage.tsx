@@ -11,6 +11,7 @@ import Badge from '../components/ui/Badge';
 import Calendar from '../components/ui/Calendar';
 import InstallationTermModal from '../components/InstallationTermModal';
 import ReceiptTermModal from '../components/ReceiptTermModal';
+import QrCodeScanner from '../components/QrCodeScanner';
 
 
 const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
@@ -432,6 +433,10 @@ const LogisticsPage: FC = () => {
                     <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Painel de Logística</h1>
                     <p className="mt-2 text-text-secondary dark:text-slate-400">Gerencie e agende as entregas e instalações.</p>
                 </div>
+            </div>
+
+            <div className="mt-6">
+                <QrCodeScanner />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-5 mt-6 h-[75vh]">
