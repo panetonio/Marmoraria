@@ -271,6 +271,63 @@ DELETE /api/quotes/:id
 Authorization: Bearer {token}
 ```
 
+### Assets
+
+As rotas de assets permitem consultar e atualizar informações de diferentes tipos de patrimônio (itens de estoque, equipamentos e produtos) utilizando QR Codes padronizados no formato `marmoraria://asset/<tipo>/<id>`.
+
+#### Ler asset via QR Code
+```http
+GET /api/assets/qrcode-scan?data=marmoraria://asset/stock/<assetId>
+Authorization: Bearer {token}
+```
+
+**Resposta**
+```json
+{
+  "success": true,
+  "data": {
+    "type": "stock_item",
+    "data": {
+      "_id": "6631e4f7f1b7c1a2b3c4d5e6",
+      "status": "disponivel",
+      "location": "Pátio A",
+      "createdAt": "2024-01-12T10:00:00.000Z",
+      "updatedAt": "2024-01-12T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Atualizar status do asset
+```http
+PUT /api/assets/{type}/{id}/status
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "status": "em_manutencao"
+}
+```
+
+Os valores aceitos dependem do tipo do asset:
+- `stock` → `disponivel`, `reservada`, `em_uso`, `consumida`, `em_corte`, `em_acabamento`, `pronto_para_expedicao`
+- `equipment` → `operacional`, `em_manutencao`, `desativado`
+
+#### Atualizar localização do asset
+```http
+PUT /api/assets/{type}/{id}/location
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "location": "Galpão 2"
+}
+```
+
+Para itens de estoque a localização é mapeada para o campo `location`, enquanto equipamentos utilizam o campo `currentLocation`.
+
+> ℹ️ Produtos podem ser consultados pelas rotas de assets, mas não possuem atualizações de status ou localização disponíveis no momento.
+
 ## 🔐 Autenticação
 
 A API usa JWT (JSON Web Tokens) para autenticação.
