@@ -338,9 +338,12 @@ export interface Equipment {
   category: EquipmentCategory;
   purchaseDate: string;
   warrantyEndDate: string;
-  purchaseInvoiceId?: string; // Link para Invoice de compra
+  purchaseInvoiceNumber: string;
+  supplierCnpj: string;
   assignedTo: string; // ID do funcionário de produção (obrigatório)
   status: EquipmentStatus;
+  currentLocation: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -371,6 +374,7 @@ export type ActivityType =
   | 'delivery_scheduled' | 'delivery_started' | 'delivery_completed'
   | 'installation_scheduled' | 'installation_completed'
   | 'service_order_checklist_updated' | 'service_order_checklist_item_checked'
+  | 'asset_scanned' | 'asset_status_updated' | 'asset_location_updated' | 'asset_status_location_updated'
   | 'stock_scanned' | 'stock_status_updated' | 'stock_location_updated' | 'stock_status_location_updated'
   | 'user_login' | 'user_logout' | 'user_created' | 'user_updated'
   | 'system_backup' | 'system_restore' | 'data_export' | 'data_import';

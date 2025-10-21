@@ -547,9 +547,12 @@ export const mockEquipment: Equipment[] = [
         category: 'maquina',
         purchaseDate: '2023-01-15',
         warrantyEndDate: '2025-01-15',
-        purchaseInvoiceId: 'NF-2023-001',
+        purchaseInvoiceNumber: 'NF-2023-001',
+        supplierCnpj: '12.345.678/0001-90',
         assignedTo: 'emp-1', // Marcos Silva - Cortador
         status: 'operacional',
+        currentLocation: 'Galpão A - Setor de Corte',
+        notes: 'Necessita calibração mensal.',
         createdAt: '2023-01-15T10:00:00Z',
         updatedAt: '2023-01-15T10:00:00Z'
     },
@@ -560,9 +563,11 @@ export const mockEquipment: Equipment[] = [
         category: 'maquina',
         purchaseDate: '2023-03-20',
         warrantyEndDate: '2025-03-20',
-        purchaseInvoiceId: 'NF-2023-015',
+        purchaseInvoiceNumber: 'NF-2023-015',
+        supplierCnpj: '98.765.432/0001-11',
         assignedTo: 'emp-3', // Ricardo Alves - Acabador
         status: 'operacional',
+        currentLocation: 'Galpão B - Acabamento',
         createdAt: '2023-03-20T14:30:00Z',
         updatedAt: '2023-03-20T14:30:00Z'
     },
@@ -573,9 +578,12 @@ export const mockEquipment: Equipment[] = [
         category: 'maquina',
         purchaseDate: '2022-08-10',
         warrantyEndDate: '2024-08-10',
-        purchaseInvoiceId: 'NF-2022-045',
+        purchaseInvoiceNumber: 'NF-2022-045',
+        supplierCnpj: '54.321.987/0001-22',
         assignedTo: 'emp-5', // Luiz Pereira - Montador
         status: 'em_manutencao',
+        currentLocation: 'Oficina de Manutenção',
+        notes: 'Em manutenção preventiva.',
         createdAt: '2022-08-10T09:15:00Z',
         updatedAt: '2024-07-25T16:20:00Z'
     },
@@ -586,9 +594,11 @@ export const mockEquipment: Equipment[] = [
         category: 'maquina',
         purchaseDate: '2021-12-05',
         warrantyEndDate: '2023-12-05',
-        purchaseInvoiceId: 'NF-2021-089',
+        purchaseInvoiceNumber: 'NF-2021-089',
+        supplierCnpj: '45.678.123/0001-55',
         assignedTo: 'emp-2', // Paulo Costa - Cortador
         status: 'operacional',
+        currentLocation: 'Galpão A - Área de Corte',
         createdAt: '2021-12-05T11:45:00Z',
         updatedAt: '2021-12-05T11:45:00Z'
     },
@@ -599,9 +609,11 @@ export const mockEquipment: Equipment[] = [
         category: 'maquina',
         purchaseDate: '2023-06-12',
         warrantyEndDate: '2025-06-12',
-        purchaseInvoiceId: 'NF-2023-032',
+        purchaseInvoiceNumber: 'NF-2023-032',
+        supplierCnpj: '23.456.789/0001-33',
         assignedTo: 'emp-8', // Carlos Eduardo - Supervisor
         status: 'operacional',
+        currentLocation: 'Sala de Compressores',
         createdAt: '2023-06-12T13:20:00Z',
         updatedAt: '2023-06-12T13:20:00Z'
     },
@@ -612,9 +624,12 @@ export const mockEquipment: Equipment[] = [
         category: 'veiculo',
         purchaseDate: '2023-02-10',
         warrantyEndDate: '2025-02-10',
-        purchaseInvoiceId: 'NF-2023-008',
+        purchaseInvoiceNumber: 'NF-2023-008',
+        supplierCnpj: '34.567.891/0001-77',
         assignedTo: 'emp-6', // Fernando Souza - Entregador
         status: 'operacional',
+        currentLocation: 'Pátio Externo',
+        notes: 'Verificar pneus mensalmente.',
         createdAt: '2023-02-10T08:00:00Z',
         updatedAt: '2023-02-10T08:00:00Z'
     },
@@ -625,9 +640,11 @@ export const mockEquipment: Equipment[] = [
         category: 'veiculo',
         purchaseDate: '2022-11-15',
         warrantyEndDate: '2024-11-15',
-        purchaseInvoiceId: 'NF-2022-078',
+        purchaseInvoiceNumber: 'NF-2022-078',
+        supplierCnpj: '67.890.123/0001-44',
         assignedTo: 'emp-7', // Roberto Carlos - Entregador
         status: 'operacional',
+        currentLocation: 'Garagem Coberta',
         createdAt: '2022-11-15T10:30:00Z',
         updatedAt: '2022-11-15T10:30:00Z'
     },
@@ -638,9 +655,11 @@ export const mockEquipment: Equipment[] = [
         category: 'veiculo',
         purchaseDate: '2023-04-20',
         warrantyEndDate: '2025-04-20',
-        purchaseInvoiceId: 'NF-2023-025',
+        purchaseInvoiceNumber: 'NF-2023-025',
+        supplierCnpj: '11.222.333/0001-66',
         assignedTo: 'emp-6', // Fernando Souza - Entregador
         status: 'em_manutencao',
+        currentLocation: 'Oficina de Terceiros',
         createdAt: '2023-04-20T14:15:00Z',
         updatedAt: '2024-08-01T09:00:00Z'
     }
