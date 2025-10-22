@@ -60,13 +60,32 @@ const CreateServiceOrderModal: FC<{
     const [error, setError] = useState<string>('');
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
+    // Resetar estado quando o modal abrir ou o pedido mudar
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedItemIds([]);
+            setDeliveryDate('');
+            setError('');
+            setSelectedTemplateId('');
+        }
+    }, [isOpen, order.id]);
+
     const availableItems = useMemo(() => {
         const assignedItemIds = new Set(
             serviceOrders
                 .filter(os => os.orderId === order.id)
                 .flatMap(os => os.items.map(item => item.id))
         );
-        return order.items.filter(item => !assignedItemIds.has(item.id));
+        const available = order.items.filter(item => !assignedItemIds.has(item.id));
+        
+        // Debug: Verificar se há IDs duplicados
+        const itemIds = available.map(item => item.id);
+        const uniqueIds = new Set(itemIds);
+        if (itemIds.length !== uniqueIds.size) {
+            console.warn('⚠️ Aviso: IDs duplicados encontrados nos itens disponíveis!', itemIds);
+        }
+        
+        return available;
     }, [order, serviceOrders]);
 
     const selectedItems = useMemo(() => {
@@ -78,9 +97,17 @@ const CreateServiceOrderModal: FC<{
     }, [selectedItems]);
 
     const handleToggleItem = (itemId: string) => {
-        setSelectedItemIds(prev => 
-            prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
-        );
+        setSelectedItemIds(prev => {
+            const isCurrentlySelected = prev.includes(itemId);
+            const newSelection = isCurrentlySelected 
+                ? prev.filter(id => id !== itemId) 
+                : [...prev, itemId];
+            
+            // Debug: Log para verificar seleção
+            console.log('Toggle item:', itemId, 'Currently selected:', isCurrentlySelected, 'New selection:', newSelection);
+            
+            return newSelection;
+        });
     };
 
     const selectedTemplate = useMemo(() => {
@@ -138,15 +165,21 @@ const CreateServiceOrderModal: FC<{
                 <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Itens do Pedido Disponíveis</label>
                 <div className="max-h-60 overflow-y-auto border border-border dark:border-slate-700 rounded-lg p-2 space-y-2">
                     {availableItems.length > 0 ? availableItems.map(item => (
-                        <label key={item.id} className="flex items-center p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
+                        <div key={item.id} className="flex items-center p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">
                             <input
                                 type="checkbox"
-                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                id={`os-item-${item.id}`}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                                 checked={selectedItemIds.includes(item.id)}
                                 onChange={() => handleToggleItem(item.id)}
                             />
-                            <span className="ml-3 text-sm text-text-primary dark:text-slate-200">{item.description} ({item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})</span>
-                        </label>
+                            <label 
+                                htmlFor={`os-item-${item.id}`}
+                                className="ml-3 text-sm text-text-primary dark:text-slate-200 cursor-pointer flex-1"
+                            >
+                                {item.description} ({item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                            </label>
+                        </div>
                     )) : <p className="text-sm text-text-secondary dark:text-slate-400 p-4 text-center">Todos os itens deste pedido já foram alocados em Ordens de Serviço.</p>}
                 </div>
             </div>

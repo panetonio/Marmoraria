@@ -86,6 +86,7 @@ interface DataContextType {
     addEvent: (event: Omit<AgendaEvent, 'id'>) => void;
     markTransactionAsPaid: (transactionId: string) => void;
     updateFinancialTransaction: (transaction: FinancialTransaction) => void;
+    addFinancialTransaction: (transactionData: Omit<FinancialTransaction, 'id'>) => void;
     addReceipt: (receiptData: Omit<Receipt, 'id' | 'createdAt'>) => void;
     saveMaterial: (material: Material) => void;
     deleteMaterial: (materialId: string) => void;
@@ -422,6 +423,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     id: newOrderId,
                     originalQuoteId: savedQuote.id,
                     clientName: savedQuote.clientName,
+                    clientCpf: savedQuote.clientCpf,
                     deliveryAddress: savedQuote.deliveryAddress,
                     items: savedQuote.items,
                     subtotal: savedQuote.subtotal,
@@ -527,6 +529,15 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 t.id === transactionToUpdate.id ? transactionToUpdate : t
             )
         );
+    };
+
+    const addFinancialTransaction = (transactionData: Omit<FinancialTransaction, 'id'>) => {
+        const newId = `fin-${Date.now()}`;
+        const newTransaction: FinancialTransaction = {
+            ...transactionData,
+            id: newId,
+        };
+        setFinancialTransactions(prev => [...prev, newTransaction]);
     };
 
     const addReceipt = (receiptData: Omit<Receipt, 'id' | 'createdAt'>) => {
@@ -991,6 +1002,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         addEvent,
         markTransactionAsPaid,
         updateFinancialTransaction,
+        addFinancialTransaction,
         addReceipt,
         saveMaterial,
         deleteMaterial,

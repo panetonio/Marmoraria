@@ -158,6 +158,7 @@ export interface Quote {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  clientCpf?: string;
   deliveryAddress: Address;
   status: QuoteStatus;
   items: QuoteItem[];
@@ -177,6 +178,7 @@ export interface Order {
   id: string; // PED-
   originalQuoteId: string; // ORC-
   clientName: string;
+  clientCpf?: string;
   deliveryAddress: Address;
   items: QuoteItem[];
   subtotal: number;

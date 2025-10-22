@@ -219,6 +219,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     const [itemType, setItemType] = useState<QuoteItemType>('material');
     
     const [itemFormData, setItemFormData] = useState<Partial<QuoteItem & { materialName?: string, area?: number, perimeter?: number }>>({});
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
     
     const [isCatalogOpen, setIsCatalogOpen] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -256,8 +257,8 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
             if (!quote.clientPhone.trim()) newErrors.clientPhone = "Telefone do cliente é obrigatório.";
             if (!quote.paymentMethod) {
                 newErrors.paymentMethod = "A forma de pagamento é obrigatória.";
-            } else if (quote.paymentMethod === 'cartao_credito' && (!quote.installments || quote.installments < 1)) {
-                newErrors.installments = "O número de parcelas deve ser 1 ou mais.";
+            } else if (quote.paymentMethod === 'cartao_credito' && (!quote.installments || quote.installments < 1 || quote.installments > 12)) {
+                newErrors.installments = "O número de parcelas deve ser entre 1 e 12.";
             }
         }
         
@@ -325,11 +326,11 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         return Object.keys(newItemErrors).length === 0;
     };
 
-    const handleAddItem = () => {
+    const handleSaveItem = () => {
         if (!validateItem()) return;
         
-        let newItem: QuoteItem | null = null;
-        const baseId = `item-${Date.now()}`;
+        let updatedItem: QuoteItem | null = null;
+        const baseId = editingItemId || `item-${Date.now()}`;
         
         const commonData = {
             id: baseId,
@@ -340,7 +341,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         };
 
         if (itemType === 'material') {
-            newItem = {
+            updatedItem = {
                 ...commonData,
                 type: 'material',
                 description: `${itemFormData.description} - ${itemFormData.materialName}`,
@@ -353,17 +354,28 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
         } else if (itemType === 'service') {
             const service = services.find(s => s.id === itemFormData.id);
             if (!service) return;
-            newItem = { ...commonData, type: 'service', description: service.name };
+            updatedItem = { ...commonData, type: 'service', description: service.name };
         } else if (itemType === 'product') {
             const product = products.find(p => p.id === itemFormData.id);
             if (!product) return;
-            newItem = { ...commonData, type: 'product', description: product.name };
+            updatedItem = { ...commonData, type: 'product', description: product.name };
         }
 
-        if (newItem) {
-            setQuote(prev => ({...prev, items: [...prev.items, newItem!]}));
+        if (updatedItem) {
+            if (editingItemId) {
+                // Atualizar item existente
+                setQuote(prev => ({
+                    ...prev,
+                    items: prev.items.map(item => item.id === editingItemId ? updatedItem! : item)
+                }));
+            } else {
+                // Adicionar novo item
+                setQuote(prev => ({...prev, items: [...prev.items, updatedItem!]}));
+            }
+            
             setItemFormData({unitPrice: 0, quantity: 0});
             setItemErrors({});
+            setEditingItemId(null);
             if (errors.items) {
                 const newErrors = {...errors};
                 delete newErrors.items;
@@ -383,6 +395,53 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
             ...prev,
             items: prev.items.filter(item => item.id !== itemId)
         }));
+        // Se estiver editando o item que foi deletado, limpar edição
+        if (editingItemId === itemId) {
+            setEditingItemId(null);
+            setItemFormData({unitPrice: 0, quantity: 0});
+            setItemErrors({});
+        }
+    };
+
+    const handleEditItem = (item: QuoteItem) => {
+        setEditingItemId(item.id);
+        setItemType(item.type);
+        
+        // Preencher o formulário com os dados do item
+        if (item.type === 'material') {
+            const material = materials.find(m => m.id === item.materialId);
+            const descriptionParts = item.description.split(' - ');
+            setItemFormData({
+                ...item,
+                description: descriptionParts[0],
+                materialName: material?.name || descriptionParts[1],
+                area: item.width && item.height ? item.width * item.height : item.quantity,
+            });
+        } else if (item.type === 'service') {
+            const service = services.find(s => s.name === item.description);
+            setItemFormData({
+                ...item,
+                id: service?.id,
+            });
+        } else if (item.type === 'product') {
+            const product = products.find(p => p.name === item.description);
+            setItemFormData({
+                ...item,
+                id: product?.id,
+            });
+        }
+        
+        // Scroll para o formulário de item
+        const itemFormElement = document.getElementById('item-form-section');
+        if (itemFormElement) {
+            itemFormElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditingItemId(null);
+        setItemFormData({unitPrice: 0, quantity: 0});
+        setItemErrors({});
     };
     
     const renderItemForm = () => {
@@ -547,7 +606,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     const handleClientSelect = (clientId: string) => {
         const emptyAddress: Address = { cep: '', uf: '', city: '', neighborhood: '', address: '', number: '' };
         if (!clientId) {
-            setQuote(prev => ({ ...prev, clientName: '', clientEmail: '', clientPhone: '', deliveryAddress: emptyAddress }));
+            setQuote(prev => ({ ...prev, clientName: '', clientEmail: '', clientPhone: '', clientCpf: '', deliveryAddress: emptyAddress }));
             return;
         }
         const selectedClient = clients.find(c => c.id === clientId);
@@ -557,6 +616,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 clientName: selectedClient.name,
                 clientEmail: selectedClient.email,
                 clientPhone: selectedClient.phone,
+                clientCpf: selectedClient.type === 'pessoa_fisica' ? selectedClient.cpfCnpj : '',
                 deliveryAddress: selectedClient.address,
             }));
         }
@@ -630,8 +690,45 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                              label="Telefone do Cliente"
                              id="client-phone"
                              value={quote.clientPhone}
-                             onChange={e => setQuote({...quote, clientPhone: e.target.value})}
+                             onChange={e => {
+                                 const value = e.target.value.replace(/\D/g, '');
+                                 let formatted = value;
+                                 if (value.length <= 10) {
+                                     // Formato: (00) 0000-0000
+                                     formatted = value.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+                                 } else {
+                                     // Formato: (00) 00000-0000
+                                     formatted = value.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3');
+                                 }
+                                 setQuote({...quote, clientPhone: formatted.trim()});
+                             }}
                              error={errors.clientPhone}
+                             placeholder="(00) 00000-0000"
+                             maxLength={15}
+                        />
+                        <Input
+                             label="CPF do Cliente (Opcional)"
+                             id="client-cpf"
+                             value={quote.clientCpf || ''}
+                             onChange={e => {
+                                 const value = e.target.value.replace(/\D/g, '');
+                                 let formatted = '';
+                                 if (value.length > 0) {
+                                     if (value.length <= 3) {
+                                         formatted = value;
+                                     } else if (value.length <= 6) {
+                                         formatted = `${value.slice(0, 3)}.${value.slice(3)}`;
+                                     } else if (value.length <= 9) {
+                                         formatted = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6)}`;
+                                     } else {
+                                         formatted = `${value.slice(0, 3)}.${value.slice(3, 6)}.${value.slice(6, 9)}-${value.slice(9, 11)}`;
+                                     }
+                                 }
+                                 setQuote({...quote, clientCpf: formatted});
+                             }}
+                             error={errors.clientCpf}
+                             placeholder="___.___.___-__"
+                             maxLength={14}
                         />
                     </div>
                 </div>
@@ -645,21 +742,37 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                     />
                 </div>
             
-                <div className="border-t border-border dark:border-slate-700 pt-4">
+                <div className="border-t border-border dark:border-slate-700 pt-4" id="item-form-section">
                      <h3 className="text-xl font-semibold text-text-primary dark:text-slate-100 mb-2">Itens do Orçamento</h3>
                      {errors.items && <div className="bg-red-100 dark:bg-red-900/50 border border-error dark:border-error text-error dark:text-red-300 px-4 py-3 rounded relative mb-4" role="alert">{errors.items}</div>}
                      <div className="lg:flex gap-4">
                         <div className="lg:w-1/3 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg border border-border dark:border-slate-700 mb-4 lg:mb-0">
-                            <h4 className="font-semibold mb-3">Adicionar Novo Item</h4>
+                            <h4 className="font-semibold mb-3">
+                                {editingItemId ? 'Editar Item' : 'Adicionar Novo Item'}
+                            </h4>
                             <div className="flex space-x-2 mb-4">
                                 {(['material', 'service', 'product'] as QuoteItemType[]).map(type => (
-                                    <button key={type} onClick={() => handleItemTypeChange(type)} className={`px-3 py-1 rounded text-sm ${itemType === type ? 'bg-primary text-white' : 'bg-slate-200 dark:bg-slate-700 dark:text-slate-200'}`}>
+                                    <button 
+                                        key={type} 
+                                        onClick={() => handleItemTypeChange(type)} 
+                                        className={`px-3 py-1 rounded text-sm ${itemType === type ? 'bg-primary text-white' : 'bg-slate-200 dark:bg-slate-700 dark:text-slate-200'}`}
+                                        disabled={!!editingItemId}
+                                    >
                                         {type === 'material' ? 'Material' : type === 'service' ? 'Serviço' : 'Produto'}
                                     </button>
                                 ))}
                             </div>
                             {renderItemForm()}
-                            <Button onClick={handleAddItem} className="w-full mt-3">Adicionar Item</Button>
+                            <div className="flex gap-2 mt-3">
+                                <Button onClick={handleSaveItem} className="flex-1">
+                                    {editingItemId ? 'Salvar Alterações' : 'Adicionar Item'}
+                                </Button>
+                                {editingItemId && (
+                                    <Button onClick={handleCancelEdit} variant="secondary" className="flex-1">
+                                        Cancelar
+                                    </Button>
+                                )}
+                            </div>
                         </div>
 
                         <div className="lg:w-2/3">
@@ -679,20 +792,31 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                                     <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0"><tr className="border-b border-border dark:border-slate-700"><th className="p-2">Descrição</th><th className="p-2">Qtd.</th><th className="p-2">Preço Unit.</th><th className="p-2">Desconto</th><th className="p-2">Total</th><th className="p-2 text-center">Ações</th></tr></thead>
                                     <tbody>
                                         {quote.items.map(item => (
-                                            <tr key={item.id} className="border-b border-border dark:border-slate-700">
+                                            <tr key={item.id} className={`border-b border-border dark:border-slate-700 ${editingItemId === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
                                                 <td className="p-2">{item.description}</td>
                                                 <td className="p-2">{item.quantity.toFixed(2)}</td>
                                                 <td className="p-2">{item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                                 <td className="p-2 text-red-600 dark:text-red-400">{item.discount ? `- ${item.discount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : '-'}</td>
                                                 <td className="p-2">{item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                                 <td className="p-2 text-center">
-                                                    <button 
-                                                        onClick={() => handleDeleteItem(item.id)}
-                                                        className="text-error hover:text-red-700 p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
-                                                        aria-label={`Remover item ${item.description}`}
-                                                    >
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                    </button>
+                                                    <div className="flex justify-center gap-1">
+                                                        <button 
+                                                            onClick={() => handleEditItem(item)}
+                                                            className="text-primary hover:text-blue-700 p-1 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                                            aria-label={`Editar item ${item.description}`}
+                                                            title="Editar item"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteItem(item.id)}
+                                                            className="text-error hover:text-red-700 p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                                                            aria-label={`Remover item ${item.description}`}
+                                                            title="Remover item"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -768,16 +892,31 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                             ))}
                         </Select>
                         {quote.paymentMethod === 'cartao_credito' && (
-                            <div>
+                            <div className="space-y-2">
                                 <Input
                                     label="Nº de Parcelas"
                                     id="installments"
                                     type="number"
                                     min="1"
+                                    max="12"
+                                    step="1"
                                     value={quote.installments || ''}
-                                    onChange={e => setQuote({...quote, installments: parseInt(e.target.value, 10) || 1})}
+                                    onChange={e => {
+                                        const value = parseInt(e.target.value, 10);
+                                        if (!isNaN(value) && value >= 1 && value <= 12) {
+                                            setQuote({...quote, installments: value});
+                                        } else if (e.target.value === '') {
+                                            setQuote({...quote, installments: undefined});
+                                        }
+                                    }}
                                     error={errors.installments}
+                                    placeholder="1 a 12 parcelas"
                                 />
+                                {quote.installments && quote.installments > 0 && totals.total > 0 && (
+                                    <div className="text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg">
+                                        {quote.installments}x de {(totals.total / quote.installments).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -902,8 +1041,8 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
     const handleNew = () => {
         setSelectedQuote({
             id: `new-${Date.now()}`,
-            clientName: '', clientEmail: '', clientPhone: '', 
-            deliveryAddress: { cep: '', uf: '', city: '', neighborhood: '', address: '', number: '' },
+            clientName: '', clientEmail: '', clientPhone: '', clientCpf: '',
+            deliveryAddress: { cep: '', uf: 'RO', city: '', neighborhood: '', address: '', number: '' },
             status: 'draft', items: [], subtotal: 0, total: 0,
             discount: 0,
             freight: 0,

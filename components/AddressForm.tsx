@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Address } from '../types';
 import Input from './ui/Input';
+import Select from './ui/Select';
+import { ufs, getMunicipiosByUF } from '../utils/municipios';
 
 interface AddressFormProps {
     address: Address;
@@ -11,6 +13,27 @@ interface AddressFormProps {
 const AddressForm: React.FC<AddressFormProps> = ({ address, onAddressChange, errors }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [cepError, setCepError] = useState<string | undefined>(errors.cep);
+    const [municipios, setMunicipios] = useState<string[]>([]);
+
+    // Inicializar UF com RO se estiver vazio
+    useEffect(() => {
+        if (!address.uf) {
+            onAddressChange('uf', 'RO');
+        }
+    }, []);
+
+    // Atualizar lista de municípios quando UF mudar
+    useEffect(() => {
+        if (address.uf) {
+            const municipiosDisponiveis = getMunicipiosByUF(address.uf);
+            setMunicipios(municipiosDisponiveis);
+            
+            // Se o município atual não está na nova lista, limpar
+            if (address.city && !municipiosDisponiveis.includes(address.city)) {
+                onAddressChange('city', '');
+            }
+        }
+    }, [address.uf]);
 
     const handleCepBlur = async (cep: string) => {
         const cleanedCep = cep.replace(/\D/g, '');
@@ -67,11 +90,21 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onAddressChange, err
                     id="address-cep"
                     value={address.cep}
                     onChange={e => {
-                        onAddressChange('cep', e.target.value);
+                        const value = e.target.value.replace(/\D/g, '');
+                        let formatted = '';
+                        if (value.length > 0) {
+                            if (value.length <= 5) {
+                                formatted = value;
+                            } else {
+                                formatted = `${value.slice(0, 5)}-${value.slice(5, 8)}`;
+                            }
+                        }
+                        onAddressChange('cep', formatted);
                         if (cepError) setCepError(undefined); // Clear error on typing
                     }}
                     onBlur={e => handleCepBlur(e.target.value)}
                     error={cepError || errors.cep}
+                    placeholder="_____-___"
                     maxLength={9} // 00000-000
                     endAdornment={isLoading ? <LoadingSpinner /> : null}
                 />
@@ -112,24 +145,34 @@ const AddressForm: React.FC<AddressFormProps> = ({ address, onAddressChange, err
                     error={errors.neighborhood}
                 />
             </div>
+            <div className="md:col-span-1">
+                <Select
+                    label="UF"
+                    id="address-uf"
+                    value={address.uf || 'RO'}
+                    onChange={e => onAddressChange('uf', e.target.value)}
+                    error={errors.uf}
+                >
+                    <option value="">Selecione...</option>
+                    {ufs.map(uf => (
+                        <option key={uf} value={uf}>{uf}</option>
+                    ))}
+                </Select>
+            </div>
             <div className="md:col-span-3">
-                <Input
-                    label="Cidade"
+                <Select
+                    label="Município"
                     id="address-city"
                     value={address.city}
                     onChange={e => onAddressChange('city', e.target.value)}
                     error={errors.city}
-                />
-            </div>
-            <div className="md:col-span-1">
-                <Input
-                    label="UF"
-                    id="address-uf"
-                    value={address.uf}
-                    maxLength={2}
-                    onChange={e => onAddressChange('uf', e.target.value.toUpperCase())}
-                    error={errors.uf}
-                />
+                    disabled={!address.uf || municipios.length === 0}
+                >
+                    <option value="">Selecione o município...</option>
+                    {municipios.map(municipio => (
+                        <option key={municipio} value={municipio}>{municipio}</option>
+                    ))}
+                </Select>
             </div>
         </div>
     );

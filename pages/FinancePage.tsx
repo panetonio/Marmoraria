@@ -1,6 +1,6 @@
 import React, { useState, useMemo, FC, useEffect, ChangeEvent } from 'react';
 import type { FinancialTransaction, TransactionStatus, TransactionType, PaymentMethod } from '../types';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
+import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Tabs from '../components/ui/Tabs';
 import { useData } from '../context/DataContext';
@@ -9,10 +9,12 @@ import { transactionStatusMap } from '../config/statusMaps';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
 import { exportTransactionsToCSV } from '../utils/helpers';
 
 type FinanceView = 'contas' | 'fluxo_caixa' | 'relatorios';
 type ReportPeriod = 'day' | 'week' | 'month';
+type TransactionTab = 'entradas' | 'saidas';
 
 const KPICard: FC<{ title: string; value: string; colorClass?: string }> = ({ title, value, colorClass = 'text-primary' }) => (
     <Card>
@@ -62,6 +64,126 @@ const ReportTable: FC<{ title: React.ReactNode, transactions: FinancialTransacti
         </div>
     </Card>
 );
+
+const AddTransactionModal: FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (transaction: Omit<FinancialTransaction, 'id'>) => void;
+    type: TransactionType;
+    paymentMethodLabels: Record<PaymentMethod, string>;
+}> = ({ isOpen, onClose, onSave, type, paymentMethodLabels }) => {
+    const [formData, setFormData] = useState<Partial<FinancialTransaction>>({
+        description: '',
+        amount: 0,
+        type: type,
+        status: 'pendente',
+        dueDate: new Date().toISOString().split('T')[0],
+        paymentMethod: undefined,
+    });
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        if (isOpen) {
+            setFormData({
+                description: '',
+                amount: 0,
+                type: type,
+                status: 'pendente',
+                dueDate: new Date().toISOString().split('T')[0],
+                paymentMethod: undefined,
+            });
+            setErrors({});
+        }
+    }, [isOpen, type]);
+
+    const handleChange = (field: keyof FinancialTransaction, value: any) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+        if (errors[field]) {
+            setErrors(prev => ({ ...prev, [field]: '' }));
+        }
+    };
+
+    const validate = () => {
+        const newErrors: Record<string, string> = {};
+        if (!formData.description?.trim()) newErrors.description = 'Descrição é obrigatória';
+        if (!formData.amount || formData.amount <= 0) newErrors.amount = 'Valor deve ser maior que zero';
+        if (!formData.dueDate) newErrors.dueDate = 'Data é obrigatória';
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleSave = () => {
+        if (validate()) {
+            onSave({
+                description: formData.description!,
+                amount: formData.amount!,
+                type: formData.type!,
+                status: formData.status!,
+                dueDate: formData.dueDate!,
+                paymentMethod: formData.paymentMethod,
+            });
+            onClose();
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Adicionar ${type === 'receita' ? 'Entrada' : 'Saída'}`}>
+            <div className="space-y-4">
+                <Textarea
+                    label="Descrição"
+                    id="new-desc"
+                    value={formData.description || ''}
+                    onChange={e => handleChange('description', e.target.value)}
+                    error={errors.description}
+                    placeholder="Ex: Pagamento de fornecedor, Venda de produtos..."
+                />
+                <Input
+                    label="Valor (R$)"
+                    id="new-amount"
+                    type="number"
+                    step="0.01"
+                    value={formData.amount || ''}
+                    onChange={e => handleChange('amount', parseFloat(e.target.value) || 0)}
+                    error={errors.amount}
+                />
+                <Input
+                    label="Data de Vencimento"
+                    id="new-dueDate"
+                    type="date"
+                    value={formData.dueDate?.split('T')[0] || ''}
+                    onChange={e => handleChange('dueDate', e.target.value)}
+                    error={errors.dueDate}
+                />
+                <Select
+                    label="Status"
+                    id="new-status"
+                    value={formData.status || 'pendente'}
+                    onChange={e => handleChange('status', e.target.value as TransactionStatus)}
+                >
+                    <option value="pendente">Pendente</option>
+                    <option value="pago">Pago</option>
+                </Select>
+                {type === 'receita' && (
+                    <Select
+                        label="Método de Pagamento"
+                        id="new-paymentMethod"
+                        value={formData.paymentMethod || ''}
+                        onChange={e => handleChange('paymentMethod', e.target.value as PaymentMethod)}
+                    >
+                        <option value="">-- Selecione --</option>
+                        {Object.entries(paymentMethodLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                        ))}
+                    </Select>
+                )}
+            </div>
+            <div className="flex justify-end mt-6 space-x-3">
+                <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                <Button onClick={handleSave}>Adicionar</Button>
+            </div>
+        </Modal>
+    );
+};
 
 const TransactionEditModal: FC<{
     transaction: FinancialTransaction;
@@ -212,11 +334,15 @@ const AttachmentModal: FC<{
 
 
 const FinancePage: FC = () => {
-    const { financialTransactions: transactions, markTransactionAsPaid, updateFinancialTransaction } = useData();
+    const { financialTransactions: transactions, markTransactionAsPaid, updateFinancialTransaction, addFinancialTransaction } = useData();
     const [view, setView] = useState<FinanceView>('contas');
+    const [transactionTab, setTransactionTab] = useState<TransactionTab>('entradas');
     const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('month');
     const [editingTransaction, setEditingTransaction] = useState<FinancialTransaction | null>(null);
     const [attachingTransaction, setAttachingTransaction] = useState<FinancialTransaction | null>(null);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [statusFilter, setStatusFilter] = useState<TransactionStatus | 'all'>('all');
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState<PaymentMethod | 'all'>('all');
     
     const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
         pix: 'PIX',
@@ -349,55 +475,178 @@ const FinancePage: FC = () => {
         reader.readAsDataURL(file);
     };
 
+    const handleAddTransaction = (transactionData: Omit<FinancialTransaction, 'id'>) => {
+        addFinancialTransaction(transactionData);
+        setIsAddModalOpen(false);
+    };
+
+    const filteredTransactions = useMemo(() => {
+        let filtered = transactions.filter(t => 
+            transactionTab === 'entradas' ? t.type === 'receita' : t.type === 'despesa'
+        );
+
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(t => t.status === statusFilter);
+        }
+
+        if (paymentMethodFilter !== 'all' && transactionTab === 'entradas') {
+            filtered = filtered.filter(t => t.paymentMethod === paymentMethodFilter);
+        }
+
+        return filtered.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    }, [transactions, transactionTab, statusFilter, paymentMethodFilter]);
 
     const renderView = () => {
         switch (view) {
             case 'contas':
                 return (
-                    <Card className="p-0">
-                        <CardContent>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead><tr className="border-b border-border dark:border-slate-700"><th className="p-3">Vencimento</th><th className="p-3">Descrição</th><th className="p-3">Tipo</th><th className="p-3">Método Pgto.</th><th className="p-3 text-right">Valor</th><th className="p-3 text-center">Status</th><th className="p-3 text-center">Ações</th></tr></thead>
-                                    <tbody>
-                                        {transactions.sort((a,b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()).map(t => (
-                                            <tr key={t.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                                <td className="p-3">{new Date(t.dueDate).toLocaleDateString()}</td>
-                                                <td className="p-3">{t.description}</td>
-                                                <td className={`p-3 font-semibold ${t.type === 'receita' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{t.type === 'receita' ? 'Receita' : 'Despesa'}</td>
-                                                <td className="p-3 text-sm capitalize text-text-secondary dark:text-slate-400">
-                                                    {(t.type === 'receita' && t.paymentMethod)
-                                                        ? PAYMENT_METHOD_LABELS[t.paymentMethod]
-                                                        : 'N/A'}
-                                                </td>
-                                                <td className="p-3 text-right font-mono">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                                <td className="p-3 text-center"><StatusBadge status={t.status} statusMap={transactionStatusMap} /></td>
-                                                <td className="p-3 text-center">
-                                                    <div className="flex items-center justify-center space-x-2">
-                                                        {t.status === 'pendente' && (
-                                                            <>
-                                                                <Button size="sm" variant="ghost" onClick={() => handleEditTransaction(t)}>Editar</Button>
-                                                                <Button size="sm" onClick={() => markTransactionAsPaid(t.id)}>Marcar como Pago</Button>
-                                                            </>
-                                                        )}
-                                                        {t.status === 'pago' && (
-                                                            <>
-                                                                {t.attachment ? (
-                                                                    <Button size="sm" variant="ghost" onClick={() => window.open(t.attachment.url, '_blank')}>Ver Comprovante</Button>
-                                                                ) : (
-                                                                    <Button size="sm" variant="secondary" onClick={() => setAttachingTransaction(t)}>Anexar</Button>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </td>
+                    <div className="space-y-6">
+                        {/* Abas de Entradas e Saídas */}
+                        <Card>
+                            <CardContent className="py-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex gap-2">
+                                        <Button 
+                                            size="sm" 
+                                            variant={transactionTab === 'entradas' ? 'primary' : 'ghost'}
+                                            onClick={() => setTransactionTab('entradas')}
+                                        >
+                                            💰 Entradas ({transactions.filter(t => t.type === 'receita').length})
+                                        </Button>
+                                        <Button 
+                                            size="sm" 
+                                            variant={transactionTab === 'saidas' ? 'primary' : 'ghost'}
+                                            onClick={() => setTransactionTab('saidas')}
+                                        >
+                                            💸 Saídas ({transactions.filter(t => t.type === 'despesa').length})
+                                        </Button>
+                                    </div>
+                                    <Button onClick={() => setIsAddModalOpen(true)}>
+                                        + Adicionar {transactionTab === 'entradas' ? 'Entrada' : 'Saída'}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Filtros */}
+                        <Card>
+                            <CardContent>
+                                <div className="flex items-center gap-4 flex-wrap">
+                                    <div className="flex items-center gap-2">
+                                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            Status:
+                                        </label>
+                                        <Select 
+                                            value={statusFilter} 
+                                            onChange={e => setStatusFilter(e.target.value as TransactionStatus | 'all')}
+                                            className="w-40"
+                                        >
+                                            <option value="all">Todos</option>
+                                            <option value="pendente">Pendente</option>
+                                            <option value="pago">Pago</option>
+                                        </Select>
+                                    </div>
+                                    
+                                    {transactionTab === 'entradas' && (
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Método de Pagamento:
+                                            </label>
+                                            <Select 
+                                                value={paymentMethodFilter} 
+                                                onChange={e => setPaymentMethodFilter(e.target.value as PaymentMethod | 'all')}
+                                                className="w-48"
+                                            >
+                                                <option value="all">Todos</option>
+                                                {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
+                                                    <option key={key} value={key}>{label}</option>
+                                                ))}
+                                            </Select>
+                                        </div>
+                                    )}
+
+                                    {(statusFilter !== 'all' || paymentMethodFilter !== 'all') && (
+                                        <Button 
+                                            size="sm" 
+                                            variant="ghost" 
+                                            onClick={() => {
+                                                setStatusFilter('all');
+                                                setPaymentMethodFilter('all');
+                                            }}
+                                        >
+                                            Limpar Filtros
+                                        </Button>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Tabela de transações filtradas */}
+                        <Card className="p-0">
+                            <CardContent>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="border-b border-border dark:border-slate-700">
+                                                <th className="p-3">Vencimento</th>
+                                                <th className="p-3">Descrição</th>
+                                                {transactionTab === 'entradas' && <th className="p-3">Método Pgto.</th>}
+                                                <th className="p-3 text-right">Valor</th>
+                                                <th className="p-3 text-center">Status</th>
+                                                <th className="p-3 text-center">Ações</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
+                                        </thead>
+                                        <tbody>
+                                            {filteredTransactions.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={transactionTab === 'entradas' ? 6 : 5} className="p-8 text-center text-slate-500">
+                                                        Nenhuma {transactionTab === 'entradas' ? 'entrada' : 'saída'} encontrada
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredTransactions.map(t => (
+                                                    <tr key={t.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                                        <td className="p-3">{new Date(t.dueDate).toLocaleDateString()}</td>
+                                                        <td className="p-3">{t.description}</td>
+                                                        {transactionTab === 'entradas' && (
+                                                            <td className="p-3 text-sm capitalize text-text-secondary dark:text-slate-400">
+                                                                {t.paymentMethod ? PAYMENT_METHOD_LABELS[t.paymentMethod] : '-'}
+                                                            </td>
+                                                        )}
+                                                        <td className="p-3 text-right font-mono">
+                                                            <span className={t.type === 'receita' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                                                {t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 text-center"><StatusBadge status={t.status} statusMap={transactionStatusMap} /></td>
+                                                        <td className="p-3 text-center">
+                                                            <div className="flex items-center justify-center space-x-2">
+                                                                {t.status === 'pendente' && (
+                                                                    <>
+                                                                        <Button size="sm" variant="ghost" onClick={() => handleEditTransaction(t)}>Editar</Button>
+                                                                        <Button size="sm" onClick={() => markTransactionAsPaid(t.id)}>Marcar como Pago</Button>
+                                                                    </>
+                                                                )}
+                                                                {t.status === 'pago' && (
+                                                                    <>
+                                                                        {t.attachment ? (
+                                                                            <Button size="sm" variant="ghost" onClick={() => window.open(t.attachment.url, '_blank')}>Ver Comprovante</Button>
+                                                                        ) : (
+                                                                            <Button size="sm" variant="secondary" onClick={() => setAttachingTransaction(t)}>Anexar</Button>
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 );
             case 'fluxo_caixa':
                  return (
@@ -510,6 +759,13 @@ const FinancePage: FC = () => {
 
     return (
         <div>
+            <AddTransactionModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSave={handleAddTransaction}
+                type={transactionTab === 'entradas' ? 'receita' : 'despesa'}
+                paymentMethodLabels={PAYMENT_METHOD_LABELS}
+            />
             {editingTransaction && (
                 <TransactionEditModal
                     isOpen={!!editingTransaction}

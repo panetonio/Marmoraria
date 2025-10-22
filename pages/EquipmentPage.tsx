@@ -1,6 +1,6 @@
 import React, { useState, useMemo, FC, useEffect } from 'react';
 import { useData } from '../context/DataContext';
-import type { Equipment, MaintenanceLog, EquipmentStatus, Page } from '../types';
+import type { Equipment, MaintenanceLog, EquipmentStatus, EquipmentCategory, Page } from '../types';
 import { mockProductionProfessionals, mockUsers } from '../data/mockData';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -15,6 +15,11 @@ const equipmentStatusMap: StatusMap<EquipmentStatus> = {
     operacional: { label: 'Operacional', variant: 'success' },
     em_manutencao: { label: 'Em Manutenção', variant: 'warning' },
     desativado: { label: 'Desativado', variant: 'default' },
+};
+
+const equipmentCategoryMap: Record<EquipmentCategory, string> = {
+    maquina: 'Máquina',
+    veiculo: 'Veículo',
 };
 
 const EquipmentForm: FC<{
@@ -32,6 +37,7 @@ const EquipmentForm: FC<{
     const validate = () => {
         const newErrors: Record<string, string> = {};
         if (!equipment.name.trim()) newErrors.name = "Nome é obrigatório.";
+        if (!equipment.category) newErrors.category = "Categoria é obrigatória.";
         if (!equipment.serialNumber.trim()) newErrors.serialNumber = "Nº de série é obrigatório.";
         if (!equipment.purchaseDate) newErrors.purchaseDate = "Data da compra é obrigatória.";
         if (!equipment.warrantyEndDate) newErrors.warrantyEndDate = "Data da garantia é obrigatória.";
@@ -55,7 +61,13 @@ const EquipmentForm: FC<{
             <CardContent>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                     <Input label="Nome do Equipamento" value={equipment.name} onChange={e => handleChange('name', e.target.value)} error={errors.name} />
+                    <Select label="Categoria" value={equipment.category} onChange={e => handleChange('category', e.target.value as EquipmentCategory)} error={errors.category}>
+                        <option value="">Selecione...</option>
+                        {Object.entries(equipmentCategoryMap).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                    </Select>
+                    
                     <Input label="Número de Série" value={equipment.serialNumber} onChange={e => handleChange('serialNumber', e.target.value)} error={errors.serialNumber} />
+                    <Input label="Localização Atual" value={equipment.currentLocation} onChange={e => handleChange('currentLocation', e.target.value)} error={errors.currentLocation} />
                     
                     <Input label="Data da Compra" type="date" value={equipment.purchaseDate.split('T')[0]} onChange={e => handleChange('purchaseDate', e.target.value)} error={errors.purchaseDate} />
                     <Input label="Data Fim da Garantia" type="date" value={equipment.warrantyEndDate.split('T')[0]} onChange={e => handleChange('warrantyEndDate', e.target.value)} error={errors.warrantyEndDate} />
@@ -63,7 +75,6 @@ const EquipmentForm: FC<{
                     <Input label="Nº da NF de Compra" value={equipment.purchaseInvoiceNumber} onChange={e => handleChange('purchaseInvoiceNumber', e.target.value)} error={errors.purchaseInvoiceNumber} />
                     <Input label="CNPJ do Fornecedor" value={equipment.supplierCnpj} onChange={e => handleChange('supplierCnpj', e.target.value)} error={errors.supplierCnpj} />
                     
-                    <Input label="Localização Atual" value={equipment.currentLocation} onChange={e => handleChange('currentLocation', e.target.value)} error={errors.currentLocation} />
                      <Select label="Responsável" value={equipment.assignedTo} onChange={e => handleChange('assignedTo', e.target.value)} error={errors.assignedTo}>
                         <option value="">Ninguém</option>
                         {mockProductionProfessionals.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -150,12 +161,14 @@ const EquipmentPage: FC<EquipmentPageProps> = ({ searchTarget, clearSearchTarget
     const [view, setView] = useState<'list' | 'form'>('list');
     const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
     const [isMaintModalOpen, setIsMaintModalOpen] = useState(false);
+    const [categoryFilter, setCategoryFilter] = useState<EquipmentCategory | 'all'>('all');
     
     const handleNew = () => {
         setEditingEquipment({
-            id: 'new-eqp', name: '', serialNumber: '', status: 'operacional', assignedTo: '',
+            id: 'new-eqp', name: '', serialNumber: '', category: 'maquina', status: 'operacional', assignedTo: '',
             currentLocation: '', purchaseDate: new Date().toISOString(),
-            purchaseInvoiceNumber: '', supplierCnpj: '', warrantyEndDate: ''
+            purchaseInvoiceNumber: '', supplierCnpj: '', warrantyEndDate: '', 
+            createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         });
         setView('form');
     };
@@ -199,6 +212,11 @@ const EquipmentPage: FC<EquipmentPageProps> = ({ searchTarget, clearSearchTarget
         setEditingEquipment(null);
     };
 
+    const filteredEquipment = useMemo(() => {
+        if (categoryFilter === 'all') return equipment;
+        return equipment.filter(eq => eq.category === categoryFilter);
+    }, [equipment, categoryFilter]);
+
     if (view === 'form' && editingEquipment) {
         return <EquipmentForm equipment={editingEquipment} onSave={handleSave} onCancel={handleCancel} />;
     }
@@ -221,18 +239,56 @@ const EquipmentPage: FC<EquipmentPageProps> = ({ searchTarget, clearSearchTarget
                 <Button onClick={handleNew}>Novo Equipamento</Button>
             </div>
 
+            <Card className="mb-6">
+                <CardContent>
+                    <div className="flex items-center gap-4">
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            Filtrar por:
+                        </label>
+                        <div className="flex gap-2">
+                            <Button 
+                                size="sm" 
+                                variant={categoryFilter === 'all' ? 'primary' : 'ghost'}
+                                onClick={() => setCategoryFilter('all')}
+                            >
+                                Todos ({equipment.length})
+                            </Button>
+                            <Button 
+                                size="sm" 
+                                variant={categoryFilter === 'maquina' ? 'primary' : 'ghost'}
+                                onClick={() => setCategoryFilter('maquina')}
+                            >
+                                🏭 Máquinas ({equipment.filter(eq => eq.category === 'maquina').length})
+                            </Button>
+                            <Button 
+                                size="sm" 
+                                variant={categoryFilter === 'veiculo' ? 'primary' : 'ghost'}
+                                onClick={() => setCategoryFilter('veiculo')}
+                            >
+                                🚚 Veículos ({equipment.filter(eq => eq.category === 'veiculo').length})
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <Card className="p-0">
                 <CardContent>
                      <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead><tr className="border-b border-border dark:border-slate-700"><th className="p-3">Equipamento</th><th className="p-3">Nº Série</th><th className="p-3">Localização</th><th className="p-3">Responsável</th><th className="p-3">Status</th><th className="p-3">Próx. Manutenção</th><th className="p-3 text-center">Ações</th></tr></thead>
+                            <thead><tr className="border-b border-border dark:border-slate-700"><th className="p-3">Equipamento</th><th className="p-3">Categoria</th><th className="p-3">Nº Série</th><th className="p-3">Localização</th><th className="p-3">Responsável</th><th className="p-3">Status</th><th className="p-3">Próx. Manutenção</th><th className="p-3 text-center">Ações</th></tr></thead>
                             <tbody>
-                                {equipment.map(eq => {
+                                {filteredEquipment.map(eq => {
                                     const logs = maintenanceLogs.filter(l => l.equipmentId === eq.id).sort((a,b) => new Date(b.maintenanceDate).getTime() - new Date(a.maintenanceDate).getTime());
                                     const nextMaint = logs[0]?.nextMaintenanceDate;
                                     return (
                                     <tr key={eq.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                         <td className="p-3 font-semibold">{eq.name}</td>
+                                        <td className="p-3">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                {eq.category === 'maquina' ? '🏭' : '🚚'} {equipmentCategoryMap[eq.category]}
+                                            </span>
+                                        </td>
                                         <td className="p-3 font-mono text-sm">{eq.serialNumber}</td>
                                         <td className="p-3">{eq.currentLocation}</td>
                                         <td className="p-3">{mockProductionProfessionals.find(p => p.id === eq.assignedTo)?.name || '-'}</td>
