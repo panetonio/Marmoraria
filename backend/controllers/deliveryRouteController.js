@@ -1,5 +1,6 @@
 const DeliveryRoute = require('../models/DeliveryRoute');
 const Vehicle = require('../models/Vehicle');
+const ProductionEmployee = require('../models/ProductionEmployee');
 
 const parseDate = (value, field) => {
   const date = new Date(value);
@@ -46,7 +47,19 @@ exports.getRoutes = async (req, res) => {
 
 exports.createRoute = async (req, res) => {
   try {
-    const { vehicleId, serviceOrderId, start, end, status, notes } = req.body;
+    const { 
+      vehicleId, 
+      serviceOrderId, 
+      start, 
+      end, 
+      scheduledStart,
+      scheduledEnd,
+      type,
+      teamIds,
+      status, 
+      notes,
+      checklistCompleted 
+    } = req.body;
 
     if (!vehicleId || !serviceOrderId || !start || !end) {
       return res.status(400).json({ success: false, message: 'Veículo, ordem de serviço, início e fim são obrigatórios' });
@@ -57,16 +70,70 @@ exports.createRoute = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Veículo não encontrado' });
     }
 
+    // Verificar se veículo está em manutenção
+    if (vehicle.status === 'em_manutencao') {
+      return res.status(400).json({ success: false, message: 'Veículo está em manutenção e não pode ser agendado' });
+    }
+
     const startDate = parseDate(start, 'start');
     const endDate = parseDate(end, 'end');
+    const schedStartDate = scheduledStart ? parseDate(scheduledStart, 'scheduledStart') : startDate;
+    const schedEndDate = scheduledEnd ? parseDate(scheduledEnd, 'scheduledEnd') : endDate;
 
     if (startDate >= endDate) {
       return res.status(400).json({ success: false, message: 'Horário final deve ser após o horário inicial' });
     }
 
-    const available = await DeliveryRoute.isVehicleAvailable(vehicleId, startDate, endDate);
-    if (!available) {
-      return res.status(409).json({ success: false, message: 'Veículo indisponível para o período selecionado' });
+    if (schedStartDate >= schedEndDate) {
+      return res.status(400).json({ success: false, message: 'Horário agendado final deve ser após o horário inicial' });
+    }
+
+    // Verificar conflitos de agendamento (veículo e equipe)
+    const conflicts = await DeliveryRoute.getSchedulingConflicts(
+      vehicleId, 
+      teamIds || [], 
+      schedStartDate, 
+      schedEndDate
+    );
+
+    if (conflicts.vehicle) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'Veículo indisponível para o período selecionado',
+        conflict: {
+          type: 'vehicle',
+          existingRoute: conflicts.vehicle
+        }
+      });
+    }
+
+    if (conflicts.teamMembers.length > 0) {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'Um ou mais membros da equipe estão indisponíveis para o período selecionado',
+        conflict: {
+          type: 'team',
+          conflicts: conflicts.teamMembers
+        }
+      });
+    }
+
+    // Validar membros da equipe
+    if (teamIds && teamIds.length > 0) {
+      const teamMembers = await ProductionEmployee.find({ _id: { $in: teamIds } });
+      if (teamMembers.length !== teamIds.length) {
+        return res.status(404).json({ success: false, message: 'Um ou mais membros da equipe não foram encontrados' });
+      }
+
+      // Verificar se membros estão ativos
+      const inactiveMembers = teamMembers.filter(member => !member.active);
+      if (inactiveMembers.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Um ou mais membros da equipe estão inativos',
+          inactiveMembers: inactiveMembers.map(m => m.name)
+        });
+      }
     }
 
     const route = await DeliveryRoute.create({
@@ -74,11 +141,16 @@ exports.createRoute = async (req, res) => {
       serviceOrderId,
       start: startDate,
       end: endDate,
+      scheduledStart: schedStartDate,
+      scheduledEnd: schedEndDate,
+      type: type || 'delivery',
+      teamIds: teamIds || [],
       status: status || 'scheduled',
       notes,
+      checklistCompleted: checklistCompleted || false,
     });
 
-    const populated = await route.populate('vehicle');
+    const populated = await route.populate('vehicle teamIds');
     res.status(201).json({ success: true, message: 'Rota criada com sucesso', data: populated });
   } catch (error) {
     res.status(error.statusCode || 500).json({
@@ -169,6 +241,102 @@ exports.checkAvailability = async (req, res) => {
     res.status(error.statusCode || 500).json({
       success: false,
       message: error.statusCode ? error.message : 'Erro ao verificar disponibilidade',
+      error: error.message,
+    });
+  }
+};
+
+// Novo endpoint: Verificar disponibilidade de recursos (veículos e funcionários)
+exports.getResourceAvailability = async (req, res) => {
+  try {
+    const { type, start, end, role } = req.query;
+
+    if (!type || !start || !end) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Parâmetros obrigatórios: type (vehicle|employee), start e end' 
+      });
+    }
+
+    if (!['vehicle', 'employee'].includes(type)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Type deve ser "vehicle" ou "employee"' 
+      });
+    }
+
+    const startDate = parseDate(start, 'start');
+    const endDate = parseDate(end, 'end');
+
+    if (startDate >= endDate) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Data final deve ser após a data inicial' 
+      });
+    }
+
+    let availableResources = [];
+
+    if (type === 'vehicle') {
+      // Buscar todos os veículos disponíveis
+      const vehicles = await Vehicle.find({ 
+        status: { $in: ['disponivel', 'em_uso'] }
+      });
+
+      // Verificar disponibilidade de cada veículo no período
+      for (const vehicle of vehicles) {
+        const isAvailable = await DeliveryRoute.isVehicleAvailable(
+          vehicle._id, 
+          startDate, 
+          endDate
+        );
+
+        if (isAvailable) {
+          availableResources.push({
+            id: vehicle._id,
+            name: vehicle.name,
+            licensePlate: vehicle.licensePlate,
+            type: vehicle.type,
+            capacity: vehicle.capacity,
+            status: vehicle.status,
+            nextMaintenanceDate: vehicle.nextMaintenanceDate
+          });
+        }
+      }
+    } else if (type === 'employee') {
+      // Buscar funcionários disponíveis no período
+      const employees = await ProductionEmployee.getAvailableInPeriod(
+        startDate, 
+        endDate, 
+        role || null
+      );
+
+      availableResources = employees.map(emp => ({
+        id: emp._id,
+        name: emp.name,
+        role: emp.role,
+        availability: emp.availability,
+        skills: emp.skills,
+        email: emp.email,
+        phone: emp.phone
+      }));
+    }
+
+    res.json({ 
+      success: true, 
+      type,
+      period: {
+        start: startDate,
+        end: endDate
+      },
+      count: availableResources.length,
+      resources: availableResources 
+    });
+
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Erro ao verificar disponibilidade de recursos',
       error: error.message,
     });
   }

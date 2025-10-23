@@ -427,6 +427,90 @@ export const api = {
     return response.json();
   },
 
+  async getResourceAvailability(params: { 
+    type: 'vehicle' | 'employee'; 
+    start: string; 
+    end: string; 
+    role?: string 
+  }) {
+    const query = new URLSearchParams({ 
+      type: params.type, 
+      start: params.start, 
+      end: params.end 
+    });
+    if (params.role) {
+      query.append('role', params.role);
+    }
+    const response = await fetch(`${API_URL}/delivery-routes/resources/availability?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  // Production Employees
+  async getProductionEmployees(params: { role?: string; availability?: string; active?: boolean } = {}) {
+    const query = new URLSearchParams();
+    if (params.role) query.append('role', params.role);
+    if (params.availability) query.append('availability', params.availability);
+    if (params.active !== undefined) query.append('active', String(params.active));
+
+    const qs = query.toString();
+    const response = await fetch(`${API_URL}/production-employees${qs ? `?${qs}` : ''}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async getProductionEmployeeById(id: string) {
+    const response = await fetch(`${API_URL}/production-employees/${id}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async createProductionEmployee(employeeData: any) {
+    const response = await fetch(`${API_URL}/production-employees`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(employeeData),
+    });
+    return response.json();
+  },
+
+  async updateProductionEmployee(id: string, employeeData: any) {
+    const response = await fetch(`${API_URL}/production-employees/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(employeeData),
+    });
+    return response.json();
+  },
+
+  async deleteProductionEmployee(id: string) {
+    const response = await fetch(`${API_URL}/production-employees/${id}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async assignEmployeeToTask(id: string, taskData: { taskId: string; taskType: 'delivery_route' | 'service_order' }) {
+    const response = await fetch(`${API_URL}/production-employees/${id}/assign`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(taskData),
+    });
+    return response.json();
+  },
+
+  async releaseEmployeeFromTask(id: string) {
+    const response = await fetch(`${API_URL}/production-employees/${id}/release`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
   // Estoque
   async getStockItemByQrCode(id: string) {
     const response = await fetch(`${API_URL}/stock/qrcode/${encodeURIComponent(id)}`, {

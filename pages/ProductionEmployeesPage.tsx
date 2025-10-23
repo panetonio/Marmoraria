@@ -1,5 +1,5 @@
-import React, { useState, useMemo, FC } from 'react';
-import type { ProductionEmployee, ProductionEmployeeRole } from '../types';
+import React, { useState, useMemo, FC, useEffect } from 'react';
+import type { ProductionEmployee, ProductionEmployeeRole, Vehicle, ResourceAvailability } from '../types';
 import { useData } from '../context/DataContext';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
@@ -7,6 +7,199 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import StatusBadge from '../components/ui/StatusBadge';
+import { api } from '../utils/api';
+
+// Modal para visualizar disponibilidade de recursos
+const ResourceAvailabilityModal: FC<{
+    isOpen: boolean;
+    onClose: () => void;
+}> = ({ isOpen, onClose }) => {
+    const { vehicles } = useData();
+    const [resourceType, setResourceType] = useState<'vehicle' | 'employee'>('vehicle');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [startTime, setStartTime] = useState('08:00');
+    const [endTime, setEndTime] = useState('18:00');
+    const [roleFilter, setRoleFilter] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [availableResources, setAvailableResources] = useState<ResourceAvailability[]>([]);
+    const [error, setError] = useState('');
+
+    const handleCheck = async () => {
+        if (!startDate || !endDate) {
+            setError('Por favor, selecione data de início e fim.');
+            return;
+        }
+
+        const start = new Date(`${startDate}T${startTime}`).toISOString();
+        const end = new Date(`${endDate}T${endTime}`).toISOString();
+
+        if (new Date(start) >= new Date(end)) {
+            setError('A data/hora final deve ser posterior à inicial.');
+            return;
+        }
+
+        setLoading(true);
+        setError('');
+
+        try {
+            const params: any = { type: resourceType, start, end };
+            if (resourceType === 'employee' && roleFilter) {
+                params.role = roleFilter;
+            }
+
+            const response = await api.getResourceAvailability(params);
+            
+            if (response.success) {
+                setAvailableResources(response.resources || []);
+            } else {
+                setError(response.message || 'Erro ao buscar disponibilidade');
+            }
+        } catch (err) {
+            setError('Erro ao conectar com o servidor');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Verificar Disponibilidade de Recursos" className="max-w-4xl">
+            <div className="space-y-6">
+                {/* Seleção de tipo de recurso */}
+                <div>
+                    <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-2">
+                        Tipo de Recurso
+                    </label>
+                    <div className="flex gap-4">
+                        <Button
+                            variant={resourceType === 'vehicle' ? 'primary' : 'ghost'}
+                            onClick={() => setResourceType('vehicle')}
+                        >
+                            🚚 Veículos
+                        </Button>
+                        <Button
+                            variant={resourceType === 'employee' ? 'primary' : 'ghost'}
+                            onClick={() => setResourceType('employee')}
+                        >
+                            👥 Funcionários
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Filtros de data/hora */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <Input
+                            label="Data de Início"
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            min={new Date().toISOString().split('T')[0]}
+                        />
+                        <Input
+                            label="Hora de Início"
+                            type="time"
+                            value={startTime}
+                            onChange={(e) => setStartTime(e.target.value)}
+                            className="mt-2"
+                        />
+                    </div>
+                    <div>
+                        <Input
+                            label="Data de Término"
+                            type="date"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            min={startDate || new Date().toISOString().split('T')[0]}
+                        />
+                        <Input
+                            label="Hora de Término"
+                            type="time"
+                            value={endTime}
+                            onChange={(e) => setEndTime(e.target.value)}
+                            className="mt-2"
+                        />
+                    </div>
+                </div>
+
+                {/* Filtro de função (apenas para funcionários) */}
+                {resourceType === 'employee' && (
+                    <Select
+                        label="Filtrar por Função (opcional)"
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                    >
+                        <option value="">Todas as Funções</option>
+                        <option value="installer">Instalador</option>
+                        <option value="driver">Motorista</option>
+                        <option value="helper">Ajudante</option>
+                        <option value="technician">Técnico</option>
+                    </Select>
+                )}
+
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                        <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+                    </div>
+                )}
+
+                <Button onClick={handleCheck} disabled={loading} className="w-full">
+                    {loading ? 'Verificando...' : 'Verificar Disponibilidade'}
+                </Button>
+
+                {/* Resultados */}
+                {availableResources.length > 0 && (
+                    <div className="mt-6">
+                        <h3 className="text-lg font-semibold text-text-primary dark:text-slate-100 mb-4">
+                            Recursos Disponíveis ({availableResources.length})
+                        </h3>
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {availableResources.map((resource, idx) => (
+                                <Card key={`${resource.id}-${idx}`} className="p-4">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h4 className="font-semibold text-text-primary dark:text-slate-100">
+                                                {resource.name}
+                                            </h4>
+                                            {resourceType === 'vehicle' ? (
+                                                <div className="text-sm text-text-secondary dark:text-slate-400 mt-1">
+                                                    <p>Placa: {(resource as any).licensePlate}</p>
+                                                    <p>Tipo: {(resource as any).type}</p>
+                                                    <p>Capacidade: {(resource as any).capacity} kg</p>
+                                                </div>
+                                            ) : (
+                                                <div className="text-sm text-text-secondary dark:text-slate-400 mt-1">
+                                                    <p>Função: {(resource as any).role}</p>
+                                                    {(resource as any).email && <p>Email: {(resource as any).email}</p>}
+                                                    {(resource as any).phone && <p>Telefone: {(resource as any).phone}</p>}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <StatusBadge
+                                            status="available"
+                                            statusMap={{
+                                                available: { label: 'Disponível', variant: 'success' }
+                                            }}
+                                        />
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {!loading && availableResources.length === 0 && startDate && endDate && (
+                    <div className="text-center p-8 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <p className="text-text-secondary dark:text-slate-400">
+                            Nenhum recurso disponível para o período selecionado.
+                        </p>
+                    </div>
+                )}
+            </div>
+        </Modal>
+    );
+};
 
 const EmployeeCard: FC<{ 
     employee: ProductionEmployee, 
@@ -212,6 +405,7 @@ const ProductionEmployeesPage: React.FC = () => {
     const [selectedEmployee, setSelectedEmployee] = useState<ProductionEmployee | null>(null);
     const [roleFilter, setRoleFilter] = useState<string>('');
     const [statusFilter, setStatusFilter] = useState<string>('');
+    const [showAvailabilityModal, setShowAvailabilityModal] = useState(false);
 
     const handleNew = () => {
         setSelectedEmployee({
@@ -277,6 +471,11 @@ const ProductionEmployeesPage: React.FC = () => {
 
     return (
         <div>
+            <ResourceAvailabilityModal
+                isOpen={showAvailabilityModal}
+                onClose={() => setShowAvailabilityModal(false)}
+            />
+            
             {currentView === 'list' && (
                 <>
                     <div className="flex justify-between items-center mb-4">
@@ -284,7 +483,12 @@ const ProductionEmployeesPage: React.FC = () => {
                             <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Funcionários de Produção</h1>
                             <p className="mt-2 text-text-secondary dark:text-slate-400">Gerencie a equipe de produção e logística.</p>
                         </div>
-                        <Button onClick={handleNew}>+ Adicionar Funcionário</Button>
+                        <div className="flex gap-3">
+                            <Button variant="secondary" onClick={() => setShowAvailabilityModal(true)}>
+                                🔍 Verificar Disponibilidade
+                            </Button>
+                            <Button onClick={handleNew}>+ Adicionar Funcionário</Button>
+                        </div>
                     </div>
 
                     {/* Estatísticas por função */}

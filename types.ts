@@ -1,6 +1,6 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log' | 'checklist_templates';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log' | 'checklist_templates' | 'operations_dashboard';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
@@ -240,17 +240,44 @@ export interface ChecklistTemplate {
 export type InvoiceStatus = 'pending' | 'issued' | 'canceled';
 
 export type DeliveryRouteStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+export type DeliveryRouteType = 'delivery' | 'installation';
+
+export interface DeliveryRoutePhoto {
+  url: string;
+  description?: string;
+}
+
+export interface DeliveryRouteSignature {
+  url: string;
+  timestamp: string;
+}
 
 export interface DeliveryRoute {
   id: string;
   vehicleId: string;
   serviceOrderId: string;
+  type: DeliveryRouteType;
   start: string;
   end: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  actualStart?: string;
+  actualEnd?: string;
+  teamIds: string[];
   status: DeliveryRouteStatus;
   notes?: string;
+  checklistCompleted: boolean;
+  photos?: DeliveryRoutePhoto[];
+  customerSignature?: DeliveryRouteSignature;
   createdAt: string;
   updatedAt: string;
+}
+
+// Tipo para disponibilidade de recursos do backend
+export interface ResourceAvailability {
+  id: string;
+  name: string;
+  [key: string]: any; // Campos específicos dependem do tipo (vehicle/employee)
 }
 
 export interface Invoice {

@@ -108,8 +108,6 @@ const serviceOrderSchema = new mongoose.Schema({
     name: String,
     url: String,
   },
-  deliveryScheduledDate: Date,
-  deliveryTeamIds: [String],
   departureChecklist: [checklistItemSchema],
   observations: String,
 }, {

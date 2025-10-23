@@ -7,7 +7,7 @@ import {
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers,
     mockMaterials, mockStockItems, mockServices, mockProducts, mockQuotes,
     mockOrders, mockServiceOrders, mockInvoices, mockFinancialTransactions,
-    mockEquipment, mockMaintenanceLogs, mockProductionEmployees, mockActivityLogs, mockVehicles, mockDeliveryRoutes
+    mockEquipment, mockMaintenanceLogs, mockProductionEmployees, mockActivityLogs, mockVehicles, mockDeliveryRoutes, mockChecklistTemplates
 } from '../data/mockData';
 
 type DeliveryScheduleInput = {
@@ -163,7 +163,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>(mockMaintenanceLogs);
     const [productionEmployees, setProductionEmployees] = useState<ProductionEmployee[]>(mockProductionEmployees);
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(mockActivityLogs);
-    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>([]);
+    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(mockChecklistTemplates);
 
     // Carregar dados do backend
     useEffect(() => {

@@ -10,5 +10,6 @@ router.post('/', deliveryRouteController.createRoute);
 router.put('/:id', deliveryRouteController.updateRoute);
 router.delete('/:id', deliveryRouteController.deleteRoute);
 router.get('/availability/check', deliveryRouteController.checkAvailability);
+router.get('/resources/availability', deliveryRouteController.getResourceAvailability);
 
 module.exports = router;

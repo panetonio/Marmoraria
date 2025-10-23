@@ -29,6 +29,12 @@ const vehicleSchema = new mongoose.Schema(
       enum: ['disponivel', 'em_uso', 'em_manutencao'],
       default: 'disponivel',
     },
+    lastMaintenanceDate: {
+      type: Date,
+    },
+    nextMaintenanceDate: {
+      type: Date,
+    },
     notes: {
       type: String,
       trim: true,

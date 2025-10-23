@@ -1,4 +1,4 @@
-import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, Vehicle, DeliveryRoute } from '../types';
+import type { Material, Service, Product, Quote, User, Supplier, Invoice, Order, ServiceOrder, StockItem, Client, Opportunity, AgendaEvent, Note, FinancialTransaction, ProductionProfessional, PaymentMethod, Address, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, Vehicle, DeliveryRoute, ChecklistTemplate } from '../types';
 
 export const mockUsers: User[] = [
     { id: 'user-1', name: 'Admin', role: 'admin' },
@@ -940,5 +940,103 @@ export const mockActivityLogs: ActivityLog[] = [
             ipAddress: '192.168.1.100'
         },
         createdAt: '2024-08-03T16:20:00Z'
+    }
+];
+
+// Checklists de Entrega e Instalação
+export const mockChecklistTemplates: ChecklistTemplate[] = [
+    {
+        id: 'checklist-1',
+        name: 'Checklist Padrão de Entrega',
+        type: 'entrega',
+        items: [
+            { id: '1', text: 'Verificar se o material está limpo e sem danos' },
+            { id: '2', text: 'Conferir quantidade de peças com a nota fiscal' },
+            { id: '3', text: 'Validar dimensões das peças' },
+            { id: '4', text: 'Verificar embalagem e proteção adequada' },
+            { id: '5', text: 'Conferir localização de entrega e acesso' },
+            { id: '6', text: 'Garantir que o cliente está presente para receber' },
+            { id: '7', text: 'Obter assinatura do cliente no termo de recebimento' },
+            { id: '8', text: 'Fotografar o material entregue' },
+            { id: '9', text: 'Registrar horário de chegada e saída' },
+            { id: '10', text: 'Anotar observações relevantes' }
+        ],
+        createdAt: '2024-01-01T08:00:00Z',
+        updatedAt: '2024-01-01T08:00:00Z'
+    },
+    {
+        id: 'checklist-2',
+        name: 'Checklist Completo de Instalação',
+        type: 'montagem',
+        items: [
+            { id: '1', text: 'Conferir todas as peças antes de iniciar' },
+            { id: '2', text: 'Verificar ferramentas e equipamentos necessários' },
+            { id: '3', text: 'Avaliar local de instalação (nivelamento, umidade)' },
+            { id: '4', text: 'Proteger móveis e áreas adjacentes' },
+            { id: '5', text: 'Realizar medições finais e confirmar projeto' },
+            { id: '6', text: 'Executar furação e fixação conforme projeto' },
+            { id: '7', text: 'Aplicar selantes e rejuntes adequados' },
+            { id: '8', text: 'Realizar acabamento e polimento' },
+            { id: '9', text: 'Limpar local e remover detritos' },
+            { id: '10', text: 'Apresentar resultado final ao cliente' },
+            { id: '11', text: 'Obter assinatura no termo de instalação' },
+            { id: '12', text: 'Fotografar instalação finalizada' },
+            { id: '13', text: 'Fornecer instruções de manutenção ao cliente' }
+        ],
+        createdAt: '2024-01-01T08:00:00Z',
+        updatedAt: '2024-01-01T08:00:00Z'
+    },
+    {
+        id: 'checklist-3',
+        name: 'Checklist Rápido de Entrega',
+        type: 'entrega',
+        items: [
+            { id: '1', text: 'Conferir nota fiscal' },
+            { id: '2', text: 'Verificar integridade do material' },
+            { id: '3', text: 'Confirmar endereço de entrega' },
+            { id: '4', text: 'Obter assinatura do recebedor' },
+            { id: '5', text: 'Tirar foto do material entregue' }
+        ],
+        createdAt: '2024-01-15T08:00:00Z',
+        updatedAt: '2024-01-15T08:00:00Z'
+    },
+    {
+        id: 'checklist-4',
+        name: 'Checklist Instalação de Bancada',
+        type: 'montagem',
+        items: [
+            { id: '1', text: 'Conferir medidas da bancada' },
+            { id: '2', text: 'Verificar nivelamento da base' },
+            { id: '3', text: 'Preparar cola e fixadores' },
+            { id: '4', text: 'Posicionar bancada cuidadosamente' },
+            { id: '5', text: 'Fixar com segurança' },
+            { id: '6', text: 'Aplicar silicone nas juntas' },
+            { id: '7', text: 'Instalar cuba e torneira (se aplicável)' },
+            { id: '8', text: 'Limpar e polir superfície' },
+            { id: '9', text: 'Testar torneiras e louças' },
+            { id: '10', text: 'Registrar conclusão com foto' }
+        ],
+        createdAt: '2024-02-01T08:00:00Z',
+        updatedAt: '2024-02-01T08:00:00Z'
+    },
+    {
+        id: 'checklist-5',
+        name: 'Checklist Instalação de Revestimento',
+        type: 'montagem',
+        items: [
+            { id: '1', text: 'Verificar planicidade da parede' },
+            { id: '2', text: 'Conferir esquadro e prumo' },
+            { id: '3', text: 'Preparar argamassa ou cola' },
+            { id: '4', text: 'Iniciar aplicação pelas peças mais visíveis' },
+            { id: '5', text: 'Manter espaçamento uniforme' },
+            { id: '6', text: 'Verificar alinhamento constantemente' },
+            { id: '7', text: 'Realizar recortes com precisão' },
+            { id: '8', text: 'Aplicar rejunte após cura' },
+            { id: '9', text: 'Limpar excesso de rejunte' },
+            { id: '10', text: 'Fazer inspeção final' },
+            { id: '11', text: 'Apresentar trabalho concluído ao cliente' }
+        ],
+        createdAt: '2024-02-15T08:00:00Z',
+        updatedAt: '2024-02-15T08:00:00Z'
     }
 ];
