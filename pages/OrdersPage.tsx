@@ -147,7 +147,9 @@ const CreateServiceOrderModal: FC<{
             total: selectedItemsTotal,
             deliveryDate: new Date(deliveryDate).toISOString(),
             assignedToIds: [],
-            status: 'cutting',
+            productionStatus: 'pending_production',
+            logisticsStatus: 'awaiting_scheduling',
+            isFinalized: false,
             departureChecklist: selectedTemplate
                 ? selectedTemplate.items.map(item => ({
                     id: item.id || generateChecklistItemId(),

@@ -26,6 +26,9 @@ const PAGE_LABELS: Record<Page, string> = {
   activity_log: 'Histórico',
   users: 'Usuários',
   checklist_templates: 'Checklists',
+  operations_dashboard: 'Operações',
+  shopfloor_dashboard: 'Shopfloor',
+  productivity: 'Produtividade',
 };
 
 const Breadcrumbs: React.FC<BreadcrumbProps> = ({ currentPage, setCurrentPage }) => {

@@ -7,6 +7,7 @@ router.use(authenticate);
 
 router.get('/', deliveryRouteController.getRoutes);
 router.post('/', deliveryRouteController.createRoute);
+router.post('/installation', deliveryRouteController.createInstallationRoute);
 router.put('/:id', deliveryRouteController.updateRoute);
 router.delete('/:id', deliveryRouteController.deleteRoute);
 router.get('/availability/check', deliveryRouteController.checkAvailability);

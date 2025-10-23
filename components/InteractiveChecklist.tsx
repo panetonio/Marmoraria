@@ -17,14 +17,27 @@ interface Photo {
 }
 
 interface InteractiveChecklistProps {
-  title: string;
-  items: ChecklistItem[];
-  onChecklistComplete: (data: {
+  title?: string;
+  items?: ChecklistItem[];
+  template?: {
+    id: string;
+    name: string;
+    type: string;
+    items: ChecklistItem[];
+    isActive: boolean;
+  };
+  onChecklistComplete?: (data: {
     items: ChecklistItem[];
     photos: Photo[];
     signature: string | null;
   }) => void;
+  onComplete?: (data: {
+    checklistCompleted: boolean;
+    photos: Array<{ url: string; description?: string }>;
+    signature: { url: string; timestamp: string };
+  }) => void;
   onCancel?: () => void;
+  onSkip?: () => void;
   requireSignature?: boolean;
   requirePhotos?: boolean;
   minPhotos?: number;
@@ -32,16 +45,19 @@ interface InteractiveChecklistProps {
 }
 
 const InteractiveChecklist: React.FC<InteractiveChecklistProps> = ({
-  title,
+  title = "Checklist de Entrega",
   items: initialItems,
+  template,
   onChecklistComplete,
+  onComplete,
   onCancel,
+  onSkip,
   requireSignature = true,
   requirePhotos = false,
   minPhotos = 1,
   tabletMode = false
 }) => {
-  const [items, setItems] = useState<ChecklistItem[]>(initialItems);
+  const [items, setItems] = useState<ChecklistItem[]>(initialItems || template?.items || []);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [signature, setSignature] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<'checklist' | 'photos' | 'signature'>('checklist');
@@ -70,11 +86,29 @@ const InteractiveChecklist: React.FC<InteractiveChecklistProps> = ({
   const handleComplete = () => {
     if (!canComplete) return;
 
-    onChecklistComplete({
+    const data = {
       items,
       photos,
       signature
-    });
+    };
+
+    if (onChecklistComplete) {
+      onChecklistComplete(data);
+    }
+    
+    if (onComplete) {
+      onComplete({
+        checklistCompleted: true,
+        photos: photos.map(photo => ({
+          url: photo.dataUrl,
+          description: photo.description
+        })),
+        signature: {
+          url: signature || '',
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
   };
 
   // Classes para modo tablet
@@ -319,6 +353,26 @@ const InteractiveChecklist: React.FC<InteractiveChecklistProps> = ({
           </div>
         </div>
       </Card>
+
+      {/* Botões de ação */}
+      <div className="flex justify-between items-center pt-4 border-t border-border dark:border-slate-700">
+        <div className="flex items-center gap-3">
+          {onCancel && (
+            <Button variant="ghost" onClick={onCancel} className={buttonSize}>
+              Cancelar
+            </Button>
+          )}
+          {onSkip && (
+            <Button variant="secondary" onClick={onSkip} className={buttonSize}>
+              Pular Checklist
+            </Button>
+          )}
+        </div>
+        
+        <div className="text-sm text-text-secondary dark:text-slate-400">
+          {items.filter(item => item.checked).length} de {items.length} itens concluídos
+        </div>
+      </div>
     </div>
   );
 };

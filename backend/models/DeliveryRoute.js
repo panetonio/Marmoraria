@@ -69,8 +69,8 @@ const deliveryRouteSchema = new mongoose.Schema(
     }],
     status: {
       type: String,
-      enum: ['scheduled', 'in_progress', 'completed', 'cancelled'],
-      default: 'scheduled',
+      enum: ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'],
+      default: 'pending',
     },
     notes: {
       type: String,

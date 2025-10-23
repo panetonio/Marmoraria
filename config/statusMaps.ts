@@ -10,14 +10,22 @@ export const quoteStatusMap: StatusMap<QuoteStatus> = {
 };
 
 export const productionStatusMap: StatusMap<ProductionStatus> = {
+  pending_production: { label: 'Aguardando Produção', variant: 'secondary' },
   cutting: { label: 'Em Corte', variant: 'warning' },
   finishing: { label: 'Em Acabamento', variant: 'primary' },
-  awaiting_pickup: { label: 'Aguardando Retirada', variant: 'warning' },
-  ready_for_logistics: { label: 'Pronto p/ Logística', variant: 'primary' },
+  quality_check: { label: 'Controle de Qualidade', variant: 'purple' },
+  awaiting_logistics: { label: 'Aguardando Logística', variant: 'info' },
+};
+
+export const logisticsStatusMap: StatusMap<LogisticsStatus> = {
+  awaiting_scheduling: { label: 'Aguardando Agendamento', variant: 'secondary' },
   scheduled: { label: 'Agendado', variant: 'primary' },
-  in_transit: { label: 'Em Rota', variant: 'warning' },
-  realizado: { label: 'Realizado', variant: 'primary' },
-  completed: { label: 'Finalizado', variant: 'success' },
+  in_transit: { label: 'Em Trânsito', variant: 'warning' },
+  delivered: { label: 'Entregue', variant: 'success' },
+  in_installation: { label: 'Em Instalação', variant: 'info' },
+  completed: { label: 'Concluído', variant: 'success' },
+  picked_up: { label: 'Retirado', variant: 'default' },
+  canceled: { label: 'Cancelado', variant: 'error' },
 };
 
 export const stockStatusMap: StatusMap<StockItemStatus> = {

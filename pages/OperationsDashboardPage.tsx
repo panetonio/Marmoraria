@@ -107,7 +107,7 @@ const ServiceOrderDetailModal: FC<{
                 </div>
                 <div>
                   <h4 className="text-sm text-text-secondary dark:text-slate-400">Status Atual</h4>
-                  <StatusBadge status={order.status} statusMap={productionStatusMap} />
+                  <StatusBadge status={order.productionStatus} statusMap={productionStatusMap} />
                 </div>
                  <div className="col-span-2">
                     <Select
@@ -482,7 +482,7 @@ const ProductionCard: FC<{
 
       <div className="mt-3 pt-3 border-t border-border dark:border-slate-700">
         <div className="flex justify-end items-center gap-2">
-          {order.status === 'finishing' && (
+          {order.productionStatus === 'finishing' && (
                <Button variant="accent" size="sm" onClick={(e) => { e.stopPropagation(); onFinalize(order); }}>Finalizar Produção</Button>
           )}
         </div>
@@ -542,11 +542,11 @@ const LogisticsCard: FC<{
             )}
 
             <div className="mt-3 pt-3 border-t border-border dark:border-slate-700 space-y-2">
-                {order.status === 'ready_for_logistics' && <Button size="sm" className="w-full" onClick={() => onSchedule(order)}>Agendar</Button>}
-                {order.status === 'scheduled' && <Button size="sm" className="w-full" onClick={() => onStartRoute(order.id)}>Iniciar Rota</Button>}
-                {order.status === 'in_transit' && <Button size="sm" className="w-full" onClick={() => onArrive(order.id)}>Chegou ao Destino</Button>}
+                {order.logisticsStatus === 'awaiting_scheduling' && <Button size="sm" className="w-full" onClick={() => onSchedule(order)}>Agendar</Button>}
+                {order.logisticsStatus === 'scheduled' && <Button size="sm" className="w-full" onClick={() => onStartRoute(order.id)}>Iniciar Rota</Button>}
+                {order.logisticsStatus === 'in_transit' && <Button size="sm" className="w-full" onClick={() => onArrive(order.id)}>Chegou ao Destino</Button>}
                 
-                {order.status === 'realizado' && (
+                {order.logisticsStatus === 'delivered' && (
                     <div className="space-y-2">
                         {order.finalizationType !== 'pickup' && !order.delivery_confirmed && (
                              <Button size="sm" className="w-full" variant="secondary" onClick={() => onConfirmDelivery(order.id)}>Confirmar Entrega</Button>
@@ -570,9 +570,9 @@ const LogisticsCard: FC<{
                     </div>
                 )}
                 
-                {( (order.status === 'ready_for_logistics' || order.status === 'scheduled') && order.finalizationType !== 'pickup') || order.installation_confirmed ? (
+                {( (order.logisticsStatus === 'awaiting_scheduling' || order.logisticsStatus === 'scheduled') && order.finalizationType !== 'pickup') || order.installation_confirmed ? (
                     <div className="!mt-3 pt-2 border-t border-dashed space-y-2">
-                        {(order.status === 'ready_for_logistics' || order.status === 'scheduled') && order.finalizationType !== 'pickup' && (
+                        {(order.logisticsStatus === 'awaiting_scheduling' || order.logisticsStatus === 'scheduled') && order.finalizationType !== 'pickup' && (
                             <Button size="sm" variant="ghost" className="w-full" onClick={() => onGenerateReceiptTerm(order)}>Termo Recebimento</Button>
                         )}
                         {order.installation_confirmed && (
@@ -652,12 +652,12 @@ const OperationsDashboardPage: FC = () => {
   // Filtrar OSs por tipo
   const productionOrders = useMemo(() => {
     const productionStatuses: ProductionStatus[] = ['cutting', 'finishing', 'awaiting_pickup'];
-    return serviceOrders.filter(o => productionStatuses.includes(o.status));
+    return serviceOrders.filter(o => productionStatuses.includes(o.productionStatus));
   }, [serviceOrders]);
 
   const logisticsOrders = useMemo(() => {
-    const logisticsStatuses: ProductionStatus[] = ['ready_for_logistics', 'scheduled', 'in_transit', 'realizado', 'completed'];
-    return serviceOrders.filter(o => logisticsStatuses.includes(o.status));
+    const logisticsStatuses: LogisticsStatus[] = ['awaiting_scheduling', 'scheduled', 'in_transit', 'delivered', 'completed'];
+    return serviceOrders.filter(o => logisticsStatuses.includes(o.logisticsStatus));
   }, [serviceOrders]);
 
   const installationOrders = useMemo(() => {
@@ -683,11 +683,11 @@ const OperationsDashboardPage: FC = () => {
     e.preventDefault();
     const orderId = e.dataTransfer.getData("orderId");
     const order = serviceOrders.find(o => o.id === orderId);
-    if (order && order.status !== newStatus) {
+    if (order && order.productionStatus !== newStatus) {
         if(newStatus === 'awaiting_pickup') return; // Cannot drag here
         setServiceOrders(prevOrders =>
             prevOrders.map(o =>
-                o.id === orderId ? { ...o, status: newStatus } : o
+                o.id === orderId ? { ...o, productionStatus: newStatus } : o
             )
         );
     }
@@ -885,7 +885,7 @@ const OperationsDashboardPage: FC = () => {
               </div>
               <div className="flex-1 overflow-y-auto pr-1">
                 {productionOrders
-                  .filter(order => order.status === column.id)
+                  .filter(order => order.productionStatus === column.id)
                   .map(order => (
                     <ProductionCard
                         key={order.id}
@@ -913,7 +913,7 @@ const OperationsDashboardPage: FC = () => {
                 <h3 className="font-semibold text-text-primary dark:text-slate-100">{column.title}</h3>
               </div>
               <div className="flex-1 overflow-y-auto pr-1">
-                {logisticsOrders.filter(o => o.status === column.id).map(order => (
+                {logisticsOrders.filter(o => o.logisticsStatus === column.id).map(order => (
                   <LogisticsCard
                     key={order.id}
                     order={order}
@@ -949,8 +949,8 @@ const OperationsDashboardPage: FC = () => {
                 {installationOrders.filter(o => {
                   // Mapear para o status de instalação
                   if (o.installation_confirmed) return column.id === 'completed';
-                  if (o.status === 'realizado') return column.id === 'in_progress';
-                  if (o.status === 'scheduled') return column.id === 'scheduled';
+                  if (o.logisticsStatus === 'delivered') return column.id === 'in_progress';
+                  if (o.logisticsStatus === 'scheduled') return column.id === 'scheduled';
                   return column.id === 'pending';
                 }).map(order => (
                   <InstallationCard

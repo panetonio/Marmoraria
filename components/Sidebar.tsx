@@ -24,6 +24,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   CheckSquareOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import type { Page } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -67,6 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
       assembly: <BuildOutlined />,
       logistics: <TruckOutlined />,
       operations_dashboard: <FileDoneOutlined />,
+      shopfloor_dashboard: <SettingOutlined />,
       stock: <InboxOutlined />,
       catalog: <AppstoreOutlined />,
       suppliers: <TeamOutlined />,
@@ -80,6 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
       activity_log: <HistoryOutlined />,
       users: <UserOutlined />,
       checklist_templates: <CheckSquareOutlined />,
+      productivity: <BarChartOutlined />,
     };
     return iconMap[page] || <DashboardOutlined />;
   };
@@ -94,6 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
       assembly: 'Montagem',
       logistics: 'Logística',
       operations_dashboard: 'Operações',
+      shopfloor_dashboard: 'Shopfloor',
       stock: 'Estoque',
       catalog: 'Catálogo',
       suppliers: 'Fornecedores',
@@ -107,6 +111,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
       activity_log: 'Histórico',
       users: 'Usuários',
       checklist_templates: 'Checklists',
+      productivity: 'Produtividade',
     };
     return labelMap[page] || page;
   };
@@ -117,9 +122,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
     { key: 'quotes', icon: getIcon('quotes'), label: getLabel('quotes') },
     { key: 'orders', icon: getIcon('orders'), label: getLabel('orders') },
     { key: 'operations_dashboard', icon: getIcon('operations_dashboard'), label: getLabel('operations_dashboard') },
-    { key: 'production', icon: getIcon('production'), label: getLabel('production') },
-    { key: 'assembly', icon: getIcon('assembly'), label: getLabel('assembly') },
-    { key: 'logistics', icon: getIcon('logistics'), label: getLabel('logistics') },
+    { 
+      key: 'shopfloor', 
+      icon: getIcon('shopfloor_dashboard'), 
+      label: getLabel('shopfloor_dashboard'),
+      children: [
+        { key: 'shopfloor_dashboard', icon: getIcon('shopfloor_dashboard'), label: 'Dashboard' },
+        { key: 'production', icon: getIcon('production'), label: getLabel('production') },
+        { key: 'logistics', icon: getIcon('logistics'), label: getLabel('logistics') },
+        { key: 'assembly', icon: getIcon('assembly'), label: getLabel('assembly') },
+        { key: 'productivity', icon: getIcon('productivity'), label: 'Produtividade' },
+      ].filter(subItem => hasAccessToPage(subItem.key as Page))
+    },
     { key: 'checklist_templates', icon: getIcon('checklist_templates'), label: getLabel('checklist_templates') },
     { key: 'stock', icon: getIcon('stock'), label: getLabel('stock') },
     { key: 'catalog', icon: getIcon('catalog'), label: getLabel('catalog') },
@@ -133,7 +147,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
     { key: 'production_employees', icon: getIcon('production_employees'), label: getLabel('production_employees') },
     { key: 'activity_log', icon: getIcon('activity_log'), label: getLabel('activity_log') },
     { key: 'users', icon: getIcon('users'), label: getLabel('users') },
-  ].filter(item => hasAccessToPage(item.key as Page));
+  ].filter(item => {
+    // Para itens com children, verificar se tem pelo menos um filho acessível
+    if (item.children) {
+      return item.children.length > 0;
+    }
+    return hasAccessToPage(item.key as Page);
+  });
 
   const handleMenuClick = ({ key }: { key: string }) => {
     setCurrentPage(key as Page);

@@ -19,6 +19,10 @@ export const PERMISSIONS: Record<Page, string> = {
   activity_log: 'view_activity_log',
   users: 'manage_users',
   checklist_templates: 'manage_checklists',
+  operations_dashboard: 'view_operations',
+  shopfloor_dashboard: 'view_shopfloor',
+  productivity: 'view_productivity',
+  vehicles: 'manage_vehicles',
 };
 
 export const ROLES = {
@@ -30,7 +34,7 @@ export const ROLES = {
         'manage_crm', 'manage_finance', 'manage_invoices', 'view_receipts',
         'manage_catalog', 'manage_stock_levels', 'assign_production_resources', 'manage_users',
         'manage_equipment', 'manage_production_employees', 'view_activity_log',
-        'manage_checklists'
+        'manage_checklists', 'view_operations', 'view_shopfloor', 'view_productivity'
     ],
   },
   vendedor: {
@@ -42,6 +46,7 @@ export const ROLES = {
       PERMISSIONS.orders,
       PERMISSIONS.crm,
       PERMISSIONS.stock,
+      PERMISSIONS.productivity, // Vendedores podem ver produtividade
     ],
   },
   producao: {
@@ -60,6 +65,9 @@ export const ROLES = {
       PERMISSIONS.equipment, // Produção precisa gerenciar equipamentos
       PERMISSIONS.production_employees, // Produção precisa gerenciar funcionários
       PERMISSIONS.checklist_templates,
+      PERMISSIONS.operations_dashboard, // Dashboard de operações
+      PERMISSIONS.shopfloor_dashboard, // Dashboard de shopfloor
+      PERMISSIONS.productivity, // Relatórios de produtividade
     ],
   },
   aux_administrativo: {
@@ -78,6 +86,9 @@ export const ROLES = {
       PERMISSIONS.equipment, // Auxiliar administrativo pode gerenciar equipamentos
       PERMISSIONS.production_employees, // Auxiliar administrativo pode gerenciar funcionários
       PERMISSIONS.checklist_templates,
+      PERMISSIONS.operations_dashboard, // Dashboard de operações
+      PERMISSIONS.shopfloor_dashboard, // Dashboard de shopfloor
+      PERMISSIONS.productivity, // Relatórios de produtividade
     ],
   },
 };

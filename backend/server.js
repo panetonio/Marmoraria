@@ -59,6 +59,7 @@ app.use('/api/production-employees', require('./routes/productionEmployees'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/assets', require('./routes/assets'));
 app.use('/api/checklist-templates', require('./routes/checklistTemplates'));
+app.use('/api/reports', require('./routes/reports'));
 
 // Rota de teste
 app.get('/', (req, res) => {

@@ -399,6 +399,22 @@ export const api = {
     return response.json();
   },
 
+  async createInstallationRoute(routeData: {
+    serviceOrderId: string;
+    scheduledStart: string;
+    scheduledEnd: string;
+    teamIds: string[];
+    vehicleId?: string;
+    notes?: string;
+  }) {
+    const response = await fetch(`${API_URL}/delivery-routes/installation`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(routeData),
+    });
+    return response.json();
+  },
+
   async updateDeliveryRoute(id: string, routeData: any) {
     const response = await fetch(`${API_URL}/delivery-routes/${id}`, {
       method: 'PUT',
@@ -551,6 +567,41 @@ export const api = {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(payload),
+    });
+    return response.json();
+  },
+
+  // Relatórios de produtividade
+  async getEmployeeProductivity(params: {
+    startDate: string;
+    endDate: string;
+    role?: string;
+    employeeId?: string;
+  }) {
+    const query = new URLSearchParams({
+      startDate: params.startDate,
+      endDate: params.endDate
+    });
+    if (params.role) query.append('role', params.role);
+    if (params.employeeId) query.append('employeeId', params.employeeId);
+
+    const response = await fetch(`${API_URL}/reports/productivity/employees?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async getCompanyProductivity(params: {
+    startDate: string;
+    endDate: string;
+  }) {
+    const query = new URLSearchParams({
+      startDate: params.startDate,
+      endDate: params.endDate
+    });
+
+    const response = await fetch(`${API_URL}/reports/productivity/company?${query.toString()}`, {
+      headers: getHeaders(),
     });
     return response.json();
   },

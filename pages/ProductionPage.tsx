@@ -103,7 +103,7 @@ const ServiceOrderDetailModal: FC<{
                 </div>
                 <div>
                   <h4 className="text-sm text-text-secondary dark:text-slate-400">Status Atual</h4>
-                  <StatusBadge status={order.status} statusMap={productionStatusMap} />
+                  <StatusBadge status={order.productionStatus} statusMap={productionStatusMap} />
                 </div>
                  <div className="col-span-2">
                     <Select
@@ -550,13 +550,13 @@ const KanbanCard: FC<{
             )}
           </div>
           <div className="flex items-center gap-2">
-            {order.status === 'finishing' && (
+            {order.productionStatus === 'finishing' && (
                  <Button variant="accent" size="sm" onClick={(e) => { e.stopPropagation(); onFinalize(order); }}>Finalizar Produção</Button>
             )}
-            {order.status === 'cutting' && !order.allocatedSlabId && (
+            {order.productionStatus === 'cutting' && !order.allocatedSlabId && (
                 <Button variant="secondary" size="sm" onClick={(e) => { e.stopPropagation(); onAllocate(order); }}>Alocar Chapa</Button>
             )}
-            {order.status !== 'cutting' || order.allocatedSlabId ? (
+            {order.productionStatus !== 'cutting' || order.allocatedSlabId ? (
                 <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); onAssign(order); }}>Equipe</Button>
             ) : null}
           </div>
@@ -593,7 +593,7 @@ const ProductionPage: FC = () => {
       const professionalMatch = professionalFilter ? order.assignedToIds.includes(professionalFilter) : true;
       const orderIdMatch = orderIdFilter ? order.orderId.toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
       const productionStatuses: ProductionStatus[] = ['cutting', 'finishing', 'awaiting_pickup'];
-      return professionalMatch && orderIdMatch && productionStatuses.includes(order.status);
+      return professionalMatch && orderIdMatch && productionStatuses.includes(order.productionStatus);
     });
   }, [serviceOrders, professionalFilter, orderIdFilter]);
   
@@ -614,11 +614,11 @@ const ProductionPage: FC = () => {
     e.preventDefault();
     const orderId = e.dataTransfer.getData("orderId");
     const order = serviceOrders.find(o => o.id === orderId);
-    if (order && order.status !== newStatus) {
+    if (order && order.productionStatus !== newStatus) {
         if(newStatus === 'awaiting_pickup') return; // Cannot drag here
         setServiceOrders(prevOrders =>
             prevOrders.map(o =>
-                o.id === orderId ? { ...o, status: newStatus } : o
+                o.id === orderId ? { ...o, productionStatus: newStatus } : o
             )
         );
     }
@@ -756,7 +756,7 @@ const ProductionPage: FC = () => {
               </div>
               <div className="flex-1 overflow-y-auto pr-1">
                 {filteredServiceOrders
-                  .filter(order => order.status === column.id)
+                  .filter(order => order.productionStatus === column.id)
                   .map(order => (
                     <KanbanCard
                         key={order.id}
@@ -804,7 +804,7 @@ const ProductionPage: FC = () => {
                                     </span>
                                 </td>
                                 <td className="p-3">
-                                    <StatusBadge status={order.status} statusMap={productionStatusMap} />
+                                    <StatusBadge status={order.productionStatus} statusMap={productionStatusMap} />
                                 </td>
                                 <td className="p-3 text-right">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                             </tr>

@@ -77,13 +77,24 @@ const serviceOrderSchema = new mongoose.Schema({
   assignedToIds: [{
     type: String,
   }],
-  status: {
+  productionStatus: {
     type: String,
     enum: [
-      'cutting', 'finishing', 'awaiting_pickup', 'ready_for_logistics',
-      'scheduled', 'in_transit', 'realizado', 'completed'
+      'pending_production', 'cutting', 'finishing', 'quality_check', 'awaiting_logistics'
     ],
-    default: 'cutting',
+    default: 'pending_production',
+  },
+  logisticsStatus: {
+    type: String,
+    enum: [
+      'awaiting_scheduling', 'scheduled', 'in_transit', 'delivered', 
+      'in_installation', 'completed', 'picked_up', 'canceled'
+    ],
+    default: 'awaiting_scheduling',
+  },
+  isFinalized: {
+    type: Boolean,
+    default: false,
   },
   allocatedSlabId: String,
   priority: {

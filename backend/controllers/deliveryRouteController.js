@@ -1,6 +1,7 @@
 const DeliveryRoute = require('../models/DeliveryRoute');
 const Vehicle = require('../models/Vehicle');
 const ProductionEmployee = require('../models/ProductionEmployee');
+const ServiceOrder = require('../models/ServiceOrder');
 
 const parseDate = (value, field) => {
   const date = new Date(value);
@@ -337,6 +338,146 @@ exports.getResourceAvailability = async (req, res) => {
     res.status(error.statusCode || 500).json({
       success: false,
       message: error.statusCode ? error.message : 'Erro ao verificar disponibilidade de recursos',
+      error: error.message,
+    });
+  }
+};
+
+// Criar rota de instalação após entrega
+exports.createInstallationRoute = async (req, res) => {
+  try {
+    const { 
+      serviceOrderId, 
+      scheduledStart, 
+      scheduledEnd, 
+      teamIds, 
+      vehicleId, 
+      notes 
+    } = req.body;
+
+    // Validar dados obrigatórios
+    if (!serviceOrderId || !scheduledStart || !scheduledEnd || !teamIds || teamIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Dados obrigatórios: serviceOrderId, scheduledStart, scheduledEnd, teamIds'
+      });
+    }
+
+    // Verificar se a OS existe e está entregue
+    const serviceOrder = await ServiceOrder.findById(serviceOrderId);
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ordem de Serviço não encontrada'
+      });
+    }
+
+    if (serviceOrder.logisticsStatus !== 'delivered') {
+      return res.status(400).json({
+        success: false,
+        message: 'A OS deve estar com status "delivered" para criar rota de instalação'
+      });
+    }
+
+    // Verificar se já existe rota de instalação para esta OS
+    const existingRoute = await DeliveryRoute.findOne({
+      serviceOrderId,
+      type: 'installation'
+    });
+
+    if (existingRoute) {
+      return res.status(400).json({
+        success: false,
+        message: 'Já existe uma rota de instalação para esta OS'
+      });
+    }
+
+    // Validar datas
+    const startDate = parseDate(scheduledStart, 'scheduledStart');
+    const endDate = parseDate(scheduledEnd, 'scheduledEnd');
+
+    if (startDate >= endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Data de fim deve ser posterior à data de início'
+      });
+    }
+
+    // Verificar disponibilidade da equipe
+    for (const teamMemberId of teamIds) {
+      const isAvailable = await DeliveryRoute.isTeamMemberAvailable(
+        teamMemberId, 
+        startDate, 
+        endDate
+      );
+      
+      if (!isAvailable) {
+        return res.status(400).json({
+          success: false,
+          message: `Membro da equipe ${teamMemberId} não está disponível no período`
+        });
+      }
+    }
+
+    // Verificar disponibilidade do veículo (se fornecido)
+    if (vehicleId) {
+      const isVehicleAvailable = await DeliveryRoute.isVehicleAvailable(
+        vehicleId, 
+        startDate, 
+        endDate
+      );
+      
+      if (!isVehicleAvailable) {
+        return res.status(400).json({
+          success: false,
+          message: 'Veículo não está disponível no período'
+        });
+      }
+    }
+
+    // Criar a rota de instalação
+    const installationRoute = new DeliveryRoute({
+      vehicle: vehicleId || null,
+      serviceOrderId,
+      type: 'installation',
+      scheduledStart: startDate,
+      scheduledEnd: endDate,
+      start: startDate, // Compatibilidade
+      end: endDate, // Compatibilidade
+      teamIds,
+      status: 'pending',
+      notes: notes || ''
+    });
+
+    await installationRoute.save();
+
+    // Atualizar status da OS para aguardando instalação
+    serviceOrder.logisticsStatus = 'in_installation';
+    serviceOrder.installation_confirmed = true;
+    await serviceOrder.save();
+
+    // Atribuir equipe às tarefas
+    for (const teamMemberId of teamIds) {
+      const employee = await ProductionEmployee.findById(teamMemberId);
+      if (employee) {
+        await employee.assignToTask(installationRoute._id, 'delivery_route');
+      }
+    }
+
+    // Popular dados para resposta
+    await installationRoute.populate('vehicle');
+    await installationRoute.populate('teamIds');
+
+    res.status(201).json({
+      success: true,
+      message: 'Rota de instalação criada com sucesso',
+      data: installationRoute
+    });
+
+  } catch (error) {
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Erro ao criar rota de instalação',
       error: error.message,
     });
   }

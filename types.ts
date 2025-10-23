@@ -1,6 +1,6 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log' | 'checklist_templates' | 'operations_dashboard';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log' | 'checklist_templates' | 'operations_dashboard' | 'shopfloor_dashboard' | 'productivity';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
@@ -172,7 +172,9 @@ export interface Quote {
   salespersonId?: string;
 }
 
-export type ProductionStatus = 'cutting' | 'finishing' | 'awaiting_pickup' | 'ready_for_logistics' | 'scheduled' | 'in_transit' | 'realizado' | 'completed';
+export type ProductionStatus = 'pending_production' | 'cutting' | 'finishing' | 'quality_check' | 'awaiting_logistics';
+
+export type LogisticsStatus = 'awaiting_scheduling' | 'scheduled' | 'in_transit' | 'delivered' | 'in_installation' | 'completed' | 'picked_up' | 'canceled';
 
 export interface Order {
   id: string; // PED-
@@ -203,7 +205,9 @@ export interface ServiceOrder {
   total: number;
   deliveryDate: string;
   assignedToIds: string[];
-  status: ProductionStatus;
+  productionStatus: ProductionStatus;
+  logisticsStatus: LogisticsStatus;
+  isFinalized: boolean;
   allocatedSlabId?: string;
   priority?: Priority;
   requiresInstallation?: boolean; // Legacy, replaced by finalizationType

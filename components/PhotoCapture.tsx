@@ -33,7 +33,7 @@ const PhotoCapture: React.FC<PhotoCaptureProps> = ({
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
 
     filesToProcess.forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
+      if (!(file instanceof File) || !file.type.startsWith('image/')) return;
 
       const reader = new FileReader();
       reader.onload = (event) => {
