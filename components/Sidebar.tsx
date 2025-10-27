@@ -175,11 +175,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
           icon={<MenuUnfoldOutlined />}
           onClick={showMobileDrawer}
           className={`fixed top-4 left-4 z-50 shadow-lg ${
-            theme === 'dark' 
-              ? 'bg-gray-800 text-white hover:bg-gray-700' 
+            theme === 'dark'
+              ? 'bg-gray-800 text-white hover:bg-gray-700'
               : 'bg-white text-gray-800 hover:bg-gray-50'
           }`}
           size="large"
+          aria-label={mobileDrawerVisible ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
+          title={mobileDrawerVisible ? 'Fechar menu de navegação' : 'Abrir menu de navegação'}
+          aria-expanded={mobileDrawerVisible}
+          aria-controls="mobile-navigation-menu"
         />
         <Drawer
           title="Marmoraria ERP"
@@ -188,6 +192,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
           open={mobileDrawerVisible}
           width={280}
           className={`mobile-drawer ${theme === 'dark' ? 'dark' : ''}`}
+          id="mobile-navigation-menu"
           styles={{
             body: {
               backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
