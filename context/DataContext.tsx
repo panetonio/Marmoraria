@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type {
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem,
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType, Vehicle, DeliveryRoute, ChecklistTemplate
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType, Vehicle, DeliveryRoute, ChecklistTemplate, OrderAddendum
 } from '../types';
 import {
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers,
@@ -70,7 +70,8 @@ interface DataContextType {
     deliveryRoutes: DeliveryRoute[];
     setDeliveryRoutes: React.Dispatch<React.SetStateAction<DeliveryRoute[]>>;
     checklistTemplates: ChecklistTemplate[];
-
+    orderAddendums: OrderAddendum[];
+    setOrderAddendums: React.Dispatch<React.SetStateAction<OrderAddendum[]>>;
 
     // Add specific data manipulation functions here
     addClient: (client: Client) => void;
@@ -132,6 +133,14 @@ interface DataContextType {
     getActivityLogsByEntity: (entityType: string, entityId: string) => ActivityLog[];
     getActivityLogsByUser: (userId: string) => ActivityLog[];
     getActivityLogsByType: (activityType: ActivityType) => ActivityLog[];
+    
+    // Order addendum management functions
+    loadOrderAddendums: (orderId: string) => Promise<void>;
+    createOrderAddendum: (orderId: string, addendumData: any) => Promise<{ success: boolean; message?: string; data?: OrderAddendum }>;
+    updateOrderAddendumStatus: (addendumId: string, status: 'approved' | 'rejected') => Promise<{ success: boolean; message?: string; data?: OrderAddendum }>;
+    
+    // ServiceOrder refresh functions
+    refreshServiceOrder: (serviceOrderId: string) => Promise<void>;
 }
 
 // Create the context
@@ -164,6 +173,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [productionEmployees, setProductionEmployees] = useState<ProductionEmployee[]>(mockProductionEmployees);
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(mockActivityLogs);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(mockChecklistTemplates);
+    const [orderAddendums, setOrderAddendums] = useState<OrderAddendum[]>([]);
 
     // Carregar dados do backend
     useEffect(() => {
@@ -690,11 +700,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return [...prev, newRoute];
         });
 
+        // Update ServiceOrder with delivery details (status will be updated by backend hooks)
         setServiceOrders(prev => prev.map(so =>
             so.id === serviceOrderId
                 ? {
                     ...so,
-                    status: 'scheduled',
                     deliveryScheduledDate: start,
                     deliveryStart: start,
                     deliveryEnd: end,
@@ -754,43 +764,52 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
     
     const updateServiceOrderStatus = (serviceOrderId: string, status: ProductionStatus) => {
+        // Only allow production status updates - logistics statuses are managed by hooks
+        const allowedProductionStatuses: ProductionStatus[] = [
+            'pending_production', 'cutting', 'finishing', 'quality_check', 'awaiting_logistics'
+        ];
+        
+        if (!allowedProductionStatuses.includes(status)) {
+            console.warn(`Status '${status}' is not allowed for manual updates. Use DeliveryRoute operations for logistics statuses.`);
+            return;
+        }
+        
         setServiceOrders(prev => prev.map(so =>
-            so.id === serviceOrderId ? { ...so, status } : so
+            so.id === serviceOrderId ? { ...so, productionStatus: status } : so
         ));
     };
 
     const completeProductionStep = (serviceOrderId: string, requiresInstallation: boolean) => {
         setServiceOrders(prev => prev.map(so => 
-            so.id === serviceOrderId ? { ...so, status: 'ready_for_logistics', requiresInstallation } : so
+            so.id === serviceOrderId ? { ...so, productionStatus: 'awaiting_logistics', requiresInstallation } : so
         ));
     };
     
     const setFinalizationType = (orderId: string, type: FinalizationType) => {
         setServiceOrders(prev => prev.map(so => {
             if (so.id === orderId) {
-                const newStatus = type === 'pickup' ? 'awaiting_pickup' : 'ready_for_logistics';
-                return { ...so, finalizationType: type, status: newStatus };
+                const newProductionStatus = type === 'pickup' ? 'awaiting_logistics' : 'awaiting_logistics';
+                return { ...so, finalizationType: type, productionStatus: newProductionStatus };
             }
             return so;
         }));
     };
 
     const confirmDelivery = (orderId: string) => {
+        // Only update delivery confirmation - logistics status is managed by hooks
         setServiceOrders(prev => prev.map(so => {
             if (so.id === orderId) {
-                const isComplete = so.finalizationType === 'delivery_only';
-                return { ...so, delivery_confirmed: true, status: isComplete ? 'completed' : so.status };
+                return { ...so, delivery_confirmed: true };
             }
             return so;
         }));
     };
     
     const confirmInstallation = (orderId: string) => {
+        // Only update installation confirmation - logistics status is managed by hooks
         setServiceOrders(prev => prev.map(so => {
             if (so.id === orderId) {
-                // An installation can only be completed if the delivery was also confirmed.
-                const isComplete = so.delivery_confirmed;
-                return { ...so, installation_confirmed: true, status: isComplete ? 'completed' : so.status };
+                return { ...so, installation_confirmed: true };
             }
             return so;
         }));
@@ -962,6 +981,128 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return activityLogs.filter(log => log.activityType === activityType);
     };
 
+    // Order addendum management functions
+    const loadOrderAddendums = async (orderId: string) => {
+        try {
+            const result = await api.getOrderAddendums(orderId);
+            if (result.success) {
+                // Mapear dados do backend para o formato do frontend
+                const mappedAddendums: OrderAddendum[] = result.data.map((addendum: any) => ({
+                    id: addendum._id || addendum.id,
+                    orderId: addendum.orderId,
+                    addendumNumber: addendum.addendumNumber,
+                    reason: addendum.reason,
+                    status: addendum.status,
+                    addedItems: addendum.addedItems || [],
+                    removedItemIds: addendum.removedItemIds || [],
+                    changedItems: addendum.changedItems || [],
+                    priceAdjustment: addendum.priceAdjustment || 0,
+                    approvedBy: addendum.approvedBy?._id || addendum.approvedBy,
+                    approvedAt: addendum.approvedAt,
+                    createdBy: addendum.createdBy?._id || addendum.createdBy,
+                    createdAt: addendum.createdAt,
+                    updatedAt: addendum.updatedAt
+                }));
+                setOrderAddendums(mappedAddendums);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar adendos do pedido:', error);
+        }
+    };
+
+    const createOrderAddendum = async (orderId: string, addendumData: any) => {
+        try {
+            const result = await api.createOrderAddendum(orderId, addendumData);
+            if (result.success && result.data) {
+                // Mapear dados do backend para o formato do frontend
+                const mappedAddendum: OrderAddendum = {
+                    id: result.data._id || result.data.id,
+                    orderId: result.data.orderId,
+                    addendumNumber: result.data.addendumNumber,
+                    reason: result.data.reason,
+                    status: result.data.status,
+                    addedItems: result.data.addedItems || [],
+                    removedItemIds: result.data.removedItemIds || [],
+                    changedItems: result.data.changedItems || [],
+                    priceAdjustment: result.data.priceAdjustment || 0,
+                    approvedBy: result.data.approvedBy?._id || result.data.approvedBy,
+                    approvedAt: result.data.approvedAt,
+                    createdBy: result.data.createdBy?._id || result.data.createdBy,
+                    createdAt: result.data.createdAt,
+                    updatedAt: result.data.updatedAt
+                };
+                
+                // Adicionar o novo adendo ao estado local
+                setOrderAddendums(prev => [...prev, mappedAddendum]);
+                
+                return { success: true, message: result.message, data: mappedAddendum };
+            }
+            return { success: false, message: result.message || 'Erro ao criar adendo' };
+        } catch (error) {
+            console.error('Erro ao criar adendo:', error);
+            return { success: false, message: 'Erro inesperado ao criar adendo' };
+        }
+    };
+
+    const updateOrderAddendumStatus = async (addendumId: string, status: 'approved' | 'rejected') => {
+        try {
+            const result = await api.updateOrderAddendumStatus(addendumId, status);
+            if (result.success && result.data) {
+                // Mapear dados do backend para o formato do frontend
+                const mappedAddendum: OrderAddendum = {
+                    id: result.data._id || result.data.id,
+                    orderId: result.data.orderId,
+                    addendumNumber: result.data.addendumNumber,
+                    reason: result.data.reason,
+                    status: result.data.status,
+                    addedItems: result.data.addedItems || [],
+                    removedItemIds: result.data.removedItemIds || [],
+                    changedItems: result.data.changedItems || [],
+                    priceAdjustment: result.data.priceAdjustment || 0,
+                    approvedBy: result.data.approvedBy?._id || result.data.approvedBy,
+                    approvedAt: result.data.approvedAt,
+                    createdBy: result.data.createdBy?._id || result.data.createdBy,
+                    createdAt: result.data.createdAt,
+                    updatedAt: result.data.updatedAt
+                };
+                
+                // Atualizar o adendo no estado local
+                setOrderAddendums(prev => prev.map(addendum => 
+                    addendum.id === addendumId ? mappedAddendum : addendum
+                ));
+                
+                return { success: true, message: result.message, data: mappedAddendum };
+            }
+            return { success: false, message: result.message || 'Erro ao atualizar status do adendo' };
+        } catch (error) {
+            console.error('Erro ao atualizar status do adendo:', error);
+            return { success: false, message: 'Erro inesperado ao atualizar status do adendo' };
+        }
+    };
+
+    const refreshServiceOrder = async (serviceOrderId: string) => {
+        try {
+            // Fetch updated ServiceOrder from backend
+            const response = await fetch(`/api/service-orders/${serviceOrderId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const updatedServiceOrder = await response.json();
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === serviceOrderId ? updatedServiceOrder : so
+                ));
+                console.log(`✅ ServiceOrder ${serviceOrderId} refreshed with updated logistics status`);
+            } else {
+                console.warn(`⚠️ Failed to refresh ServiceOrder ${serviceOrderId}`);
+            }
+        } catch (error) {
+            console.error('Erro ao atualizar ServiceOrder:', error);
+        }
+    };
 
     const value = {
         clients, setClients,
@@ -986,6 +1127,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         vehicles, setVehicles,
         deliveryRoutes, setDeliveryRoutes,
         checklistTemplates,
+        orderAddendums, setOrderAddendums,
         productionEmployees, setProductionEmployees,
         activityLogs, setActivityLogs,
         
@@ -1046,6 +1188,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         getActivityLogsByEntity,
         getActivityLogsByUser,
         getActivityLogsByType,
+        
+        // Order addendum management functions
+        loadOrderAddendums,
+        createOrderAddendum,
+        updateOrderAddendumStatus,
+        
+        // ServiceOrder refresh functions
+        refreshServiceOrder,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

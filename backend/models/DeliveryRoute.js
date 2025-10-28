@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { calculateDerivedStatus } = require('../utils/statusHelper');
 
 const photoSchema = new mongoose.Schema({
   url: {
@@ -172,5 +173,155 @@ deliveryRouteSchema.statics.getSchedulingConflicts = async function (vehicleId, 
 
   return conflicts;
 };
+
+// Hook para atualizar status da ServiceOrder após salvar uma DeliveryRoute
+deliveryRouteSchema.post('save', async function(doc, next) {
+  try {
+    console.log(`🔄 Hook post-save: Recalculando status da OS ${doc.serviceOrderId} após salvar rota ${doc._id}`);
+    
+    // Calcular o novo status derivado baseado em todas as rotas
+    const derivedStatus = await calculateDerivedStatus(doc.serviceOrderId);
+    
+    if (derivedStatus) {
+      // Buscar a ServiceOrder correspondente
+      const ServiceOrder = mongoose.model('ServiceOrder');
+      const serviceOrder = await ServiceOrder.findById(doc.serviceOrderId);
+      
+      if (serviceOrder) {
+        // Status logísticos que podem ser atualizados automaticamente
+        const logisticsStatuses = ['awaiting_scheduling', 'scheduled', 'in_transit', 'delivered', 'completed', 'picked_up', 'canceled'];
+        
+        // Verificar se o status atual é um status logístico e se o novo status é diferente
+        if (logisticsStatuses.includes(serviceOrder.logisticsStatus) && 
+            serviceOrder.logisticsStatus !== derivedStatus) {
+          
+          console.log(`📝 Atualizando status da OS ${doc.serviceOrderId}: ${serviceOrder.logisticsStatus} → ${derivedStatus}`);
+          
+          // Atualizar o status da ServiceOrder
+          serviceOrder.logisticsStatus = derivedStatus;
+          await serviceOrder.save();
+          
+          console.log(`✅ Status da OS ${doc.serviceOrderId} atualizado para: ${derivedStatus}`);
+        } else {
+          console.log(`⏭️ Status da OS ${doc.serviceOrderId} não atualizado. Status atual: ${serviceOrder.logisticsStatus}, Status derivado: ${derivedStatus}`);
+        }
+      } else {
+        console.warn(`⚠️ ServiceOrder ${doc.serviceOrderId} não encontrada`);
+      }
+    } else {
+      console.log(`ℹ️ Nenhum status derivado calculado para OS ${doc.serviceOrderId}`);
+    }
+    
+    next();
+  } catch (error) {
+    console.error('❌ Erro no hook post-save da DeliveryRoute:', error);
+    next(error);
+  }
+});
+
+// Hook para atualizar status da ServiceOrder após deletar uma DeliveryRoute
+deliveryRouteSchema.post('deleteOne', async function(doc, next) {
+  try {
+    console.log(`🗑️ Hook post-deleteOne: Recalculando status da OS após deletar rota`);
+    
+    // Obter o serviceOrderId do documento deletado
+    const serviceOrderId = this.getQuery().serviceOrderId || doc?.serviceOrderId;
+    
+    if (serviceOrderId) {
+      console.log(`🔄 Recalculando status da OS ${serviceOrderId} após deletar rota`);
+      
+      // Calcular o novo status derivado baseado nas rotas restantes
+      const derivedStatus = await calculateDerivedStatus(serviceOrderId);
+      
+      if (derivedStatus) {
+        // Buscar a ServiceOrder correspondente
+        const ServiceOrder = mongoose.model('ServiceOrder');
+        const serviceOrder = await ServiceOrder.findById(serviceOrderId);
+        
+        if (serviceOrder) {
+          // Status logísticos que podem ser atualizados automaticamente
+          const logisticsStatuses = ['awaiting_scheduling', 'scheduled', 'in_transit', 'delivered', 'completed', 'picked_up', 'canceled'];
+          
+          // Verificar se o status atual é um status logístico e se o novo status é diferente
+          if (logisticsStatuses.includes(serviceOrder.logisticsStatus) && 
+              serviceOrder.logisticsStatus !== derivedStatus) {
+            
+            console.log(`📝 Atualizando status da OS ${serviceOrderId}: ${serviceOrder.logisticsStatus} → ${derivedStatus}`);
+            
+            // Atualizar o status da ServiceOrder
+            serviceOrder.logisticsStatus = derivedStatus;
+            await serviceOrder.save();
+            
+            console.log(`✅ Status da OS ${serviceOrderId} atualizado para: ${derivedStatus}`);
+          } else {
+            console.log(`⏭️ Status da OS ${serviceOrderId} não atualizado. Status atual: ${serviceOrder.logisticsStatus}, Status derivado: ${derivedStatus}`);
+          }
+        } else {
+          console.warn(`⚠️ ServiceOrder ${serviceOrderId} não encontrada`);
+        }
+      } else {
+        console.log(`ℹ️ Nenhum status derivado calculado para OS ${serviceOrderId}`);
+      }
+    } else {
+      console.warn(`⚠️ serviceOrderId não encontrado no hook post-deleteOne`);
+    }
+    
+    next();
+  } catch (error) {
+    console.error('❌ Erro no hook post-deleteOne da DeliveryRoute:', error);
+    next(error);
+  }
+});
+
+// Hook alternativo para findOneAndDelete
+deliveryRouteSchema.post('findOneAndDelete', async function(doc, next) {
+  try {
+    console.log(`🗑️ Hook post-findOneAndDelete: Recalculando status da OS após deletar rota`);
+    
+    if (doc && doc.serviceOrderId) {
+      console.log(`🔄 Recalculando status da OS ${doc.serviceOrderId} após deletar rota ${doc._id}`);
+      
+      // Calcular o novo status derivado baseado nas rotas restantes
+      const derivedStatus = await calculateDerivedStatus(doc.serviceOrderId);
+      
+      if (derivedStatus) {
+        // Buscar a ServiceOrder correspondente
+        const ServiceOrder = mongoose.model('ServiceOrder');
+        const serviceOrder = await ServiceOrder.findById(doc.serviceOrderId);
+        
+        if (serviceOrder) {
+          // Status logísticos que podem ser atualizados automaticamente
+          const logisticsStatuses = ['awaiting_scheduling', 'scheduled', 'in_transit', 'delivered', 'completed', 'picked_up', 'canceled'];
+          
+          // Verificar se o status atual é um status logístico e se o novo status é diferente
+          if (logisticsStatuses.includes(serviceOrder.logisticsStatus) && 
+              serviceOrder.logisticsStatus !== derivedStatus) {
+            
+            console.log(`📝 Atualizando status da OS ${doc.serviceOrderId}: ${serviceOrder.logisticsStatus} → ${derivedStatus}`);
+            
+            // Atualizar o status da ServiceOrder
+            serviceOrder.logisticsStatus = derivedStatus;
+            await serviceOrder.save();
+            
+            console.log(`✅ Status da OS ${doc.serviceOrderId} atualizado para: ${derivedStatus}`);
+          } else {
+            console.log(`⏭️ Status da OS ${doc.serviceOrderId} não atualizado. Status atual: ${serviceOrder.logisticsStatus}, Status derivado: ${derivedStatus}`);
+          }
+        } else {
+          console.warn(`⚠️ ServiceOrder ${doc.serviceOrderId} não encontrada`);
+        }
+      } else {
+        console.log(`ℹ️ Nenhum status derivado calculado para OS ${doc.serviceOrderId}`);
+      }
+    } else {
+      console.warn(`⚠️ Documento ou serviceOrderId não encontrado no hook post-findOneAndDelete`);
+    }
+    
+    next();
+  } catch (error) {
+    console.error('❌ Erro no hook post-findOneAndDelete da DeliveryRoute:', error);
+    next(error);
+  }
+});
 
 module.exports = mongoose.model('DeliveryRoute', deliveryRouteSchema);

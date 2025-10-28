@@ -207,6 +207,55 @@ exports.updateRoute = async (req, res) => {
   }
 };
 
+exports.updateRouteStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const { id } = req.params;
+
+    // Validar status
+    const validStatuses = ['pending', 'scheduled', 'in_progress', 'completed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Status inválido. Status válidos: ${validStatuses.join(', ')}`
+      });
+    }
+
+    const route = await DeliveryRoute.findById(id);
+    if (!route) {
+      return res.status(404).json({ success: false, message: 'Rota não encontrada' });
+    }
+
+    // Atualizar status da rota (hook atualizará ServiceOrder automaticamente)
+    route.status = status;
+    
+    // Definir timestamps baseado no status
+    if (status === 'in_progress' && !route.actualStart) {
+      route.actualStart = new Date();
+    } else if (status === 'completed' && !route.actualEnd) {
+      route.actualEnd = new Date();
+    }
+
+    await route.save();
+    
+    // Popular dados para resposta
+    await route.populate('vehicle');
+    await route.populate('teamIds');
+
+    res.json({ 
+      success: true, 
+      message: `Status da rota atualizado para: ${status}`, 
+      data: route 
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao atualizar status da rota',
+      error: error.message,
+    });
+  }
+};
+
 exports.deleteRoute = async (req, res) => {
   try {
     const route = await DeliveryRoute.findById(req.params.id);
@@ -451,8 +500,7 @@ exports.createInstallationRoute = async (req, res) => {
 
     await installationRoute.save();
 
-    // Atualizar status da OS para aguardando instalação
-    serviceOrder.logisticsStatus = 'in_installation';
+    // Marcar instalação como confirmada (hook atualizará o status automaticamente)
     serviceOrder.installation_confirmed = true;
     await serviceOrder.save();
 

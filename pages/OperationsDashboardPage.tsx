@@ -636,7 +636,9 @@ const OperationsDashboardPage: FC = () => {
     vehicles,
     users,
     addAttachmentToServiceOrder, 
-    removeAttachmentFromServiceOrder
+    removeAttachmentFromServiceOrder,
+    refreshServiceOrder,
+    deliveryRoutes
   } = useData();
 
   const [activeTab, setActiveTab] = useState<OperationTab>('production');
@@ -648,6 +650,61 @@ const OperationsDashboardPage: FC = () => {
   const [generatingReceiptTermOrder, setGeneratingReceiptTermOrder] = useState<ServiceOrder | null>(null);
   const [generatingInstallTermOrder, setGeneratingInstallTermOrder] = useState<ServiceOrder | null>(null);
   const [confirmingDeliveryOrder, setConfirmingDeliveryOrder] = useState<ServiceOrder | null>(null);
+
+  // Functions to handle route status updates
+  const handleStartRoute = async (orderId: string) => {
+    try {
+      // Find the delivery route for this order
+      const route = deliveryRoutes.find(r => r.serviceOrderId === orderId);
+      if (route) {
+        // Update route status to 'in_progress' via API
+        const response = await fetch(`/api/delivery-routes/${route.id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: 'in_progress' })
+        });
+        
+        if (response.ok) {
+          // Refresh ServiceOrder to get updated status from backend hooks
+          await refreshServiceOrder(orderId);
+        } else {
+          console.error('Failed to start route');
+        }
+      }
+    } catch (error) {
+      console.error('Error starting route:', error);
+    }
+  };
+
+  const handleArriveAtDestination = async (orderId: string) => {
+    try {
+      // Find the delivery route for this order
+      const route = deliveryRoutes.find(r => r.serviceOrderId === orderId);
+      if (route) {
+        // Update route status to 'completed' via API
+        const response = await fetch(`/api/delivery-routes/${route.id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: 'completed' })
+        });
+        
+        if (response.ok) {
+          // Refresh ServiceOrder to get updated status from backend hooks
+          await refreshServiceOrder(orderId);
+        } else {
+          console.error('Failed to complete route');
+        }
+      }
+    } catch (error) {
+      console.error('Error completing route:', error);
+    }
+  };
 
   // Filtrar OSs por tipo
   const productionOrders = useMemo(() => {
@@ -918,8 +975,8 @@ const OperationsDashboardPage: FC = () => {
                     key={order.id}
                     order={order}
                     onSchedule={handleScheduleDelivery}
-                    onStartRoute={(id) => updateServiceOrderStatus(id, 'in_transit')}
-                    onArrive={(id) => updateServiceOrderStatus(id, 'realizado')}
+                    onStartRoute={handleStartRoute}
+                    onArrive={handleArriveAtDestination}
                     onConfirmDelivery={(orderId) => {
                       const order = logisticsOrders.find(o => o.id === orderId);
                       if (order) handleConfirmDeliveryClick(order);
@@ -957,7 +1014,7 @@ const OperationsDashboardPage: FC = () => {
                     key={order.id}
                     order={order}
                     onSchedule={handleScheduleInstallation}
-                    onStart={(id) => updateServiceOrderStatus(id, 'realizado')}
+                    onStart={handleStartRoute}
                     onComplete={confirmInstallation}
                   />
                 ))}

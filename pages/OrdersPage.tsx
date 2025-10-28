@@ -1,23 +1,25 @@
 import React, { useState, useMemo, FC, useEffect } from 'react';
 import { mockUsers } from '../data/mockData';
-import type { Order, QuoteItem, ServiceOrder, Page, SortDirection, ProductionStatus } from '../types';
+import type { Order, QuoteItem, ServiceOrder, Page, SortDirection, ProductionStatus, OrderAddendum } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import DocumentPreview from '../components/QuotePreview';
+import OrderAddendumForm from '../components/OrderAddendumForm';
 import { useData } from '../context/DataContext';
 import Select from '../components/ui/Select';
 import Input from '../components/ui/Input';
 import StatusBadge from '../components/ui/StatusBadge';
 import type { StatusMap } from '../components/ui/StatusBadge';
 
-type OrderStatus = 'approved' | 'in_production' | 'in_logistics' | 'completed';
+type OrderStatus = 'approved' | 'in_production' | 'in_logistics' | 'completed' | 'cancelled';
 
 const orderStatusMap: StatusMap<OrderStatus> = {
     approved: { label: 'Aguardando Produção', variant: 'default' },
     in_production: { label: 'Em Produção', variant: 'warning' },
     in_logistics: { label: 'Em Logística', variant: 'primary' },
     completed: { label: 'Concluído', variant: 'success' },
+    cancelled: { label: 'Cancelado', variant: 'error' },
 };
 
 const getOrderStatus = (order: Order, allServiceOrders: ServiceOrder[]): OrderStatus => {
@@ -48,13 +50,56 @@ const getOrderStatus = (order: Order, allServiceOrders: ServiceOrder[]): OrderSt
 };
 
 
+// Componente para cada item individual - VERSÃO ROBUSTA
+const ServiceOrderItem: FC<{
+    item: QuoteItem;
+    index: number;
+    isSelected: boolean;
+    onToggle: (itemId: string) => void;
+}> = ({ item, index, isSelected, onToggle }) => {
+    const checkboxId = `os-item-${item.id}-${index}`;
+    
+    // Handler isolado para evitar problemas de propagação
+    const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.stopPropagation(); // Prevenir propagação de eventos
+        console.log(`🖱️ Checkbox clicked for item ${item.id}:`, e.target.checked);
+        onToggle(item.id);
+    };
+    
+    // Handler isolado para o label
+    const handleLabelClick = (e: React.MouseEvent<HTMLLabelElement>) => {
+        e.preventDefault(); // Prevenir comportamento padrão
+        console.log(`🏷️ Label clicked for item ${item.id}`);
+        onToggle(item.id);
+    };
+    
+    return (
+        <div className="flex items-center p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">
+            <input
+                type="checkbox"
+                id={checkboxId}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                checked={isSelected}
+                onChange={handleCheckboxChange}
+            />
+            <label 
+                htmlFor={checkboxId}
+                className="ml-3 text-sm text-text-primary dark:text-slate-200 cursor-pointer flex-1"
+                onClick={handleLabelClick}
+            >
+                {item.description} ({item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+            </label>
+        </div>
+    );
+};
+
 const CreateServiceOrderModal: FC<{
     isOpen: boolean;
     order: Order;
     onClose: () => void;
     onCreate: (newOs: Omit<ServiceOrder, 'id'>) => void;
 }> = ({ isOpen, order, onClose, onCreate }) => {
-    const { serviceOrders, checklistTemplates } = useData();
+    const { serviceOrders, checklistTemplates, orderAddendums } = useData();
     const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
     const [deliveryDate, setDeliveryDate] = useState('');
     const [error, setError] = useState<string>('');
@@ -71,44 +116,116 @@ const CreateServiceOrderModal: FC<{
     }, [isOpen, order.id]);
 
     const availableItems = useMemo(() => {
+        console.log('🔍 Calculating availableItems for order:', order.id);
+        console.log('📋 Order items:', order.items.map(item => ({ id: item.id, description: item.description })));
+        
+        // Buscar adendos aprovados para este pedido
+        const approvedAddendums = orderAddendums.filter(addendum => 
+            addendum.orderId === order.id && addendum.status === 'approved'
+        );
+        
+        console.log('📝 Approved addendums:', approvedAddendums.map(addendum => ({ 
+            id: addendum.id, 
+            addendumNumber: addendum.addendumNumber,
+            addedItems: addendum.addedItems.length,
+            removedItemIds: addendum.removedItemIds.length,
+            changedItems: addendum.changedItems.length
+        })));
+        
+        // IDs de itens já atribuídos a OSs existentes
         const assignedItemIds = new Set(
             serviceOrders
                 .filter(os => os.orderId === order.id)
                 .flatMap(os => os.items.map(item => item.id))
         );
-        const available = order.items.filter(item => !assignedItemIds.has(item.id));
+        
+        console.log('🚫 Assigned item IDs:', Array.from(assignedItemIds));
+        
+        // IDs de itens removidos por adendos aprovados
+        const removedItemIds = new Set(
+            approvedAddendums.flatMap(addendum => addendum.removedItemIds)
+        );
+        
+        // IDs de itens substituídos por adendos aprovados
+        const replacedItemIds = new Set(
+            approvedAddendums.flatMap(addendum => addendum.changedItems.map(change => change.originalItemId))
+        );
+        
+        console.log('🗑️ Removed item IDs:', Array.from(removedItemIds));
+        console.log('🔄 Replaced item IDs:', Array.from(replacedItemIds));
+        
+        // Itens originais disponíveis (não removidos, não substituídos, não atribuídos)
+        const originalAvailableItems = order.items.filter(item => 
+            !assignedItemIds.has(item.id) && 
+            !removedItemIds.has(item.id) && 
+            !replacedItemIds.has(item.id)
+        );
+        
+        // Itens adicionados por adendos aprovados (não atribuídos)
+        const addedItems = approvedAddendums.flatMap(addendum => 
+            addendum.addedItems.filter(item => !assignedItemIds.has(item.id))
+        );
+        
+        // Itens modificados por adendos aprovados (versão updatedItem, não atribuídos)
+        const changedItems = approvedAddendums.flatMap(addendum => 
+            addendum.changedItems
+                .map(change => change.updatedItem)
+                .filter(item => !assignedItemIds.has(item.id))
+        );
+        
+        // Combinar todos os itens disponíveis
+        const allAvailableItems = [
+            ...originalAvailableItems,
+            ...addedItems,
+            ...changedItems
+        ];
+        
+        console.log('📦 Original available items:', originalAvailableItems.map(item => ({ id: item.id, description: item.description })));
+        console.log('➕ Added items:', addedItems.map(item => ({ id: item.id, description: item.description })));
+        console.log('🔄 Changed items:', changedItems.map(item => ({ id: item.id, description: item.description })));
+        console.log('✅ Total available items:', allAvailableItems.map(item => ({ id: item.id, description: item.description })));
         
         // Debug: Verificar se há IDs duplicados
-        const itemIds = available.map(item => item.id);
+        const itemIds = allAvailableItems.map(item => item.id);
         const uniqueIds = new Set(itemIds);
         if (itemIds.length !== uniqueIds.size) {
             console.warn('⚠️ Aviso: IDs duplicados encontrados nos itens disponíveis!', itemIds);
         }
         
-        return available;
-    }, [order, serviceOrders]);
+        return allAvailableItems;
+    }, [order, serviceOrders, orderAddendums]);
 
     const selectedItems = useMemo(() => {
-        return order.items.filter(item => selectedItemIds.includes(item.id));
-    }, [selectedItemIds, order.items]);
+        return availableItems.filter(item => selectedItemIds.includes(item.id));
+    }, [selectedItemIds, availableItems]);
 
     const selectedItemsTotal = useMemo(() => {
         return selectedItems.reduce((sum, item) => sum + item.totalPrice, 0);
     }, [selectedItems]);
 
-    const handleToggleItem = (itemId: string) => {
+    const handleToggleItem = useCallback((itemId: string) => {
+        console.log('🔄 handleToggleItem called with itemId:', itemId);
+        console.log('📋 Current selectedItemIds:', selectedItemIds);
+        console.log('📦 Available items:', availableItems.map(item => ({ id: item.id, description: item.description })));
+        
+        // Verificar se o itemId é válido
+        const isValidItem = availableItems.some(item => item.id === itemId);
+        if (!isValidItem) {
+            console.error('❌ Invalid itemId:', itemId, 'Available items:', availableItems.map(item => item.id));
+            return;
+        }
+        
         setSelectedItemIds(prev => {
             const isCurrentlySelected = prev.includes(itemId);
             const newSelection = isCurrentlySelected 
                 ? prev.filter(id => id !== itemId) 
                 : [...prev, itemId];
             
-            // Debug: Log para verificar seleção
-            console.log('Toggle item:', itemId, 'Currently selected:', isCurrentlySelected, 'New selection:', newSelection);
+            console.log('✅ Toggle result - Item:', itemId, 'Was selected:', isCurrentlySelected, 'New selection:', newSelection);
             
             return newSelection;
         });
-    };
+    }, [selectedItemIds, availableItems]);
 
     const selectedTemplate = useMemo(() => {
         return checklistTemplates.find(template => template.id === selectedTemplateId) || null;
@@ -123,6 +240,8 @@ const CreateServiceOrderModal: FC<{
 
     const handleCreate = () => {
         setError('');
+        
+        // Validações básicas
         if (selectedItemIds.length === 0) {
             setError("Selecione pelo menos um item para a Ordem de Serviço.");
             return;
@@ -132,18 +251,31 @@ const CreateServiceOrderModal: FC<{
             return;
         }
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Compare dates only
+        today.setHours(0, 0, 0, 0);
         if (new Date(deliveryDate) < today) {
             setError("A data de entrega não pode ser no passado.");
             return;
         }
 
-        // FIX: Add missing 'deliveryAddress' property to satisfy the 'Omit<ServiceOrder, "id">' type.
+        // VALIDAÇÃO CRÍTICA: Garantir que apenas itens selecionados sejam incluídos
+        console.log('🔍 VALIDAÇÃO FINAL - Itens selecionados:', selectedItemIds);
+        console.log('📦 Itens que serão incluídos na OS:', selectedItems.map(item => ({ id: item.id, description: item.description })));
+        console.log('💰 Total calculado:', selectedItemsTotal);
+        
+        // Verificar se todos os itens selecionados são válidos
+        const invalidItems = selectedItemIds.filter(id => !availableItems.some(item => item.id === id));
+        if (invalidItems.length > 0) {
+            console.error('❌ Itens inválidos encontrados:', invalidItems);
+            setError("Alguns itens selecionados não são válidos. Recarregue a página e tente novamente.");
+            return;
+        }
+
+        // Construir dados da OS com validação dupla
         const newOsData: Omit<ServiceOrder, 'id'> = {
             orderId: order.id,
             clientName: order.clientName,
             deliveryAddress: order.deliveryAddress,
-            items: selectedItems,
+            items: selectedItems, // ✅ GARANTIDO: apenas itens selecionados
             total: selectedItemsTotal,
             deliveryDate: new Date(deliveryDate).toISOString(),
             assignedToIds: [],
@@ -158,6 +290,8 @@ const CreateServiceOrderModal: FC<{
                 }))
                 : undefined,
         };
+        
+        console.log('✅ OS criada com sucesso - Itens incluídos:', newOsData.items.length);
         onCreate(newOsData);
     };
 
@@ -166,22 +300,14 @@ const CreateServiceOrderModal: FC<{
             <div className="mb-4">
                 <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Itens do Pedido Disponíveis</label>
                 <div className="max-h-60 overflow-y-auto border border-border dark:border-slate-700 rounded-lg p-2 space-y-2">
-                    {availableItems.length > 0 ? availableItems.map(item => (
-                        <div key={item.id} className="flex items-center p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">
-                            <input
-                                type="checkbox"
-                                id={`os-item-${item.id}`}
-                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                                checked={selectedItemIds.includes(item.id)}
-                                onChange={() => handleToggleItem(item.id)}
-                            />
-                            <label 
-                                htmlFor={`os-item-${item.id}`}
-                                className="ml-3 text-sm text-text-primary dark:text-slate-200 cursor-pointer flex-1"
-                            >
-                                {item.description} ({item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
-                            </label>
-                        </div>
+                    {availableItems.length > 0 ? availableItems.map((item, index) => (
+                        <ServiceOrderItem
+                            key={`${item.id}-${index}`}
+                            item={item}
+                            index={index}
+                            isSelected={selectedItemIds.includes(item.id)}
+                            onToggle={handleToggleItem}
+                        />
                     )) : <p className="text-sm text-text-secondary dark:text-slate-400 p-4 text-center">Todos os itens deste pedido já foram alocados em Ordens de Serviço.</p>}
                 </div>
             </div>
@@ -256,10 +382,11 @@ interface OrdersPageProps {
 }
 
 const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) => {
-    const { orders, serviceOrders, createServiceOrder, quotes } = useData();
+    const { orders, serviceOrders, createServiceOrder, quotes, createOrderAddendum } = useData();
     const [isOsModalOpen, setIsOsModalOpen] = useState(false);
     const [selectedOrderForOs, setSelectedOrderForOs] = useState<Order | null>(null);
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+    const [addendumOrder, setAddendumOrder] = useState<Order | null>(null);
     const [orderIdFilter, setOrderIdFilter] = useState('');
     const [clientFilter, setClientFilter] = useState('');
     const [startDateFilter, setStartDateFilter] = useState('');
@@ -335,6 +462,29 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
         setSelectedOrderForOs(order);
         setIsOsModalOpen(true);
     };
+
+    const handleOpenAddendumModal = (order: Order) => {
+        setAddendumOrder(order);
+    };
+
+    const handleSaveAddendum = async (addendumData: any) => {
+        if (!addendumOrder) return;
+        
+        try {
+            const result = await createOrderAddendum(addendumOrder.id, addendumData);
+            if (result.success) {
+                console.log('Adendo criado com sucesso:', result.data);
+                // Fechar modal
+                setAddendumOrder(null);
+            } else {
+                console.error('Erro ao criar adendo:', result.message);
+                // TODO: Exibir mensagem de erro para o usuário
+            }
+        } catch (error) {
+            console.error('Erro ao criar adendo:', error);
+            // TODO: Exibir mensagem de erro para o usuário
+        }
+    };
     
     useEffect(() => {
         if (searchTarget && searchTarget.page === 'orders') {
@@ -378,6 +528,15 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                     onClose={handleCloseOsModal}
                     onCreate={handleCreateOs}
                 />
+            )}
+            {addendumOrder && (
+                <Modal isOpen={!!addendumOrder} onClose={() => setAddendumOrder(null)} title={`Criar Adendo para Pedido ${addendumOrder.id}`}>
+                    <OrderAddendumForm
+                        order={addendumOrder}
+                        onSave={handleSaveAddendum}
+                        onCancel={() => setAddendumOrder(null)}
+                    />
+                </Modal>
             )}
             {viewingOrder && (
                 <DocumentPreview document={viewingOrder} onClose={() => setViewingOrder(null)} />
@@ -512,6 +671,11 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                                                         </svg>
                                                         Completo
                                                     </span>
+                                                )}
+                                                {order.status !== 'completed' && order.status !== 'cancelled' && (
+                                                    <Button size="sm" variant="outline" onClick={() => handleOpenAddendumModal(order)}>
+                                                        Criar Adendo
+                                                    </Button>
                                                 )}
                                             </td>
                                         </tr>

@@ -93,5 +93,16 @@ const orderSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Referência virtual para adendos
+orderSchema.virtual('addendums', {
+  ref: 'OrderAddendum',
+  localField: '_id',
+  foreignField: 'orderId'
+});
+
+// Certifique-se de habilitar virtuais no toJSON e toObject
+orderSchema.set('toJSON', { virtuals: true });
+orderSchema.set('toObject', { virtuals: true });
+
 module.exports = mongoose.model('Order', orderSchema);
 

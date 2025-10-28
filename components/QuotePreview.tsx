@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import type { Quote, Order, PaymentMethod } from '../types';
+import React, { useState, useEffect } from 'react';
+import type { Quote, Order, PaymentMethod, OrderAddendum } from '../types';
 import { mockUsers } from '../data/mockData';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import { useData } from '../context/DataContext';
 
 
 declare const html2canvas: any;
@@ -15,6 +16,28 @@ interface DocumentPreviewProps {
 
 const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) => {
     const [isGenerating, setIsGenerating] = useState(false);
+    const [addendums, setAddendums] = useState<OrderAddendum[]>([]);
+    const [isLoadingAddendums, setIsLoadingAddendums] = useState(false);
+    
+    const { loadOrderAddendums, orderAddendums } = useData();
+    
+    // Carregar adendos se o documento for um Order
+    useEffect(() => {
+        const isOrder = 'originalQuoteId' in document;
+        if (isOrder) {
+            setIsLoadingAddendums(true);
+            loadOrderAddendums(document.id)
+                .then(() => {
+                    // Os adendos serão carregados no DataContext
+                    // Aqui precisamos acessar os adendos do contexto
+                    setIsLoadingAddendums(false);
+                })
+                .catch((error) => {
+                    console.error('Erro ao carregar adendos:', error);
+                    setIsLoadingAddendums(false);
+                });
+        }
+    }, [document.id, loadOrderAddendums]);
     
     const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
         pix: 'PIX',
@@ -99,6 +122,29 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
     
     const itemSubtotal = document.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const itemDiscounts = document.items.reduce((sum, item) => sum + (item.discount || 0), 0);
+    
+    // Filtrar adendos aprovados para este pedido
+    const approvedAddendums = isOrder ? orderAddendums.filter(addendum => 
+        addendum.orderId === document.id && addendum.status === 'approved'
+    ) : [];
+    
+    // Calcular total final considerando adendos
+    const addendumsTotalAdjustment = approvedAddendums.reduce((sum, addendum) => {
+        const addedItemsTotal = addendum.addedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+        const removedItemsTotal = addendum.removedItemIds.reduce((sum, itemId) => {
+            const originalItem = document.items.find(item => item.id === itemId);
+            return sum + (originalItem ? originalItem.totalPrice : 0);
+        }, 0);
+        const changedItemsTotal = addendum.changedItems.reduce((sum, change) => {
+            const originalItem = document.items.find(item => item.id === change.originalItemId);
+            const originalTotal = originalItem ? originalItem.totalPrice : 0;
+            return sum + (change.updatedItem.totalPrice - originalTotal);
+        }, 0);
+        
+        return sum + addedItemsTotal - removedItemsTotal + changedItemsTotal + addendum.priceAdjustment;
+    }, 0);
+    
+    const finalTotal = document.total + addendumsTotalAdjustment;
 
     return (
         <Modal isOpen={true} onClose={onClose} title={`Pré-visualização do ${docTypeLabel}`} className="max-w-4xl">
@@ -172,6 +218,97 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                     </table>
                 </section>
                 
+                {/* Seção de Adendos Aprovados */}
+                {isOrder && approvedAddendums.length > 0 && (
+                    <section className="mt-8">
+                        <h3 className="text-lg font-semibold text-slate-800 mb-4">Adendos Aprovados</h3>
+                        {approvedAddendums.map((addendum, index) => (
+                            <div key={addendum.id} className="mb-6 p-4 border border-slate-300 rounded-lg bg-slate-50">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h4 className="font-semibold text-slate-800">Adendo #{addendum.addendumNumber}</h4>
+                                        <p className="text-sm text-slate-600">
+                                            Aprovado em: {new Date(addendum.approvedAt || addendum.createdAt).toLocaleDateString('pt-BR')}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm text-slate-600">Motivo:</p>
+                                        <p className="font-medium text-slate-800">{addendum.reason}</p>
+                                    </div>
+                                </div>
+                                
+                                {/* Itens Adicionados */}
+                                {addendum.addedItems.length > 0 && (
+                                    <div className="mb-3">
+                                        <h5 className="font-medium text-green-700 mb-2">Itens Adicionados:</h5>
+                                        <div className="ml-4 space-y-1">
+                                            {addendum.addedItems.map((item, itemIndex) => (
+                                                <div key={itemIndex} className="text-sm text-green-600">
+                                                    + {item.description} - {item.quantity} x {item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} = {item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Itens Removidos */}
+                                {addendum.removedItemIds.length > 0 && (
+                                    <div className="mb-3">
+                                        <h5 className="font-medium text-red-700 mb-2">Itens Removidos:</h5>
+                                        <div className="ml-4 space-y-1">
+                                            {addendum.removedItemIds.map((itemId, itemIndex) => {
+                                                const originalItem = document.items.find(item => item.id === itemId);
+                                                return originalItem ? (
+                                                    <div key={itemIndex} className="text-sm text-red-600">
+                                                        - {originalItem.description} - {originalItem.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                    </div>
+                                                ) : null;
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Itens Modificados */}
+                                {addendum.changedItems.length > 0 && (
+                                    <div className="mb-3">
+                                        <h5 className="font-medium text-yellow-700 mb-2">Itens Modificados:</h5>
+                                        <div className="ml-4 space-y-2">
+                                            {addendum.changedItems.map((change, itemIndex) => {
+                                                const originalItem = document.items.find(item => item.id === change.originalItemId);
+                                                return (
+                                                    <div key={itemIndex} className="text-sm">
+                                                        <div className="text-yellow-600">
+                                                            {change.updatedItem.description}
+                                                        </div>
+                                                        <div className="ml-4 text-xs text-slate-500">
+                                                            {originalItem ? `De: ${originalItem.quantity} x ${originalItem.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} = ${originalItem.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}
+                                                        </div>
+                                                        <div className="ml-4 text-xs text-slate-500">
+                                                            Para: {change.updatedItem.quantity} x {change.updatedItem.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} = {change.updatedItem.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* Ajuste de Preço */}
+                                {addendum.priceAdjustment !== 0 && (
+                                    <div className="mb-3">
+                                        <h5 className="font-medium text-blue-700 mb-2">Ajuste de Preço:</h5>
+                                        <div className="ml-4 text-sm">
+                                            <span className={addendum.priceAdjustment > 0 ? 'text-green-600' : 'text-red-600'}>
+                                                {addendum.priceAdjustment > 0 ? '+' : ''}{addendum.priceAdjustment.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </section>
+                )}
+                
                 <section className="mt-8 flex justify-end">
                     <div className="w-full max-w-sm text-slate-800 space-y-1">
                         <div className="flex justify-between">
@@ -200,9 +337,15 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
                                 <span>+ {document.freight.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                             </div>
                         )}
+                        {isOrder && addendumsTotalAdjustment !== 0 && (
+                            <div className="flex justify-between text-blue-600">
+                                <span>Ajuste por Adendos:</span>
+                                <span>{addendumsTotalAdjustment > 0 ? '+' : ''}{addendumsTotalAdjustment.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between font-bold text-xl mt-2 pt-2 border-t-2 border-black text-dark">
-                            <span>TOTAL:</span>
-                            <span className="text-primary">{document.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            <span>{isOrder && addendumsTotalAdjustment !== 0 ? 'TOTAL FINAL:' : 'TOTAL:'}</span>
+                            <span className="text-primary">{finalTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                         </div>
                     </div>
                 </section>

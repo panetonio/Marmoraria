@@ -17,7 +17,15 @@ exports.getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
       .populate('salespersonId', 'name email')
-      .populate('originalQuoteId');
+      .populate('originalQuoteId')
+      .populate({ 
+        path: 'addendums', 
+        match: { status: 'approved' },
+        populate: {
+          path: 'createdBy',
+          select: 'name email'
+        }
+      });
     if (!order) {
       return res.status(404).json({ success: false, message: 'Pedido não encontrado' });
     }

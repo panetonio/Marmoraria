@@ -52,6 +52,7 @@ app.use('/api/clients', require('./routes/clients'));
 app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/quotes', require('./routes/quotes'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/order-addendums', require('./routes/orderAddendums'));
 app.use('/api/serviceorders', require('./routes/serviceOrders'));
 app.use('/api/vehicles', require('./routes/vehicles'));
 app.use('/api/delivery-routes', require('./routes/deliveryRoutes'));

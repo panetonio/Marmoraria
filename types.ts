@@ -5,6 +5,7 @@ export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
 export type Priority = 'normal' | 'alta' | 'urgente';
+export type OrderAddendumStatus = 'pending' | 'approved' | 'rejected';
 
 export interface Address {
   cep: string;
@@ -192,6 +193,24 @@ export interface Order {
   approvalDate: string;
   serviceOrderIds: string[];
   salespersonId?: string;
+  addendums?: OrderAddendum[];
+}
+
+export interface OrderAddendum {
+  id: string;
+  orderId: string;
+  addendumNumber: number;
+  reason: string;
+  status: OrderAddendumStatus;
+  addedItems: QuoteItem[];
+  removedItemIds: string[];
+  changedItems: Array<{ originalItemId: string; updatedItem: QuoteItem }>;
+  priceAdjustment: number;
+  approvedBy?: string;
+  approvedAt?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type FinalizationType = 'pickup' | 'delivery_only' | 'delivery_installation';

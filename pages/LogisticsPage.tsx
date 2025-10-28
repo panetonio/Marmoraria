@@ -1,5 +1,5 @@
 import React, { useState, useMemo, FC, DragEvent, useEffect } from 'react';
-import type { ServiceOrder, ProductionStatus, Vehicle } from '../types';
+import type { ServiceOrder, ProductionStatus, LogisticsStatus, Vehicle } from '../types';
 import { mockProductionProfessionals } from '../data/mockData';
 import { useData } from '../context/DataContext';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
@@ -14,11 +14,11 @@ import ReceiptTermModal from '../components/ReceiptTermModal';
 import QrCodeScanner from '../components/QrCodeScanner';
 
 
-const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
-  { id: 'ready_for_logistics', title: 'A Agendar', color: 'bg-purple-700' },
+const KANBAN_COLUMNS: { id: LogisticsStatus; title: string; color: string }[] = [
+  { id: 'awaiting_scheduling', title: 'A Agendar', color: 'bg-purple-700' },
   { id: 'scheduled', title: 'Agendado', color: 'bg-blue-600' },
   { id: 'in_transit', title: 'Em Rota', color: 'bg-orange-700' },
-  { id: 'realizado', title: 'Realizado', color: 'bg-indigo-600' },
+  { id: 'delivered', title: 'Realizado', color: 'bg-indigo-600' },
   { id: 'completed', title: 'Finalizado', color: 'bg-green-800' },
 ];
 
@@ -475,12 +475,12 @@ const LogisticsKanbanCard: FC<{
 
             <div className="mt-3 pt-3 border-t border-border dark:border-slate-700 space-y-2">
                 {/* Primary Status-Changing Actions */}
-                {order.status === 'ready_for_logistics' && <Button size="sm" className="w-full" onClick={() => onSchedule(order)}>Agendar</Button>}
-                {order.status === 'scheduled' && <Button size="sm" className="w-full" onClick={() => onStartRoute(order.id)}>Iniciar Rota</Button>}
-                {order.status === 'in_transit' && <Button size="sm" className="w-full" onClick={() => onArrive(order.id)}>Chegou ao Destino</Button>}
+                {order.logisticsStatus === 'awaiting_scheduling' && <Button size="sm" className="w-full" onClick={() => onSchedule(order)}>Agendar</Button>}
+                {order.logisticsStatus === 'scheduled' && <Button size="sm" className="w-full" onClick={() => onStartRoute(order.id)}>Iniciar Rota</Button>}
+                {order.logisticsStatus === 'in_transit' && <Button size="sm" className="w-full" onClick={() => onArrive(order.id)}>Chegou ao Destino</Button>}
                 
                 {/* Confirmation Actions (in 'Realizado' column) */}
-                {order.status === 'realizado' && (
+                {order.logisticsStatus === 'delivered' && (
                     <div className="space-y-2">
                         {order.finalizationType !== 'pickup' && !order.delivery_confirmed && (
                              <Button size="sm" className="w-full" variant="secondary" onClick={() => onConfirmDelivery(order.id)}>Confirmar Entrega</Button>
@@ -505,9 +505,9 @@ const LogisticsKanbanCard: FC<{
                 )}
                 
                 {/* Document Generation */}
-                {( (order.status === 'ready_for_logistics' || order.status === 'scheduled') && order.finalizationType !== 'pickup') || order.installation_confirmed ? (
+                {( (order.logisticsStatus === 'awaiting_scheduling' || order.logisticsStatus === 'scheduled') && order.finalizationType !== 'pickup') || order.installation_confirmed ? (
                     <div className="!mt-3 pt-2 border-t border-dashed space-y-2">
-                        {(order.status === 'ready_for_logistics' || order.status === 'scheduled') && order.finalizationType !== 'pickup' && (
+                        {(order.logisticsStatus === 'awaiting_scheduling' || order.logisticsStatus === 'scheduled') && order.finalizationType !== 'pickup' && (
                             <Button size="sm" variant="ghost" className="w-full" onClick={() => onGenerateReceiptTerm(order)}>Gerar Termo Recebimento</Button>
                         )}
                         {order.installation_confirmed && (
@@ -522,15 +522,70 @@ const LogisticsKanbanCard: FC<{
 
 
 const LogisticsPage: FC = () => {
-    const { serviceOrders, scheduleDelivery, updateServiceOrderStatus, confirmDelivery, confirmInstallation, vehicles, updateDepartureChecklist } = useData();
+    const { serviceOrders, scheduleDelivery, confirmDelivery, confirmInstallation, vehicles, updateDepartureChecklist, refreshServiceOrder, deliveryRoutes } = useData();
     const [schedulingOrder, setSchedulingOrder] = useState<ServiceOrder | null>(null);
     const [generatingReceiptTermOrder, setGeneratingReceiptTermOrder] = useState<ServiceOrder | null>(null);
     const [generatingInstallTermOrder, setGeneratingInstallTermOrder] = useState<ServiceOrder | null>(null);
     const [activeChecklistOrder, setActiveChecklistOrder] = useState<ServiceOrder | null>(null);
 
+    // Functions to handle route status updates
+    const handleStartRoute = async (orderId: string) => {
+        try {
+            // Find the delivery route for this order
+            const route = deliveryRoutes.find(r => r.serviceOrderId === orderId);
+            if (route) {
+                // Update route status to 'in_progress' via API
+                const response = await fetch(`/api/delivery-routes/${route.id}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'in_progress' })
+                });
+                
+                if (response.ok) {
+                    // Refresh ServiceOrder to get updated status from backend hooks
+                    await refreshServiceOrder(orderId);
+                } else {
+                    console.error('Failed to start route');
+                }
+            }
+        } catch (error) {
+            console.error('Error starting route:', error);
+        }
+    };
+
+    const handleArriveAtDestination = async (orderId: string) => {
+        try {
+            // Find the delivery route for this order
+            const route = deliveryRoutes.find(r => r.serviceOrderId === orderId);
+            if (route) {
+                // Update route status to 'completed' via API
+                const response = await fetch(`/api/delivery-routes/${route.id}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'completed' })
+                });
+                
+                if (response.ok) {
+                    // Refresh ServiceOrder to get updated status from backend hooks
+                    await refreshServiceOrder(orderId);
+                } else {
+                    console.error('Failed to complete route');
+                }
+            }
+        } catch (error) {
+            console.error('Error completing route:', error);
+        }
+    };
+
     const logisticsOrders = useMemo(() => {
-        const logisticsStatuses: ProductionStatus[] = ['ready_for_logistics', 'scheduled', 'in_transit', 'realizado', 'completed'];
-        return serviceOrders.filter(o => logisticsStatuses.includes(o.status));
+        const logisticsStatuses: LogisticsStatus[] = ['awaiting_scheduling', 'scheduled', 'in_transit', 'delivered', 'completed'];
+        return serviceOrders.filter(o => logisticsStatuses.includes(o.logisticsStatus));
     }, [serviceOrders]);
 
     useEffect(() => {
@@ -588,13 +643,13 @@ const LogisticsPage: FC = () => {
                             <h3 className="font-semibold text-text-primary dark:text-slate-100">{column.title}</h3>
                         </div>
                             <div className="flex-1 overflow-y-auto pr-1">
-                            {logisticsOrders.filter(o => o.status === column.id).map(order => (
+                            {logisticsOrders.filter(o => o.logisticsStatus === column.id).map(order => (
                                 <LogisticsKanbanCard
                                     key={order.id}
                                     order={order}
                                     onSchedule={setSchedulingOrder}
-                                    onStartRoute={(id) => updateServiceOrderStatus(id, 'in_transit')}
-                                    onArrive={(id) => updateServiceOrderStatus(id, 'realizado')}
+                                    onStartRoute={handleStartRoute}
+                                    onArrive={handleArriveAtDestination}
                                     onConfirmDelivery={confirmDelivery}
                                     onConfirmInstallation={confirmInstallation}
                                     onGenerateReceiptTerm={setGeneratingReceiptTermOrder}

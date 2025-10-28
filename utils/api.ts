@@ -605,4 +605,30 @@ export const api = {
     });
     return response.json();
   },
+
+  // Order Addendums
+  async getOrderAddendums(orderId: string) {
+    const response = await fetch(`${API_URL}/order-addendums/order/${orderId}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async createOrderAddendum(orderId: string, addendumData: any) {
+    const response = await fetch(`${API_URL}/order-addendums/order/${orderId}`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(addendumData),
+    });
+    return response.json();
+  },
+
+  async updateOrderAddendumStatus(addendumId: string, status: 'approved' | 'rejected') {
+    const response = await fetch(`${API_URL}/order-addendums/${addendumId}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    return response.json();
+  },
 };

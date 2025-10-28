@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { calculateDerivedStatus } = require('../utils/statusHelper');
 
 const addressSchema = new mongoose.Schema({
   cep: String,
@@ -124,6 +125,19 @@ const serviceOrderSchema = new mongoose.Schema({
 }, {
   timestamps: true,
 });
+
+// Static method to calculate and update derived status
+serviceOrderSchema.statics.updateDerivedStatus = async function(serviceOrderId) {
+  const derivedStatus = await calculateDerivedStatus(serviceOrderId);
+  
+  if (derivedStatus) {
+    await this.findByIdAndUpdate(serviceOrderId, {
+      logisticsStatus: derivedStatus
+    });
+  }
+  
+  return derivedStatus;
+};
 
 module.exports = mongoose.model('ServiceOrder', serviceOrderSchema);
 
