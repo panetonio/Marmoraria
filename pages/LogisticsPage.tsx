@@ -542,9 +542,9 @@ const LogisticsKanbanCard: FC<{
                 )}
                 
                 {/* Document Generation */}
-                {( (order.logisticsStatus === 'awaiting_scheduling' || order.logisticsStatus === 'scheduled') && order.finalizationType !== 'pickup') || order.installation_confirmed ? (
+                {( (order.logisticsStatus === 'awaiting_scheduling' || order.logisticsStatus === 'scheduled' || order.status === 'awaiting_pickup') && order.finalizationType !== 'pickup') || order.installation_confirmed ? (
                     <div className="!mt-3 pt-2 border-t border-dashed space-y-2">
-                        {(order.logisticsStatus === 'awaiting_scheduling' || order.logisticsStatus === 'scheduled') && order.finalizationType !== 'pickup' && (
+                        {(order.logisticsStatus === 'awaiting_scheduling' || order.logisticsStatus === 'scheduled' || order.status === 'awaiting_pickup') && order.finalizationType !== 'pickup' && (
                             <Button size="sm" variant="ghost" className="w-full" onClick={() => onGenerateReceiptTerm(order)}>Gerar Termo Recebimento</Button>
                         )}
                         {order.installation_confirmed && (

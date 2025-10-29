@@ -59,4 +59,60 @@ router.patch('/:id/resolve-rework', authorize('production'), serviceOrderControl
 router.patch('/:id/resolve-delivery-issue', authorize('logistics'), serviceOrderController.resolveDeliveryIssue);
 router.patch('/:id/complete-review', authorize('production'), serviceOrderController.completeReview);
 
+// Confirmar dados de entrega/instalação
+router.post(
+  '/:id/confirm-delivery',
+  authorize('logistics'),
+  [
+    body('checklistItems')
+      .optional()
+      .isArray()
+      .withMessage('checklistItems deve ser um array'),
+    body('checklistItems.*.id')
+      .optional()
+      .isString()
+      .withMessage('ID do item do checklist deve ser string'),
+    body('checklistItems.*.text')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Texto do item do checklist deve ser string'),
+    body('checklistItems.*.checked')
+      .optional()
+      .isBoolean()
+      .withMessage('Campo checked deve ser booleano'),
+    body('photoUrls')
+      .optional()
+      .isArray()
+      .withMessage('photoUrls deve ser um array'),
+    body('photoUrls.*.url')
+      .optional()
+      .isString()
+      .isURL()
+      .withMessage('URL da foto deve ser uma URL válida'),
+    body('photoUrls.*.description')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Descrição da foto deve ser string'),
+    body('signatureUrl')
+      .optional()
+      .isString()
+      .isURL()
+      .withMessage('URL da assinatura deve ser uma URL válida'),
+    body('signatoryName')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Nome do signatário deve ser string'),
+    body('signatoryDocument')
+      .optional()
+      .isString()
+      .trim()
+      .withMessage('Documento do signatário deve ser string'),
+  ],
+  validateRequest,
+  serviceOrderController.confirmDeliveryData,
+);
+
 module.exports = router;

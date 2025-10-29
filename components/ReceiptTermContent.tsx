@@ -3,9 +3,12 @@ import type { ServiceOrder } from '../types';
 
 interface ReceiptTermContentProps {
     order: ServiceOrder;
+    signatoryName?: string;
+    signatoryDocument?: string;
+    signatureDataUrl?: string | null;
 }
 
-const ReceiptTermContent: React.FC<ReceiptTermContentProps> = ({ order }) => {
+const ReceiptTermContent: React.FC<ReceiptTermContentProps> = ({ order, signatoryName, signatoryDocument, signatureDataUrl }) => {
     const itemCount = order.items.length;
     const orderId = order.orderId;
     const city = order.deliveryAddress.city;
@@ -33,8 +36,14 @@ const ReceiptTermContent: React.FC<ReceiptTermContentProps> = ({ order }) => {
             </div>
             
             <div className="mt-24 text-center">
-                <p>_________________________________________</p>
-                <p className="mt-2 text-sm">(Pessoa responsável pela conferência)</p>
+                {signatureDataUrl ? (
+                    <img src={signatureDataUrl} alt="Assinatura" style={{ width: '250px', height: 'auto', margin: '10px auto', borderBottom: '1px solid black' }} />
+                ) : (
+                    <p className="border-b border-black w-64 mx-auto pb-1">_________________________________________</p>
+                )}
+                <p className="mt-2 font-semibold">{signatoryName || '(Nome do Responsável)'}</p>
+                {signatoryDocument && <p className="text-sm">{signatoryDocument}</p>}
+                <p className="mt-2 text-xs">(Pessoa responsável pela conferência)</p>
             </div>
 
             <div className="mt-8 text-left text-sm space-y-2">

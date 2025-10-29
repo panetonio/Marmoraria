@@ -52,6 +52,36 @@ const checklistItemSchema = new mongoose.Schema({
   },
 }, { _id: false });
 
+const confirmationPhotoSchema = new mongoose.Schema({
+  url: {
+    type: String,
+    required: true,
+  },
+  description: {
+    type: String,
+    trim: true,
+  },
+}, { _id: false });
+
+const customerSignatureSchema = new mongoose.Schema({
+  url: {
+    type: String,
+    required: true,
+  },
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  },
+  name: {
+    type: String,
+    trim: true,
+  },
+  documentNumber: {
+    type: String,
+    trim: true,
+  },
+}, { _id: false });
+
 const serviceOrderSchema = new mongoose.Schema({
   id: {
     type: String,
@@ -154,6 +184,9 @@ const serviceOrderSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'CutPiece'
   }],
+  // Campos de confirmação de entrega
+  confirmationPhotos: [confirmationPhotoSchema],
+  customerSignature: customerSignatureSchema,
 }, {
   timestamps: true,
 });

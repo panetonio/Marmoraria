@@ -51,6 +51,16 @@ export const api = {
     return response.json();
   },
 
+  // Upload de imagens
+  async uploadImage(imageData: string) {
+    const response = await fetch(`${API_URL}/uploads/image`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ imageData }),
+    });
+    return response.json();
+  },
+
   // Usuários
   async getUsers() {
     const response = await fetch(`${API_URL}/users`, {
@@ -744,6 +754,22 @@ export const api = {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ location }),
+    });
+    return response.json();
+  },
+
+  // Confirmação de entrega
+  async confirmDeliveryData(serviceOrderId: string, data: {
+    checklistItems?: Array<{ id?: string; text: string; checked: boolean }>;
+    photoUrls?: Array<{ url: string; description?: string }>;
+    signatureUrl?: string;
+    signatoryName?: string;
+    signatoryDocument?: string;
+  }) {
+    const response = await fetch(`${API_URL}/serviceorders/${encodeURIComponent(serviceOrderId)}/confirm-delivery`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
     });
     return response.json();
   },

@@ -785,3 +785,166 @@ exports.updateServiceOrderStatus = async (req, res) => {
     });
   }
 };
+
+// Confirmar dados de entrega/instalação
+exports.confirmDeliveryData = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      checklistItems, 
+      photoUrls, 
+      signatureUrl, 
+      signatoryName, 
+      signatoryDocument 
+    } = req.body;
+
+    console.log(`📋 Confirmando dados de entrega para ServiceOrder ${id}`);
+
+    // Buscar a ServiceOrder pelo campo id personalizado
+    const serviceOrder = await ServiceOrder.findOne({ id });
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ordem de serviço não encontrada',
+      });
+    }
+
+    // Verificar se a ServiceOrder está em status adequado para confirmação
+    const validStatuses = ['in_transit', 'delivered', 'in_installation'];
+    const isValidStatus = validStatuses.includes(serviceOrder.logisticsStatus);
+    const isValidGeneralStatus = serviceOrder.status === 'in_transit' || serviceOrder.status === 'delivered' || serviceOrder.status === 'awaiting_installation';
+    
+    if (!isValidStatus && !isValidGeneralStatus) {
+      return res.status(400).json({
+        success: false,
+        message: `ServiceOrder não está em status adequado para confirmação. Status atual: ${serviceOrder.status}, Logistics Status: ${serviceOrder.logisticsStatus}`,
+        validStatuses: validStatuses
+      });
+    }
+
+    // Registrar dados anteriores para o ActivityLog
+    const previousData = {
+      delivery_confirmed: serviceOrder.delivery_confirmed,
+      confirmationPhotos: serviceOrder.confirmationPhotos?.length || 0,
+      customerSignature: serviceOrder.customerSignature ? 'existe' : 'não existe'
+    };
+
+    // Atualizar checklist de saída se fornecido
+    if (checklistItems && Array.isArray(checklistItems)) {
+      console.log(`📝 Atualizando checklist de saída com ${checklistItems.length} itens`);
+      serviceOrder.departureChecklist = checklistItems.map(item => ensureChecklistItemId(item));
+    }
+
+    // Atualizar fotos de confirmação se fornecidas
+    if (photoUrls && Array.isArray(photoUrls)) {
+      console.log(`📸 Adicionando ${photoUrls.length} fotos de confirmação`);
+      serviceOrder.confirmationPhotos = photoUrls.map(photo => ({
+        url: photo.url,
+        description: photo.description || ''
+      }));
+    }
+
+    // Atualizar assinatura do cliente se fornecida
+    if (signatureUrl) {
+      console.log(`✍️ Adicionando assinatura do cliente`);
+      serviceOrder.customerSignature = {
+        url: signatureUrl,
+        timestamp: new Date(),
+        name: signatoryName || '',
+        documentNumber: signatoryDocument || ''
+      };
+    }
+
+    // Marcar entrega como confirmada
+    serviceOrder.delivery_confirmed = true;
+    console.log(`✅ Entrega marcada como confirmada`);
+
+    // Determinar próximo status baseado no finalizationType
+    let nextStatus;
+    if (serviceOrder.finalizationType === 'pickup') {
+      nextStatus = 'completed';
+      serviceOrder.logisticsStatus = 'picked_up';
+      console.log(`📦 Finalização por retirada - marcando como concluído`);
+    } else if (serviceOrder.finalizationType === 'delivery_only') {
+      nextStatus = 'completed';
+      serviceOrder.logisticsStatus = 'delivered';
+      console.log(`🚚 Finalização apenas entrega - marcando como concluído`);
+    } else if (serviceOrder.finalizationType === 'delivery_installation') {
+      nextStatus = 'awaiting_installation';
+      serviceOrder.logisticsStatus = 'in_installation';
+      console.log(`🔧 Finalização com instalação - aguardando instalação`);
+    } else {
+      // Fallback baseado no requiresInstallation
+      if (serviceOrder.requiresInstallation) {
+        nextStatus = 'awaiting_installation';
+        serviceOrder.logisticsStatus = 'in_installation';
+        console.log(`🔧 Instalação necessária - aguardando instalação`);
+      } else {
+        nextStatus = 'completed';
+        serviceOrder.logisticsStatus = 'delivered';
+        console.log(`✅ Sem instalação - marcando como concluído`);
+      }
+    }
+
+    // Atualizar status geral
+    serviceOrder.status = nextStatus;
+
+    // Adicionar entrada ao history
+    serviceOrder.history.push({
+      status: nextStatus,
+      reason: 'Confirmação de entrega realizada',
+      user: req.user._id,
+      timestamp: new Date()
+    });
+
+    // Salvar a ServiceOrder
+    const updatedServiceOrder = await serviceOrder.save();
+    console.log(`💾 ServiceOrder ${id} atualizada com sucesso`);
+
+    // Registrar no ActivityLog
+    await ActivityLog.create({
+      serviceOrder: serviceOrder._id,
+      action: 'delivery_confirmation_completed',
+      description: `Confirmação de entrega realizada para ServiceOrder ${id}`,
+      user: buildUserSnapshot(req.user),
+      metadata: {
+        serviceOrderId: id,
+        previousData,
+        newData: {
+          delivery_confirmed: updatedServiceOrder.delivery_confirmed,
+          confirmationPhotos: updatedServiceOrder.confirmationPhotos?.length || 0,
+          customerSignature: updatedServiceOrder.customerSignature ? 'existe' : 'não existe',
+          newStatus: nextStatus,
+          finalizationType: serviceOrder.finalizationType,
+          requiresInstallation: serviceOrder.requiresInstallation
+        }
+      }
+    });
+
+    console.log(`📊 ActivityLog registrado para ServiceOrder ${id}`);
+
+    return res.json({
+      success: true,
+      message: 'Dados de confirmação de entrega salvos com sucesso',
+      data: {
+        id: updatedServiceOrder.id,
+        status: updatedServiceOrder.status,
+        logisticsStatus: updatedServiceOrder.logisticsStatus,
+        delivery_confirmed: updatedServiceOrder.delivery_confirmed,
+        confirmationPhotos: updatedServiceOrder.confirmationPhotos,
+        customerSignature: updatedServiceOrder.customerSignature,
+        departureChecklist: updatedServiceOrder.departureChecklist,
+        finalizationType: updatedServiceOrder.finalizationType,
+        requiresInstallation: updatedServiceOrder.requiresInstallation
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao confirmar dados de entrega:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao confirmar dados de entrega',
+      error: error.message
+    });
+  }
+};

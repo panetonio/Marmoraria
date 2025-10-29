@@ -3,9 +3,12 @@ import type { ServiceOrder } from '../types';
 
 interface InstallationTermContentProps {
     order: ServiceOrder;
+    signatoryName?: string;
+    signatoryDocument?: string;
+    signatureDataUrl?: string | null;
 }
 
-const InstallationTermContent: React.FC<InstallationTermContentProps> = ({ order }) => {
+const InstallationTermContent: React.FC<InstallationTermContentProps> = ({ order, signatoryName, signatoryDocument, signatureDataUrl }) => {
     const city = order.deliveryAddress.city;
 
     return (
@@ -32,8 +35,14 @@ const InstallationTermContent: React.FC<InstallationTermContentProps> = ({ order
             </div>
             
             <div className="mt-24 text-center">
-                <p>_________________________________________</p>
-                <p className="mt-2 text-sm">(Pessoa responsável pela conferência)</p>
+                {signatureDataUrl ? (
+                    <img src={signatureDataUrl} alt="Assinatura" style={{ width: '250px', height: 'auto', margin: '10px auto', borderBottom: '1px solid black' }} />
+                ) : (
+                    <p className="border-b border-black w-64 mx-auto pb-1">_________________________________________</p>
+                )}
+                <p className="mt-2 font-semibold">{signatoryName || '(Nome do Responsável)'}</p>
+                {signatoryDocument && <p className="text-sm">{signatoryDocument}</p>}
+                <p className="mt-2 text-xs">(Pessoa responsável pela conferência)</p>
             </div>
         </div>
     );

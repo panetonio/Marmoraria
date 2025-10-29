@@ -9,6 +9,7 @@ import Badge from './ui/Badge';
 import StatusBadge from './ui/StatusBadge';
 import InteractiveChecklist from './InteractiveChecklist';
 import SmartResourceSelector from './SmartResourceSelector';
+import { api } from '../utils/api';
 
 interface PostDeliverySchedulingModalProps {
   isOpen: boolean;
@@ -58,6 +59,7 @@ const PostDeliverySchedulingModal: React.FC<PostDeliverySchedulingModalProps> = 
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
 
   // Reset form when modal opens
   useEffect(() => {
@@ -93,9 +95,101 @@ const PostDeliverySchedulingModal: React.FC<PostDeliverySchedulingModalProps> = 
     );
   }, [vehicles]);
 
-  const handleDeliveryConfirmation = (newDeliveryData: typeof deliveryData) => {
+  const handleDeliveryConfirmation = async (newDeliveryData: typeof deliveryData) => {
     setDeliveryData(newDeliveryData);
     setCurrentStep('scheduling');
+  };
+
+  const handleChecklistComplete = async (data: {
+    items: Array<{ id: string; text: string; checked: boolean }>;
+    photos: Array<{ id: string; dataUrl: string; description?: string }>;
+    signature: string | null;
+  }) => {
+    setIsSubmitting(true);
+    setUploadProgress('Iniciando confirmação de entrega...');
+
+    try {
+      console.log('📋 Iniciando confirmação de entrega...');
+
+      // Upload da assinatura se existir
+      let signatureUrl: string | undefined;
+      if (data.signature) {
+        setUploadProgress('Fazendo upload da assinatura...');
+        console.log('✍️ Fazendo upload da assinatura...');
+        const signatureResult = await api.uploadImage(data.signature);
+        if (!signatureResult.success) {
+          throw new Error(`Erro ao fazer upload da assinatura: ${signatureResult.message}`);
+        }
+        signatureUrl = signatureResult.url;
+        console.log('✅ Assinatura enviada:', signatureUrl);
+      }
+
+      // Upload das fotos
+      const photoUrls: Array<{ url: string; description?: string }> = [];
+      for (let i = 0; i < data.photos.length; i++) {
+        const photo = data.photos[i];
+        setUploadProgress(`Fazendo upload da foto ${i + 1} de ${data.photos.length}...`);
+        console.log(`📸 Fazendo upload da foto ${photo.id}...`);
+        const photoResult = await api.uploadImage(photo.dataUrl);
+        if (!photoResult.success) {
+          throw new Error(`Erro ao fazer upload da foto ${photo.id}: ${photoResult.message}`);
+        }
+        photoUrls.push({
+          url: photoResult.url,
+          description: photo.description
+        });
+        console.log('✅ Foto enviada:', photoResult.url);
+      }
+
+      // Preparar dados para a API de confirmação
+      setUploadProgress('Enviando dados de confirmação...');
+      const confirmationData = {
+        checklistItems: data.items.map(item => ({
+          id: item.id,
+          text: item.text,
+          checked: item.checked
+        })),
+        photoUrls: photoUrls,
+        signatureUrl: signatureUrl,
+        signatoryName: '', // Será preenchido pelo usuário se necessário
+        signatoryDocument: '' // Será preenchido pelo usuário se necessário
+      };
+
+      console.log('📤 Enviando dados de confirmação para o backend...');
+      
+      // Chamar a API de confirmação de entrega
+      const result = await api.confirmDeliveryData(serviceOrder.id, confirmationData);
+      
+      if (!result.success) {
+        throw new Error(`Erro ao confirmar entrega: ${result.message}`);
+      }
+
+      console.log('✅ Entrega confirmada com sucesso:', result.data);
+
+      // Atualizar o estado local com as URLs das imagens
+      const updatedDeliveryData = {
+        checklistCompleted: true,
+        photos: photoUrls,
+        customerSignature: {
+          url: signatureUrl || '',
+          timestamp: new Date().toISOString()
+        }
+      };
+
+      setDeliveryData(updatedDeliveryData);
+      setCurrentStep('scheduling');
+      setUploadProgress('');
+
+      // Notificar o componente pai sobre a confirmação
+      onDeliveryConfirmed(serviceOrder.id, updatedDeliveryData);
+
+    } catch (error) {
+      console.error('❌ Erro na confirmação de entrega:', error);
+      setUploadProgress('');
+      alert(`Erro ao confirmar entrega: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleScheduleInstallation = async () => {
@@ -220,15 +314,25 @@ const PostDeliverySchedulingModal: React.FC<PostDeliverySchedulingModalProps> = 
               </p>
             </CardHeader>
             <CardContent>
+              {isSubmitting && uploadProgress && (
+                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                        Processando confirmação...
+                      </p>
+                      <p className="text-xs text-blue-600 dark:text-blue-300">
+                        {uploadProgress}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <InteractiveChecklist
                 template={checklistTemplate}
-                onComplete={(checklistData) => {
-                  handleDeliveryConfirmation({
-                    checklistCompleted: true,
-                    photos: checklistData.photos,
-                    customerSignature: checklistData.signature
-                  });
-                }}
+                onChecklistComplete={handleChecklistComplete}
                 onSkip={() => {
                   handleDeliveryConfirmation({
                     checklistCompleted: false,

@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
 
@@ -45,6 +46,9 @@ app.use('/api', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Servir arquivos estáticos (uploads)
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
 // Rotas
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
@@ -61,6 +65,7 @@ app.use('/api/stock', require('./routes/stock'));
 app.use('/api/assets', require('./routes/assets'));
 app.use('/api/cut-pieces', require('./routes/cutPieces'));
 app.use('/api/checklist-templates', require('./routes/checklistTemplates'));
+app.use('/api/uploads', require('./routes/uploads'));
 app.use('/api/reports', require('./routes/reports'));
 
 // Rota de teste
@@ -76,6 +81,7 @@ app.get('/', (req, res) => {
       suppliers: '/api/suppliers',
       quotes: '/api/quotes',
       orders: '/api/orders',
+      uploads: '/api/uploads',
     },
   });
 });

@@ -106,7 +106,11 @@ interface DataContextType {
     updateServiceOrderStatus: (serviceOrderId: string, status: ProductionStatus, allocatedSlabId?: string) => Promise<{ success: boolean; message?: string }>;
     completeProductionStep: (serviceOrderId: string, requiresInstallation: boolean) => void;
     setFinalizationType: (orderId: string, type: FinalizationType) => void;
-    confirmDelivery: (orderId: string) => void;
+    confirmDelivery: (orderId: string, deliveryData: {
+        checklistCompleted: boolean;
+        photos: Array<{ url: string; description?: string }>;
+        customerSignature: { url: string; timestamp: string };
+    }) => Promise<{ success: boolean; message?: string }>;
     confirmInstallation: (orderId: string) => void;
     
     // Equipment management functions
@@ -819,14 +823,42 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }));
     };
 
-    const confirmDelivery = (orderId: string) => {
-        // Only update delivery confirmation - logistics status is managed by hooks
-        setServiceOrders(prev => prev.map(so => {
-            if (so.id === orderId) {
-                return { ...so, delivery_confirmed: true };
+    const confirmDelivery = async (orderId: string, deliveryData: {
+        checklistCompleted: boolean;
+        photos: Array<{ url: string; description?: string }>;
+        customerSignature: { url: string; timestamp: string };
+    }) => {
+        try {
+            console.log('📋 Confirmando entrega via API para OS:', orderId);
+            
+            // Preparar dados para a API de confirmação
+            const confirmationData = {
+                checklistItems: [], // Será preenchido pelo modal se necessário
+                photoUrls: deliveryData.photos,
+                signatureUrl: deliveryData.customerSignature.url,
+                signatoryName: '', // Será preenchido pelo usuário se necessário
+                signatoryDocument: '' // Será preenchido pelo usuário se necessário
+            };
+
+            // Chamar a API de confirmação de entrega
+            const result = await api.confirmDeliveryData(orderId, confirmationData);
+            
+            if (result.success && result.data) {
+                console.log('✅ Entrega confirmada com sucesso:', result.data);
+                
+                // Atualizar o estado local com a ServiceOrder retornada pela API
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === orderId ? result.data : so
+                ));
+                
+                return { success: true, message: result.message };
             }
-            return so;
-        }));
+            
+            return { success: false, message: result.message || 'Erro ao confirmar entrega' };
+        } catch (error) {
+            console.error('❌ Erro ao confirmar entrega:', error);
+            return { success: false, message: 'Erro inesperado ao confirmar entrega' };
+        }
     };
     
     const confirmInstallation = (orderId: string) => {
