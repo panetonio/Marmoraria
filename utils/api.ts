@@ -631,4 +631,120 @@ export const api = {
     });
     return response.json();
   },
+
+  // Service Order Exception Management
+  async markOrderForRework(id: string, reason?: string) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/mark-rework`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+    return response.json();
+  },
+
+  async reportDeliveryIssue(id: string, details: string) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/report-delivery-issue`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ reason: details }),
+    });
+    return response.json();
+  },
+
+  async requestInstallationReview(id: string, reason?: string) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/request-review`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+    return response.json();
+  },
+
+  async resolveOrderIssue(id: string, resolutionDetails?: string, nextStatus?: string) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/resolve-issue`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ resolutionDetails, nextStatus }),
+    });
+    return response.json();
+  },
+
+  async resolveRework(id: string, resolutionDetails?: string, nextStatus?: string) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/resolve-rework`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ resolutionDetails, nextStatus }),
+    });
+    return response.json();
+  },
+
+  async resolveDeliveryIssue(id: string, resolutionDetails?: string, nextStatus?: string) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/resolve-delivery-issue`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ resolutionDetails, nextStatus }),
+    });
+    return response.json();
+  },
+
+  async completeReview(id: string, resolutionDetails?: string, nextStatus?: string) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/complete-review`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ resolutionDetails, nextStatus }),
+    });
+    return response.json();
+  },
+
+  // Service Order Management
+  async createServiceOrder(serviceOrderData: any) {
+    const response = await fetch(`${API_URL}/serviceorders`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(serviceOrderData),
+    });
+    return response.json();
+  },
+
+  async updateServiceOrderStatus(id: string, status: string, allocatedSlabId?: string) {
+    const response = await fetch(`${API_URL}/serviceorders/${id}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status, allocatedSlabId }),
+    });
+    return response.json();
+  },
+
+  // CutPiece Management
+  async getCutPiecesForOS(serviceOrderId: string) {
+    const response = await fetch(`${API_URL}/cut-pieces/by-os/${encodeURIComponent(serviceOrderId)}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async getCutPieceByPieceId(pieceId: string) {
+    const response = await fetch(`${API_URL}/cut-pieces/by-id/${encodeURIComponent(pieceId)}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async updateCutPieceStatus(pieceId: string, status: string, reason?: string) {
+    const response = await fetch(`${API_URL}/cut-pieces/${encodeURIComponent(pieceId)}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ status, reason }),
+    });
+    return response.json();
+  },
+
+  async updateCutPieceLocation(pieceId: string, location: string) {
+    const response = await fetch(`${API_URL}/cut-pieces/${encodeURIComponent(pieceId)}/location`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ location }),
+    });
+    return response.json();
+  },
 };

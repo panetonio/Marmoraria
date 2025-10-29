@@ -391,6 +391,62 @@ export const mockServiceOrders: ServiceOrder[] = [
             { id: 'chk-006', text: 'Separar kit de instalação', checked: false },
             { id: 'chk-007', text: 'Revisar medidas no pedido', checked: false },
         ],
+    },
+    // OSs adicionais para testes de exceção
+    {
+        id: 'OS-2024-004',
+        orderId: 'PED-2024-003',
+        clientName: 'Ana Santos',
+        deliveryAddress: { address: 'Rua das Palmeiras', number: '456', complement: '', neighborhood: 'Centro', city: 'São Paulo', uf: 'SP', cep: '01000-000' },
+        items: [
+            { id: 'item-7', type: 'material', description: 'Pia de Cozinha - Granito Branco', quantity: 1.2, unitPrice: 800, totalPrice: 960, width: 1.2, height: 0.6, materialId: 'mat-001', perimeter: 3.6 }
+        ],
+        total: 960,
+        deliveryDate: '2024-08-25T17:00:00Z',
+        assignedToIds: ['prof-1'],
+        status: 'finishing',
+        requiresInstallation: true,
+        observations: 'Teste para marcar como rework_needed',
+        allocatedSlabId: 'SLAB-GPA-01',
+    },
+    {
+        id: 'OS-2024-005',
+        orderId: 'PED-2024-004',
+        clientName: 'Pedro Costa',
+        deliveryAddress: { address: 'Avenida Paulista', number: '1000', complement: 'Sala 501', neighborhood: 'Bela Vista', city: 'São Paulo', uf: 'SP', cep: '01310-100' },
+        items: [
+            { id: 'item-8', type: 'material', description: 'Bancada Escritório - Quartzo Cinza', quantity: 2.0, unitPrice: 700, totalPrice: 1400, width: 2.0, height: 0.8, materialId: 'mat-002', perimeter: 5.6 }
+        ],
+        total: 1400,
+        deliveryDate: '2024-08-28T17:00:00Z',
+        assignedToIds: ['prof-2'],
+        status: 'in_transit',
+        requiresInstallation: false,
+        observations: 'Teste para marcar como delivery_issue',
+        deliveryStart: '2024-08-28T10:00:00Z',
+        deliveryEnd: '2024-08-28T16:00:00Z',
+        vehicleId: 'veh-1',
+        deliveryTeamIds: ['emp-6'],
+    },
+    {
+        id: 'OS-2024-006',
+        orderId: 'PED-2024-005',
+        clientName: 'Lucia Ferreira',
+        deliveryAddress: { address: 'Rua Augusta', number: '200', complement: 'Apto 15', neighborhood: 'Consolação', city: 'São Paulo', uf: 'SP', cep: '01305-000' },
+        items: [
+            { id: 'item-9', type: 'material', description: 'Mesa de Jantar - Mármore Travertino', quantity: 3.0, unitPrice: 900, totalPrice: 2700, width: 2.0, height: 1.0, materialId: 'mat-003', perimeter: 6.0 }
+        ],
+        total: 2700,
+        deliveryDate: '2024-08-30T17:00:00Z',
+        assignedToIds: ['prof-3'],
+        status: 'awaiting_installation',
+        requiresInstallation: true,
+        observations: 'Teste para marcar como installation_pending_review',
+        deliveryStart: '2024-08-30T09:00:00Z',
+        deliveryEnd: '2024-08-30T15:00:00Z',
+        vehicleId: 'veh-3',
+        deliveryTeamIds: ['emp-7'],
+        delivery_confirmed: true,
     }
 ];
 

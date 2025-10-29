@@ -2,6 +2,7 @@ const ActivityLog = require('../models/ActivityLog');
 const Equipment = require('../models/Equipment');
 const Product = require('../models/Product');
 const StockItem = require('../models/StockItem');
+const CutPiece = require('../models/CutPiece');
 
 const buildUserSnapshot = (user) => {
   if (!user) {
@@ -49,6 +50,15 @@ const assetTypeConfigs = {
     allowedStatuses: null,
     logLabel: 'produto',
   },
+  cut_piece: {
+    aliases: ['cut_piece', 'cutpiece', 'peca_cortada', 'peca'],
+    model: CutPiece,
+    statusField: 'status',
+    locationField: 'location',
+    allowedStatuses: ['pending_cut', 'cut', 'finishing', 'assembly', 'ready_for_delivery', 'delivered', 'installed'],
+    logLabel: 'peça cortada',
+    idField: 'pieceId',
+  },
 };
 
 const normalizeAssetType = (type) => {
@@ -70,6 +80,17 @@ const normalizeAssetType = (type) => {
 const getAssetConfig = (type) => {
   const normalized = normalizeAssetType(type);
   return normalized ? { ...normalized.config, normalizedType: normalized.normalized } : null;
+};
+
+// Função auxiliar para buscar asset usando o campo correto
+const findAssetById = async (config, id) => {
+  if (config.idField && config.idField !== '_id') {
+    // Para CutPiece, usar pieceId em vez de _id
+    return await config.model.findOne({ [config.idField]: id });
+  } else {
+    // Para outros assets, usar _id padrão
+    return await config.model.findById(id);
+  }
 };
 
 const parseAssetUri = (rawValue) => {
@@ -149,7 +170,7 @@ exports.scanByQrData = async (req, res) => {
       });
     }
 
-    const asset = await config.model.findById(parsed.id);
+    const asset = await findAssetById(config, parsed.id);
 
     if (!asset) {
       return res.status(404).json({
@@ -207,7 +228,7 @@ exports.updateAssetStatus = async (req, res) => {
       });
     }
 
-    const asset = await config.model.findById(id);
+    const asset = await findAssetById(config, id);
 
     if (!asset) {
       return res.status(404).json({
@@ -282,7 +303,7 @@ exports.updateAssetLocation = async (req, res) => {
       });
     }
 
-    const asset = await config.model.findById(id);
+    const asset = await findAssetById(config, id);
 
     if (!asset) {
       return res.status(404).json({

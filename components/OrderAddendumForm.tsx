@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Order, QuoteItem, OrderAddendum, Address, QuoteItemType, Service, Product, Material } from '../types';
+import type { Order, QuoteItem, OrderAddendum, Address, QuoteItemType, Service, Product, Material, ItemCategory } from '../types';
 import Card, { CardContent, CardHeader, CardFooter } from './ui/Card';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -23,11 +23,13 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
     const [changedItems, setChangedItems] = useState<Array<{ originalItemId: string, updatedItem: QuoteItem }>>([]);
     const [editingOriginalItemId, setEditingOriginalItemId] = useState<string | null>(null);
     const [currentEditingItemData, setCurrentEditingItemData] = useState<Partial<QuoteItem> | null>(null);
+    const [editingItemCategory, setEditingItemCategory] = useState<string>('');
     const [errors, setErrors] = useState<Record<string, string>>({});
     
     // Estados para formulário de adição de novos itens
     const [newItemFormData, setNewItemFormData] = useState<Partial<QuoteItem>>({});
     const [newItemType, setNewItemType] = useState<QuoteItemType>('material');
+    const [newItemCategory, setNewItemCategory] = useState<string>('');
     const [newItemErrors, setNewItemErrors] = useState<Record<string, string>>({});
     
     // Acessar dados do contexto
@@ -45,6 +47,7 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
     const handleNewItemTypeChange = (type: QuoteItemType) => {
         setNewItemType(type);
         setNewItemFormData({});
+        setNewItemCategory('');
         setNewItemErrors({});
     };
 
@@ -61,7 +64,8 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
             ...newItemFormData,
             id: `newItem-${Date.now()}`,
             type: newItemType,
-            totalPrice: (newItemFormData.quantity || 0) * (newItemFormData.unitPrice || 0) - (newItemFormData.discount || 0)
+            totalPrice: (newItemFormData.quantity || 0) * (newItemFormData.unitPrice || 0) - (newItemFormData.discount || 0),
+            ...(newItemType === 'material' && newItemCategory && { category: newItemCategory }),
         } as QuoteItem;
 
         // Adicionar ao estado
@@ -69,6 +73,7 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
 
         // Limpar formulário
         setNewItemFormData({});
+        setNewItemCategory('');
         setNewItemErrors({});
     };
 
@@ -106,6 +111,20 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
                                 onChange={e => handleNewItemFormChange('description', e.target.value)}
                                 error={newItemErrors.description}
                             />
+                        </div>
+                        <div className="mt-2">
+                            <Select
+                                label="Categoria da Peça (Opcional)"
+                                value={newItemCategory}
+                                onChange={e => setNewItemCategory(e.target.value)}
+                            >
+                                <option value="">-- Selecione uma categoria --</option>
+                                <option value="pia">Pia</option>
+                                <option value="bancada">Bancada</option>
+                                <option value="soleira">Soleira</option>
+                                <option value="revestimento">Revestimento</option>
+                                <option value="outro">Outro</option>
+                            </Select>
                         </div>
                         <div className="grid grid-cols-2 gap-2 mt-2">
                             <Input
@@ -223,12 +242,14 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
         if (originalItem) {
             setEditingOriginalItemId(itemId);
             setCurrentEditingItemData({ ...originalItem });
+            setEditingItemCategory(originalItem.category || '');
         }
     };
 
     const handleCancelEdit = () => {
         setEditingOriginalItemId(null);
         setCurrentEditingItemData(null);
+        setEditingItemCategory('');
         // Limpar erros relacionados à edição
         setErrors(prev => {
             const { description, quantity, unitPrice, ...rest } = prev;
@@ -265,7 +286,8 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
         const totalPrice = (currentEditingItemData.quantity || 0) * (currentEditingItemData.unitPrice || 0);
         const updatedItem: QuoteItem = {
             ...currentEditingItemData,
-            totalPrice
+            totalPrice,
+            ...(currentEditingItemData.type === 'material' && editingItemCategory && { category: editingItemCategory }),
         } as QuoteItem;
 
         // Atualizar changedItems
@@ -285,6 +307,7 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
         // Limpar estados e erros
         setEditingOriginalItemId(null);
         setCurrentEditingItemData(null);
+        setEditingItemCategory('');
         setErrors(prev => {
             const { description, quantity, unitPrice, ...rest } = prev;
             return rest;
@@ -559,6 +582,24 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
                                         className="bg-gray-100 dark:bg-gray-800"
                                     />
                                 </div>
+                                {currentEditingItemData.type === 'material' && (
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-medium text-text-primary dark:text-slate-100">
+                                            Categoria da Peça (Opcional)
+                                        </label>
+                                        <Select
+                                            value={editingItemCategory}
+                                            onChange={e => setEditingItemCategory(e.target.value)}
+                                        >
+                                            <option value="">-- Selecione uma categoria --</option>
+                                            <option value="pia">Pia</option>
+                                            <option value="bancada">Bancada</option>
+                                            <option value="soleira">Soleira</option>
+                                            <option value="revestimento">Revestimento</option>
+                                            <option value="outro">Outro</option>
+                                        </Select>
+                                    </div>
+                                )}
                             </div>
                             <div className="mt-4 flex justify-end space-x-3">
                                 <Button variant="ghost" onClick={handleCancelEdit}>

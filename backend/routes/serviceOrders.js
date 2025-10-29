@@ -19,10 +19,16 @@ const validateRequest = (req, res, next) => {
 };
 
 router.use(authenticate);
-router.use(authorize('logistics'));
+
+// Criar ServiceOrder
+router.post('/', authorize('production', 'admin'), serviceOrderController.createServiceOrder);
+
+// Atualizar status da ServiceOrder
+router.patch('/:id/status', authorize('production', 'admin'), serviceOrderController.updateServiceOrderStatus);
 
 router.put(
   '/:id/checklist',
+  authorize('logistics'),
   [
     body('checklist')
       .isArray()
@@ -41,5 +47,16 @@ router.put(
   validateRequest,
   serviceOrderController.updateDepartureChecklist,
 );
+
+// Marcar Exceções
+router.patch('/:id/mark-rework', authorize('production'), serviceOrderController.markForRework);
+router.patch('/:id/report-delivery-issue', authorize('logistics'), serviceOrderController.reportDeliveryIssue);
+router.patch('/:id/request-review', authorize('logistics', 'production'), serviceOrderController.requestInstallationReview);
+
+// Resolver Exceções
+router.patch('/:id/resolve-issue', authorize('production', 'logistics'), serviceOrderController.resolveServiceOrderIssue);
+router.patch('/:id/resolve-rework', authorize('production'), serviceOrderController.resolveRework);
+router.patch('/:id/resolve-delivery-issue', authorize('logistics'), serviceOrderController.resolveDeliveryIssue);
+router.patch('/:id/complete-review', authorize('production'), serviceOrderController.completeReview);
 
 module.exports = router;

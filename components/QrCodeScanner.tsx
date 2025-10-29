@@ -10,7 +10,7 @@ import Input from './ui/Input';
 import Button from './ui/Button';
 import Select from './ui/Select';
 import StatusBadge from './ui/StatusBadge';
-import { equipmentStatusMap, stockStatusMap } from '../config/statusMaps';
+import { equipmentStatusMap, stockStatusMap, cutPieceStatusMap } from '../config/statusMaps';
 import type {
   ActivityType,
   Equipment,
@@ -18,17 +18,20 @@ import type {
   Product,
   StockItem,
   StockItemStatus,
+  CutPiece,
+  CutPieceStatus,
 } from '../types';
 import { useData } from '../context/DataContext';
 import { api } from '../utils/api';
 import { useActivityLogger } from '../hooks/useActivityLogger';
 
-type AssetType = 'stock_item' | 'equipment' | 'product';
+type AssetType = 'stock_item' | 'equipment' | 'product' | 'cut_piece';
 
 type AssetPayload =
   | { type: 'stock_item'; data: StockItem }
   | { type: 'equipment'; data: Equipment }
-  | { type: 'product'; data: Product };
+  | { type: 'product'; data: Product }
+  | { type: 'cut_piece'; data: CutPiece };
 
 interface QrCodeScannerProps {
   className?: string;
@@ -37,6 +40,7 @@ interface QrCodeScannerProps {
 type RawStockItem = Partial<StockItem> & { id?: string; _id?: string; [key: string]: unknown };
 type RawEquipment = Partial<Equipment> & { id?: string; _id?: string; [key: string]: unknown };
 type RawProduct = Partial<Product> & { id?: string; _id?: string; [key: string]: unknown };
+type RawCutPiece = Partial<CutPiece> & { id?: string; _id?: string; [key: string]: unknown };
 
 declare global {
   interface Window {
@@ -52,6 +56,7 @@ const assetTypeLabels: Record<AssetType, string> = {
   stock_item: 'Item de estoque',
   equipment: 'Equipamento',
   product: 'Produto',
+  cut_piece: 'Peça Cortada',
 };
 
 const stockStatusOptions: { value: StockItemStatus; label: string }[] = [
@@ -68,6 +73,19 @@ const equipmentStatusOptions: { value: EquipmentStatus; label: string }[] = [
   { value: 'operacional', label: equipmentStatusMap.operacional.label },
   { value: 'em_manutencao', label: equipmentStatusMap.em_manutencao.label },
   { value: 'desativado', label: equipmentStatusMap.desativado.label },
+];
+
+const cutPieceStatusOptions: { value: CutPieceStatus; label: string }[] = [
+  { value: 'pending_cut', label: cutPieceStatusMap.pending_cut.label },
+  { value: 'cut', label: cutPieceStatusMap.cut.label },
+  { value: 'finishing', label: cutPieceStatusMap.finishing.label },
+  { value: 'assembly', label: cutPieceStatusMap.assembly.label },
+  { value: 'quality_check', label: cutPieceStatusMap.quality_check.label },
+  { value: 'ready_for_delivery', label: cutPieceStatusMap.ready_for_delivery.label },
+  { value: 'delivered', label: cutPieceStatusMap.delivered.label },
+  { value: 'installed', label: cutPieceStatusMap.installed.label },
+  { value: 'defective', label: cutPieceStatusMap.defective.label },
+  { value: 'rework', label: cutPieceStatusMap.rework.label },
 ];
 
 const normalizeStockItem = (data: RawStockItem): StockItem => {
@@ -135,6 +153,33 @@ const normalizeProduct = (data: RawProduct): Product => {
   };
 };
 
+const normalizeCutPiece = (data: RawCutPiece): CutPiece => {
+  const raw = data as Record<string, any>;
+  const fallbackStatus: CutPieceStatus = 'pending_cut';
+  const parsedStatus = (data.status ?? raw.currentStatus) as CutPieceStatus | undefined;
+  
+  const statusCandidate = parsedStatus && cutPieceStatusOptions.some(option => option.value === parsedStatus)
+    ? parsedStatus
+    : fallbackStatus;
+
+  return {
+    id: data.id ?? (raw._id as string) ?? '',
+    pieceId: data.pieceId ?? '',
+    serviceOrderId: data.serviceOrderId ?? '',
+    originalQuoteItemId: data.originalQuoteItemId ?? '',
+    originalStockItemId: data.originalStockItemId ?? '',
+    materialId: data.materialId ?? '',
+    description: data.description ?? '',
+    category: data.category,
+    dimensions: data.dimensions ?? '',
+    status: statusCandidate,
+    location: data.location ?? '',
+    qrCodeValue: data.qrCodeValue ?? '',
+    createdAt: data.createdAt ?? new Date().toISOString(),
+    updatedAt: data.updatedAt ?? new Date().toISOString(),
+  };
+};
+
 const normalizeAssetPayload = (payload: { type: string; data: unknown }): AssetPayload | null => {
   switch (payload.type) {
     case 'stock_item':
@@ -143,6 +188,8 @@ const normalizeAssetPayload = (payload: { type: string; data: unknown }): AssetP
       return { type: 'equipment', data: normalizeEquipment(payload.data as RawEquipment) };
     case 'product':
       return { type: 'product', data: normalizeProduct(payload.data as RawProduct) };
+    case 'cut_piece':
+      return { type: 'cut_piece', data: normalizeCutPiece(payload.data as RawCutPiece) };
     default:
       return null;
   }
@@ -154,6 +201,9 @@ const getAssetDisplayName = (payload: AssetPayload): string => {
   }
   if (payload.type === 'equipment') {
     return payload.data.name || `Equipamento ${payload.data.id}`;
+  }
+  if (payload.type === 'cut_piece') {
+    return `Peça ${payload.data.pieceId}`;
   }
   return payload.data.name || `Produto ${payload.data.id}`;
 };
@@ -465,8 +515,8 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
     void handleScanRequest(`marmoraria://asset/stock_item/${randomItem.id}`, 'manual');
   };
 
-  const supportsStatus = assetPayload?.type === 'stock_item' || assetPayload?.type === 'equipment';
-  const supportsLocation = assetPayload?.type === 'stock_item' || assetPayload?.type === 'equipment';
+  const supportsStatus = assetPayload?.type === 'stock_item' || assetPayload?.type === 'equipment' || assetPayload?.type === 'cut_piece';
+  const supportsLocation = assetPayload?.type === 'stock_item' || assetPayload?.type === 'equipment' || assetPayload?.type === 'cut_piece';
   const showUpdateControls = Boolean(assetPayload && (supportsStatus || supportsLocation));
 
   const statusOptions = useMemo(() => {
@@ -480,6 +530,10 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
 
     if (assetPayload.type === 'equipment') {
       return equipmentStatusOptions;
+    }
+
+    if (assetPayload.type === 'cut_piece') {
+      return cutPieceStatusOptions;
     }
 
     return [];
@@ -496,6 +550,10 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
 
     if (assetPayload.type === 'equipment') {
       return assetPayload.data.currentLocation ?? '';
+    }
+
+    if (assetPayload.type === 'cut_piece') {
+      return assetPayload.data.location ?? '';
     }
 
     return '';
@@ -601,6 +659,7 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
     { value: 'stock_item', label: 'Item de estoque' },
     { value: 'equipment', label: 'Equipamento' },
     { value: 'product', label: 'Produto' },
+    { value: 'cut_piece', label: 'Peça Cortada' },
   ]), []);
 
   return (

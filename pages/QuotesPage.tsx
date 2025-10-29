@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client, Page, SortDirection, PaymentMethod, Address } from '../types';
+import type { Quote, QuoteItem, QuoteItemType, QuoteStatus, User, Material, Client, Page, SortDirection, PaymentMethod, Address, ItemCategory } from '../types';
 import { mockUsers } from '../data/mockData';
 import DocumentPreview from '../components/QuotePreview';
 import CuttingOptimizer from '../components/CuttingOptimizer';
@@ -219,6 +219,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     const [itemType, setItemType] = useState<QuoteItemType>('material');
     
     const [itemFormData, setItemFormData] = useState<Partial<QuoteItem & { materialName?: string, area?: number, perimeter?: number }>>({});
+    const [itemCategory, setItemCategory] = useState<string>('');
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
     
     const [isCatalogOpen, setIsCatalogOpen] = useState(false);
@@ -350,6 +351,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 perimeter: itemFormData.perimeter,
                 materialId: itemFormData.materialId,
                 shapePoints: itemFormData.shapePoints,
+                ...(itemCategory && { category: itemCategory }),
             };
         } else if (itemType === 'service') {
             const service = services.find(s => s.id === itemFormData.id);
@@ -374,6 +376,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
             }
             
             setItemFormData({unitPrice: 0, quantity: 0});
+            setItemCategory('');
             setItemErrors({});
             setEditingItemId(null);
             if (errors.items) {
@@ -387,6 +390,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     const handleItemTypeChange = (type: QuoteItemType) => {
         setItemType(type);
         setItemFormData({unitPrice: 0, quantity: 0});
+        setItemCategory('');
         setItemErrors({});
     };
 
@@ -417,18 +421,21 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                 materialName: material?.name || descriptionParts[1],
                 area: item.width && item.height ? item.width * item.height : item.quantity,
             });
+            setItemCategory(item.category || '');
         } else if (item.type === 'service') {
             const service = services.find(s => s.name === item.description);
             setItemFormData({
                 ...item,
                 id: service?.id,
             });
+            setItemCategory('');
         } else if (item.type === 'product') {
             const product = products.find(p => p.name === item.description);
             setItemFormData({
                 ...item,
                 id: product?.id,
             });
+            setItemCategory('');
         }
         
         // Scroll para o formulário de item
@@ -441,6 +448,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
     const handleCancelEdit = () => {
         setEditingItemId(null);
         setItemFormData({unitPrice: 0, quantity: 0});
+        setItemCategory('');
         setItemErrors({});
     };
     
@@ -470,6 +478,20 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                             onChange={e => handleItemFormChange('description', e.target.value)}
                             error={itemErrors.description}
                         />
+                    </div>
+                    <div className="mt-2">
+                        <Select
+                            label="Categoria da Peça (Opcional)"
+                            value={itemCategory}
+                            onChange={e => setItemCategory(e.target.value)}
+                        >
+                            <option value="">-- Selecione uma categoria --</option>
+                            <option value="pia">Pia</option>
+                            <option value="bancada">Bancada</option>
+                            <option value="soleira">Soleira</option>
+                            <option value="revestimento">Revestimento</option>
+                            <option value="outro">Outro</option>
+                        </Select>
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-2">
                         <Input

@@ -53,6 +53,11 @@ const checklistItemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const serviceOrderSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    unique: true,
+    required: true,
+  },
   orderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',
@@ -78,6 +83,23 @@ const serviceOrderSchema = new mongoose.Schema({
   assignedToIds: [{
     type: String,
   }],
+  status: {
+    type: String,
+    enum: [
+      // Status normais de produção
+      'pending_production', 'cutting', 'finishing', 'quality_check', 'ready_for_logistics',
+      // Status normais de logística
+      'scheduled', 'in_transit', 'delivered', 'awaiting_installation', 'completed',
+      // Status de exceção
+      'rework_needed', 'delivery_issue', 'installation_pending_review',
+      // Status de exceção adicionais
+      'installation_issue', 'quality_issue', 'material_shortage', 'equipment_failure',
+      'customer_not_available', 'weather_delay', 'permit_issue', 'measurement_error', 'design_change',
+      // Status finais
+      'cancelled'
+    ],
+    default: 'pending_production',
+  },
   productionStatus: {
     type: String,
     enum: [
@@ -122,6 +144,16 @@ const serviceOrderSchema = new mongoose.Schema({
   },
   departureChecklist: [checklistItemSchema],
   observations: String,
+  history: [{
+    status: String,
+    reason: String,
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    timestamp: { type: Date, default: Date.now }
+  }],
+  cutPieceIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CutPiece'
+  }],
 }, {
   timestamps: true,
 });

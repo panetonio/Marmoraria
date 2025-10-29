@@ -13,6 +13,184 @@ import Input from '../components/ui/Input';
 import FinalizationTypeModal from '../components/FinalizationTypeModal';
 import QrCodeScanner from '../components/QrCodeScanner';
 
+// ============= MODAL: Mark Exception =============
+const MarkExceptionModal: FC<{
+  isOpen: boolean;
+  order: ServiceOrder;
+  exceptionType: 'rework' | 'delivery' | 'review';
+  onClose: () => void;
+  onMark: (orderId: string, reason?: string) => Promise<void>;
+}> = ({ isOpen, order, exceptionType, onClose, onMark }) => {
+  const [reason, setReason] = useState('');
+  
+  const exceptionConfig = {
+    rework: {
+      title: 'Marcar para Retrabalho',
+      description: 'Esta OS será marcada como necessitando retrabalho.',
+      placeholder: 'Motivo do retrabalho (opcional)',
+      buttonText: 'Marcar para Retrabalho'
+    },
+    delivery: {
+      title: 'Reportar Problema de Entrega',
+      description: 'Esta OS será marcada com problema de entrega.',
+      placeholder: 'Detalhes do problema (opcional)',
+      buttonText: 'Reportar Problema'
+    },
+    review: {
+      title: 'Solicitar Revisão de Instalação',
+      description: 'Esta OS será marcada para revisão de instalação.',
+      placeholder: 'Motivo da revisão (opcional)',
+      buttonText: 'Solicitar Revisão'
+    }
+  };
+
+  const config = exceptionConfig[exceptionType];
+
+  const handleSubmit = async () => {
+    await onMark(order.id, reason.trim() || undefined);
+    setReason('');
+    onClose();
+  };
+
+  const handleClose = () => {
+    setReason('');
+    onClose();
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} title={config.title} className="max-w-md">
+      <div className="space-y-4">
+        <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
+          <p className="text-sm text-text-secondary dark:text-slate-400">
+            <strong>OS:</strong> {order.id}
+          </p>
+          <p className="text-sm text-text-secondary dark:text-slate-400">
+            <strong>Cliente:</strong> {order.clientName}
+          </p>
+        </div>
+        
+        <p className="text-sm text-text-primary dark:text-slate-200">
+          {config.description}
+        </p>
+        
+        <div>
+          <label className="block text-sm font-medium text-text-primary dark:text-slate-200 mb-2">
+            {config.placeholder}
+          </label>
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={config.placeholder}
+            rows={3}
+          />
+        </div>
+        
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="secondary" onClick={handleClose}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit}>
+            {config.buttonText}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// ============= MODAL: Resolve Exception =============
+const ResolveExceptionModal: FC<{
+  isOpen: boolean;
+  order: ServiceOrder;
+  onClose: () => void;
+  onResolve: (orderId: string, resolutionDetails?: string, nextStatus?: string) => Promise<void>;
+}> = ({ isOpen, order, onClose, onResolve }) => {
+  const [resolutionDetails, setResolutionDetails] = useState('');
+  const [nextStatus, setNextStatus] = useState('');
+  
+  const statusOptions = [
+    { value: 'pending_production', label: 'Aguardando Produção' },
+    { value: 'cutting', label: 'Em Corte' },
+    { value: 'finishing', label: 'Em Acabamento' },
+    { value: 'quality_check', label: 'Controle de Qualidade' },
+    { value: 'ready_for_logistics', label: 'Pronto para Logística' },
+    { value: 'scheduled', label: 'Agendado' },
+    { value: 'in_transit', label: 'Em Trânsito' },
+    { value: 'delivered', label: 'Entregue' },
+    { value: 'awaiting_installation', label: 'Aguardando Instalação' },
+    { value: 'completed', label: 'Concluído' }
+  ];
+
+  const handleSubmit = async () => {
+    await onResolve(order.id, resolutionDetails.trim() || undefined, nextStatus || undefined);
+    setResolutionDetails('');
+    setNextStatus('');
+    onClose();
+  };
+
+  const handleClose = () => {
+    setResolutionDetails('');
+    setNextStatus('');
+    onClose();
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} title="Resolver Problema" className="max-w-md">
+      <div className="space-y-4">
+        <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
+          <p className="text-sm text-text-secondary dark:text-slate-400">
+            <strong>OS:</strong> {order.id}
+          </p>
+          <p className="text-sm text-text-secondary dark:text-slate-400">
+            <strong>Cliente:</strong> {order.clientName}
+          </p>
+          <p className="text-sm text-text-secondary dark:text-slate-400">
+            <strong>Status Atual:</strong> {order.status}
+          </p>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-text-primary dark:text-slate-200 mb-2">
+            Detalhes da Resolução (opcional)
+          </label>
+          <Textarea
+            value={resolutionDetails}
+            onChange={(e) => setResolutionDetails(e.target.value)}
+            placeholder="Descreva como o problema foi resolvido..."
+            rows={3}
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-text-primary dark:text-slate-200 mb-2">
+            Próximo Status (opcional)
+          </label>
+          <Select
+            value={nextStatus}
+            onChange={(e) => setNextStatus(e.target.value)}
+          >
+            <option value="">Usar status padrão</option>
+            {statusOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="secondary" onClick={handleClose}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSubmit}>
+            Resolver Problema
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 
 const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
   { id: 'cutting', title: 'Em Corte', color: 'bg-orange-800' },
@@ -36,9 +214,22 @@ const ServiceOrderDetailModal: FC<{
   onUpdateObservations: (orderId: string, observations: string) => void;
   onUpdateTeam: (orderId: string, assignedToIds: string[]) => void;
   allUsers: (ProductionProfessional | User)[];
-}> = ({ isOpen, order, onClose, onAttachClick, onRemoveAttachment, onUpdatePriority, onUpdateObservations, onUpdateTeam, allUsers }) => {
+  onMarkException: (orderId: string, reason?: string, type?: 'rework' | 'delivery' | 'review') => Promise<void>;
+  onResolveException: (orderId: string, resolutionDetails?: string, nextStatus?: string) => Promise<void>;
+}> = ({ isOpen, order, onClose, onAttachClick, onRemoveAttachment, onUpdatePriority, onUpdateObservations, onUpdateTeam, allUsers, onMarkException, onResolveException }) => {
   const [observations, setObservations] = useState(order.observations || '');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>(order.assignedToIds);
+  
+  // Estados para modais de exceção
+  const [markExceptionModal, setMarkExceptionModal] = useState<{ isOpen: boolean; type: 'rework' | 'delivery' | 'review' }>({ isOpen: false, type: 'rework' });
+  const [resolveExceptionModal, setResolveExceptionModal] = useState(false);
+  
+  // Detectar se é status de exceção
+  const isExceptionStatus = [
+    'rework_needed', 'delivery_issue', 'installation_pending_review', 'installation_issue',
+    'quality_issue', 'material_shortage', 'equipment_failure', 'customer_not_available',
+    'weather_delay', 'permit_issue', 'measurement_error', 'design_change'
+  ].includes(order.status);
 
   useEffect(() => {
     // Sync local state if the order prop changes (e.g., opening modal for a different order)
@@ -62,6 +253,19 @@ const ServiceOrderDetailModal: FC<{
     setSelectedUserIds(prev => 
       prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
     );
+  };
+
+  // Handlers para modais de exceção
+  const handleMarkException = async (orderId: string, reason?: string) => {
+    await onMarkException(orderId, reason, markExceptionModal.type);
+  };
+
+  const handleResolveException = async (orderId: string, resolutionDetails?: string, nextStatus?: string) => {
+    await onResolveException(orderId, resolutionDetails, nextStatus);
+  };
+
+  const openMarkExceptionModal = (type: 'rework' | 'delivery' | 'review') => {
+    setMarkExceptionModal({ isOpen: true, type });
   };
 
   const professionalRoles: Record<ProductionProfessional['role'], string> = {
@@ -274,8 +478,77 @@ const ServiceOrderDetailModal: FC<{
               </div>
             </CardContent>
           </Card>
+          
+          {/* Card de Ações de Exceção */}
+          <Card className="p-0">
+            <CardHeader>Gerenciamento de Exceções</CardHeader>
+            <CardContent>
+              {isExceptionStatus ? (
+                <div className="space-y-3">
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3">
+                    <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                      Status de Exceção Ativo
+                    </p>
+                    <StatusBadge status={order.status} statusMap={productionStatusMap} />
+                  </div>
+                  <Button 
+                    variant="accent" 
+                    className="w-full"
+                    onClick={() => setResolveExceptionModal(true)}
+                  >
+                    Resolver Problema
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-text-secondary dark:text-slate-400 mb-3">
+                    Marcar problema para esta OS:
+                  </p>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    className="w-full"
+                    onClick={() => openMarkExceptionModal('rework')}
+                  >
+                    Marcar para Retrabalho
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    className="w-full"
+                    onClick={() => openMarkExceptionModal('delivery')}
+                  >
+                    Reportar Problema de Entrega
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    className="w-full"
+                    onClick={() => openMarkExceptionModal('review')}
+                  >
+                    Solicitar Revisão
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
+      
+      {/* Modais de Exceção */}
+      <MarkExceptionModal
+        isOpen={markExceptionModal.isOpen}
+        order={order}
+        exceptionType={markExceptionModal.type}
+        onClose={() => setMarkExceptionModal({ ...markExceptionModal, isOpen: false })}
+        onMark={handleMarkException}
+      />
+      <ResolveExceptionModal
+        isOpen={resolveExceptionModal}
+        order={order}
+        onClose={() => setResolveExceptionModal(false)}
+        onResolve={handleResolveException}
+      />
     </Modal>
   );
 };
@@ -501,6 +774,18 @@ const KanbanCard: FC<{
 }> = ({ order, isDragging, onDragStart, onDragEnd, onAssign, onAllocate, onView, onFinalize }) => {
   const assignedProfessionals = mockProductionProfessionals.filter(p => order.assignedToIds.includes(p.id));
   const priority = order.priority || 'normal';
+  
+  // Detectar status de exceção
+  const isExceptionStatus = [
+    'rework_needed', 'delivery_issue', 'installation_pending_review', 'installation_issue',
+    'quality_issue', 'material_shortage', 'equipment_failure', 'customer_not_available',
+    'weather_delay', 'permit_issue', 'measurement_error', 'design_change'
+  ].includes(order.status);
+  
+  const isCriticalException = [
+    'rework_needed', 'delivery_issue', 'installation_issue', 'quality_issue',
+    'material_shortage', 'equipment_failure', 'permit_issue', 'measurement_error'
+  ].includes(order.status);
 
   return (
     <Card
@@ -508,11 +793,30 @@ const KanbanCard: FC<{
       onDragStart={(e) => onDragStart(e, order.id)}
       onDragEnd={onDragEnd}
       onClick={() => onView(order)}
-      className={`p-4 mt-4 shadow-sm border border-border dark:border-slate-700 cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-200 relative ${isDragging ? 'opacity-40 scale-95 bg-slate-200 dark:bg-slate-700' : ''}`}
+      className={`p-4 mt-4 shadow-sm border cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all duration-200 relative ${
+        isDragging ? 'opacity-40 scale-95 bg-slate-200 dark:bg-slate-700' : ''
+      } ${
+        isExceptionStatus 
+          ? isCriticalException 
+            ? 'border-red-500 dark:border-red-400 bg-red-50/50 dark:bg-red-900/20' 
+            : 'border-yellow-500 dark:border-yellow-400 bg-yellow-50/50 dark:bg-yellow-900/20'
+          : 'border-border dark:border-slate-700'
+      }`}
     >
       {priority !== 'normal' && (
         <div className={`absolute -top-2 -right-2 px-2 py-0.5 text-xs font-bold rounded-full shadow-lg ${priorityConfig[priority].className}`}>
             {priorityConfig[priority].label.toUpperCase()}
+        </div>
+      )}
+      
+      {/* Ícone de alerta para status de exceção */}
+      {isExceptionStatus && (
+        <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center shadow-lg ${
+          isCriticalException 
+            ? 'bg-red-500 text-white' 
+            : 'bg-yellow-500 text-white'
+        }`}>
+          <span className="text-xs font-bold">⚠</span>
         </div>
       )}
       <div className="flex justify-between items-start">
@@ -529,6 +833,13 @@ const KanbanCard: FC<{
         )}
       </div>
       <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{order.clientName}</p>
+      
+      {/* StatusBadge para status de exceção */}
+      {isExceptionStatus && (
+        <div className="mt-2">
+          <StatusBadge status={order.status} statusMap={productionStatusMap} />
+        </div>
+      )}
 
       {order.allocatedSlabId && (
         <div className="mt-2 pt-2 border-t border-border/50 dark:border-slate-700/50 text-xs">
@@ -550,6 +861,17 @@ const KanbanCard: FC<{
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Botão de resolver exceção se estiver em status de exceção */}
+            {isExceptionStatus && (
+              <Button 
+                variant="accent" 
+                size="sm" 
+                onClick={(e) => { e.stopPropagation(); onView(order); }}
+              >
+                Resolver
+              </Button>
+            )}
+            
             {order.productionStatus === 'finishing' && (
                  <Button variant="accent" size="sm" onClick={(e) => { e.stopPropagation(); onFinalize(order); }}>Finalizar Produção</Button>
             )}
@@ -570,7 +892,8 @@ const ProductionPage: FC = () => {
   const { 
       serviceOrders, setServiceOrders, allocateSlabToOrder, addAttachmentToServiceOrder, 
       removeAttachmentFromServiceOrder, updateServiceOrderPriority, 
-      updateServiceOrderObservations, setFinalizationType, users
+      updateServiceOrderObservations, setFinalizationType, users,
+      markOrderForRework, reportDeliveryIssue, requestInstallationReview, resolveOrderIssue
   } = useData();
   const [viewMode, setViewMode] = useState<'kanban' | 'timeline'>('kanban');
   const [modalOrder, setModalOrder] = useState<ServiceOrder | null>(null);
@@ -690,6 +1013,18 @@ const ProductionPage: FC = () => {
               setServiceOrders(prev => prev.map(o => o.id === orderId ? {...o, assignedToIds} : o));
             }}
             allUsers={productionTeam}
+            onMarkException={async (orderId, reason, type) => {
+              if (type === 'rework') {
+                await markOrderForRework(orderId, reason);
+              } else if (type === 'delivery') {
+                await reportDeliveryIssue(orderId, reason || '');
+              } else if (type === 'review') {
+                await requestInstallationReview(orderId, reason);
+              }
+            }}
+            onResolveException={async (orderId, resolutionDetails, nextStatus) => {
+              await resolveOrderIssue(orderId, resolutionDetails, nextStatus);
+            }}
         />
       )}
       {finalizingOrder && (

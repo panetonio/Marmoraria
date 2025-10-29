@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type {
     Client, Opportunity, AgendaEvent, Note, Supplier, Material, StockItem,
-    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType, Vehicle, DeliveryRoute, ChecklistTemplate, OrderAddendum
+    Service, Product, Quote, Order, ServiceOrder, Invoice, FinancialTransaction, Receipt, Address, Priority, ProductionStatus, FinalizationType, User, Equipment, MaintenanceLog, ProductionEmployee, ActivityLog, ActivityType, Vehicle, DeliveryRoute, ChecklistTemplate, OrderAddendum, CutPiece
 } from '../types';
 import {
     mockClients, mockOpportunities, mockAgendaEvents, mockNotes, mockSuppliers,
@@ -72,13 +72,15 @@ interface DataContextType {
     checklistTemplates: ChecklistTemplate[];
     orderAddendums: OrderAddendum[];
     setOrderAddendums: React.Dispatch<React.SetStateAction<OrderAddendum[]>>;
+    cutPieces: CutPiece[];
+    setCutPieces: React.Dispatch<React.SetStateAction<CutPiece[]>>;
 
     // Add specific data manipulation functions here
     addClient: (client: Client) => void;
     updateClient: (client: Client) => void;
     addNote: (clientId: string, content: string) => void;
     saveQuote: (quote: Quote) => void;
-    createServiceOrder: (newOsData: Omit<ServiceOrder, 'id'>) => void;
+    createServiceOrder: (newOsData: Omit<ServiceOrder, 'id'>) => Promise<{ success: boolean; message?: string }>;
     updateServiceOrderPriority: (serviceOrderId: string, priority: Priority) => void;
     updateServiceOrderObservations: (serviceOrderId: string, observations: string) => void;
     saveInvoice: (invoice: Invoice) => void;
@@ -101,7 +103,7 @@ interface DataContextType {
     scheduleDelivery: (serviceOrderId: string, schedule: DeliveryScheduleInput) => DeliveryScheduleResult;
     isVehicleAvailable: (vehicleId: string, start: string, end: string, excludeRouteId?: string) => boolean;
     updateDepartureChecklist: (serviceOrderId: string, checklist: { id: string; text: string; checked: boolean }[]) => Promise<{ success: boolean; message?: string }>;
-    updateServiceOrderStatus: (serviceOrderId: string, status: ProductionStatus) => void;
+    updateServiceOrderStatus: (serviceOrderId: string, status: ProductionStatus, allocatedSlabId?: string) => Promise<{ success: boolean; message?: string }>;
     completeProductionStep: (serviceOrderId: string, requiresInstallation: boolean) => void;
     setFinalizationType: (orderId: string, type: FinalizationType) => void;
     confirmDelivery: (orderId: string) => void;
@@ -141,6 +143,19 @@ interface DataContextType {
     
     // ServiceOrder refresh functions
     refreshServiceOrder: (serviceOrderId: string) => Promise<void>;
+    
+    // Service Order Exception Management functions
+    markOrderForRework: (id: string, reason?: string) => Promise<{ success: boolean; message?: string }>;
+    reportDeliveryIssue: (id: string, details: string) => Promise<{ success: boolean; message?: string }>;
+    requestInstallationReview: (id: string, reason?: string) => Promise<{ success: boolean; message?: string }>;
+    resolveOrderIssue: (id: string, resolutionDetails?: string, nextStatus?: string) => Promise<{ success: boolean; message?: string }>;
+    resolveRework: (id: string, resolutionDetails?: string, nextStatus?: string) => Promise<{ success: boolean; message?: string }>;
+    resolveDeliveryIssue: (id: string, resolutionDetails?: string, nextStatus?: string) => Promise<{ success: boolean; message?: string }>;
+    completeReview: (id: string, resolutionDetails?: string, nextStatus?: string) => Promise<{ success: boolean; message?: string }>;
+    
+    // CutPiece management functions
+    loadCutPiecesForOS: (serviceOrderId: string) => Promise<void>;
+    updateCutPieceStatus: (pieceId: string, status: string, reason?: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 // Create the context
@@ -174,6 +189,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(mockActivityLogs);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(mockChecklistTemplates);
     const [orderAddendums, setOrderAddendums] = useState<OrderAddendum[]>([]);
+    const [cutPieces, setCutPieces] = useState<CutPiece[]>([]);
 
     // Carregar dados do backend
     useEffect(() => {
@@ -455,21 +471,27 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
     
-    const createServiceOrder = (newOsData: Omit<ServiceOrder, 'id'>) => {
-        const newOsId = `OS-2024-${(serviceOrders.length + mockServiceOrders.length + 1).toString().padStart(3, '0')}`;
-        const newOs: ServiceOrder = { 
-            ...newOsData, 
-            id: newOsId, 
-            priority: 'normal',
-            deliveryAddress: orders.find(o => o.id === newOsData.orderId)?.deliveryAddress as Address
-        };
-        
-        setServiceOrders(prev => [...prev, newOs]);
-        setOrders(prev => prev.map(o => 
-            o.id === newOs.orderId 
-                ? { ...o, serviceOrderIds: [...o.serviceOrderIds, newOs.id] } 
-                : o
-        ));
+    const createServiceOrder = async (newOsData: Omit<ServiceOrder, 'id'>) => {
+        try {
+            const result = await api.createServiceOrder(newOsData);
+            if (result.success && result.data) {
+                // Adicionar a nova ServiceOrder ao estado local
+                setServiceOrders(prev => [...prev, result.data]);
+                
+                // Atualizar o pedido correspondente para incluir a nova ServiceOrder
+                setOrders(prev => prev.map(order => 
+                    order.id === newOsData.orderId 
+                        ? { ...order, serviceOrderIds: [...(order.serviceOrderIds || []), result.data.id] }
+                        : order
+                ));
+                
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao criar ServiceOrder' };
+        } catch (error) {
+            console.error('Erro ao criar ServiceOrder:', error);
+            return { success: false, message: 'Erro inesperado ao criar ServiceOrder' };
+        }
     };
 
     const updateServiceOrderPriority = (serviceOrderId: string, priority: Priority) => {
@@ -763,20 +785,22 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
     
-    const updateServiceOrderStatus = (serviceOrderId: string, status: ProductionStatus) => {
-        // Only allow production status updates - logistics statuses are managed by hooks
-        const allowedProductionStatuses: ProductionStatus[] = [
-            'pending_production', 'cutting', 'finishing', 'quality_check', 'awaiting_logistics'
-        ];
-        
-        if (!allowedProductionStatuses.includes(status)) {
-            console.warn(`Status '${status}' is not allowed for manual updates. Use DeliveryRoute operations for logistics statuses.`);
-            return;
+    const updateServiceOrderStatus = async (serviceOrderId: string, status: ProductionStatus, allocatedSlabId?: string) => {
+        try {
+            const result = await api.updateServiceOrderStatus(serviceOrderId, status, allocatedSlabId);
+            if (result.success && result.data) {
+                // Atualizar a ServiceOrder no estado local
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === serviceOrderId ? result.data : so
+                ));
+                
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao atualizar status da ServiceOrder' };
+        } catch (error) {
+            console.error('Erro ao atualizar status da ServiceOrder:', error);
+            return { success: false, message: 'Erro inesperado ao atualizar status da ServiceOrder' };
         }
-        
-        setServiceOrders(prev => prev.map(so =>
-            so.id === serviceOrderId ? { ...so, productionStatus: status } : so
-        ));
     };
 
     const completeProductionStep = (serviceOrderId: string, requiresInstallation: boolean) => {
@@ -1104,6 +1128,178 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
+    // Service Order Exception Management functions
+    const markOrderForRework = async (id: string, reason?: string) => {
+        try {
+            const result = await api.markOrderForRework(id, reason);
+            if (result.success && result.data) {
+                // Atualizar o estado local com a OS retornada pela API
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === id ? result.data : so
+                ));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao marcar OS para rework' };
+        } catch (error) {
+            console.error('Erro ao marcar OS para rework:', error);
+            return { success: false, message: 'Erro inesperado ao marcar OS para rework' };
+        }
+    };
+
+    const reportDeliveryIssue = async (id: string, details: string) => {
+        try {
+            const result = await api.reportDeliveryIssue(id, details);
+            if (result.success && result.data) {
+                // Atualizar o estado local com a OS retornada pela API
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === id ? result.data : so
+                ));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao reportar problema de entrega' };
+        } catch (error) {
+            console.error('Erro ao reportar problema de entrega:', error);
+            return { success: false, message: 'Erro inesperado ao reportar problema de entrega' };
+        }
+    };
+
+    const requestInstallationReview = async (id: string, reason?: string) => {
+        try {
+            const result = await api.requestInstallationReview(id, reason);
+            if (result.success && result.data) {
+                // Atualizar o estado local com a OS retornada pela API
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === id ? result.data : so
+                ));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao solicitar revisão de instalação' };
+        } catch (error) {
+            console.error('Erro ao solicitar revisão de instalação:', error);
+            return { success: false, message: 'Erro inesperado ao solicitar revisão de instalação' };
+        }
+    };
+
+    const resolveOrderIssue = async (id: string, resolutionDetails?: string, nextStatus?: string) => {
+        try {
+            const result = await api.resolveOrderIssue(id, resolutionDetails, nextStatus);
+            if (result.success && result.data) {
+                // Atualizar o estado local com a OS retornada pela API
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === id ? result.data : so
+                ));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao resolver issue da OS' };
+        } catch (error) {
+            console.error('Erro ao resolver issue da OS:', error);
+            return { success: false, message: 'Erro inesperado ao resolver issue da OS' };
+        }
+    };
+
+    const resolveRework = async (id: string, resolutionDetails?: string, nextStatus?: string) => {
+        try {
+            const result = await api.resolveRework(id, resolutionDetails, nextStatus);
+            if (result.success && result.data) {
+                // Atualizar o estado local com a OS retornada pela API
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === id ? result.data : so
+                ));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao resolver rework' };
+        } catch (error) {
+            console.error('Erro ao resolver rework:', error);
+            return { success: false, message: 'Erro inesperado ao resolver rework' };
+        }
+    };
+
+    const resolveDeliveryIssue = async (id: string, resolutionDetails?: string, nextStatus?: string) => {
+        try {
+            const result = await api.resolveDeliveryIssue(id, resolutionDetails, nextStatus);
+            if (result.success && result.data) {
+                // Atualizar o estado local com a OS retornada pela API
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === id ? result.data : so
+                ));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao resolver problema de entrega' };
+        } catch (error) {
+            console.error('Erro ao resolver problema de entrega:', error);
+            return { success: false, message: 'Erro inesperado ao resolver problema de entrega' };
+        }
+    };
+
+    const completeReview = async (id: string, resolutionDetails?: string, nextStatus?: string) => {
+        try {
+            const result = await api.completeReview(id, resolutionDetails, nextStatus);
+            if (result.success && result.data) {
+                // Atualizar o estado local com a OS retornada pela API
+                setServiceOrders(prev => prev.map(so => 
+                    so.id === id ? result.data : so
+                ));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao completar revisão' };
+        } catch (error) {
+            console.error('Erro ao completar revisão:', error);
+            return { success: false, message: 'Erro inesperado ao completar revisão' };
+        }
+    };
+
+    // CutPiece management functions
+    const loadCutPiecesForOS = async (serviceOrderId: string) => {
+        try {
+            const result = await api.getCutPiecesForOS(serviceOrderId);
+            if (result.success && result.data) {
+                // Mapear dados do backend para o formato do frontend
+                const mappedCutPieces: CutPiece[] = result.data.map((piece: any) => ({
+                    id: piece._id || piece.id,
+                    pieceId: piece.pieceId,
+                    serviceOrderId: piece.serviceOrderId,
+                    originalQuoteItemId: piece.originalQuoteItemId,
+                    originalStockItemId: piece.originalStockItemId,
+                    materialId: piece.materialId,
+                    description: piece.description,
+                    category: piece.category,
+                    dimensions: piece.dimensions,
+                    status: piece.status,
+                    location: piece.location,
+                    qrCodeValue: piece.qrCodeValue,
+                    createdAt: piece.createdAt,
+                    updatedAt: piece.updatedAt
+                }));
+                
+                // Atualizar o estado local com as peças cortadas da OS específica
+                setCutPieces(prev => {
+                    // Remover peças antigas da mesma OS e adicionar as novas
+                    const filtered = prev.filter(piece => piece.serviceOrderId !== serviceOrderId);
+                    return [...filtered, ...mappedCutPieces];
+                });
+            }
+        } catch (error) {
+            console.error('Erro ao carregar peças cortadas:', error);
+        }
+    };
+
+    const updateCutPieceStatus = async (pieceId: string, status: string, reason?: string) => {
+        try {
+            const result = await api.updateAssetStatus('cut_piece', pieceId, status, reason);
+            if (result.success && result.data) {
+                // Atualizar o estado local com a peça cortada atualizada
+                setCutPieces(prev => prev.map(piece => 
+                    piece.id === pieceId ? { ...piece, status, updatedAt: new Date().toISOString() } : piece
+                ));
+                return { success: true, message: result.message };
+            }
+            return { success: false, message: result.message || 'Erro ao atualizar status da peça cortada' };
+        } catch (error) {
+            console.error('Erro ao atualizar status da peça cortada:', error);
+            return { success: false, message: 'Erro inesperado ao atualizar status da peça cortada' };
+        }
+    };
+
     const value = {
         clients, setClients,
         opportunities, setOpportunities,
@@ -1128,6 +1324,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         deliveryRoutes, setDeliveryRoutes,
         checklistTemplates,
         orderAddendums, setOrderAddendums,
+        cutPieces, setCutPieces,
         productionEmployees, setProductionEmployees,
         activityLogs, setActivityLogs,
         
@@ -1196,6 +1393,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         // ServiceOrder refresh functions
         refreshServiceOrder,
+        
+        // Service Order Exception Management functions
+        markOrderForRework,
+        reportDeliveryIssue,
+        requestInstallationReview,
+        resolveOrderIssue,
+        resolveRework,
+        resolveDeliveryIssue,
+        completeReview,
+        
+        // CutPiece management functions
+        loadCutPiecesForOS,
+        updateCutPieceStatus,
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

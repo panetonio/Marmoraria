@@ -8,10 +8,12 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import Badge from '../components/ui/Badge';
+import StatusBadge from '../components/ui/StatusBadge';
 import Calendar from '../components/ui/Calendar';
 import InstallationTermModal from '../components/InstallationTermModal';
 import ReceiptTermModal from '../components/ReceiptTermModal';
 import QrCodeScanner from '../components/QrCodeScanner';
+import { productionStatusMap } from '../config/statusMaps';
 
 
 const KANBAN_COLUMNS: { id: LogisticsStatus; title: string; color: string }[] = [
@@ -433,6 +435,17 @@ const LogisticsKanbanCard: FC<{
     order, onSchedule, onStartRoute, onArrive, onConfirmDelivery, onConfirmInstallation,
     onGenerateReceiptTerm, onGenerateInstallTerm, vehicles, onOpenChecklist
 }) => {
+    // Detectar status de exceção
+    const isExceptionStatus = [
+        'rework_needed', 'delivery_issue', 'installation_pending_review', 'installation_issue',
+        'quality_issue', 'material_shortage', 'equipment_failure', 'customer_not_available',
+        'weather_delay', 'permit_issue', 'measurement_error', 'design_change'
+    ].includes(order.status);
+    
+    const isCriticalException = [
+        'rework_needed', 'delivery_issue', 'installation_issue', 'quality_issue',
+        'material_shortage', 'equipment_failure', 'permit_issue', 'measurement_error'
+    ].includes(order.status);
 
     const assignedVehicle = order.vehicleId ? vehicles.find(vehicle => vehicle.id === order.vehicleId) : undefined;
     const deliveryStart = order.deliveryStart || order.deliveryScheduledDate;
@@ -440,7 +453,24 @@ const LogisticsKanbanCard: FC<{
     const endDate = order.deliveryEnd ? new Date(order.deliveryEnd) : null;
 
     return (
-        <Card className="p-3 mt-3 shadow-sm border border-border dark:border-slate-700">
+        <Card className={`p-3 mt-3 shadow-sm border relative ${
+            isExceptionStatus 
+              ? isCriticalException 
+                ? 'border-red-500 dark:border-red-400 bg-red-50/50 dark:bg-red-900/20' 
+                : 'border-yellow-500 dark:border-yellow-400 bg-yellow-50/50 dark:bg-yellow-900/20'
+              : 'border-border dark:border-slate-700'
+        }`}>
+            {/* Ícone de alerta para status de exceção */}
+            {isExceptionStatus && (
+                <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center shadow-lg ${
+                    isCriticalException 
+                        ? 'bg-red-500 text-white' 
+                        : 'bg-yellow-500 text-white'
+                }`}>
+                    <span className="text-xs font-bold">⚠</span>
+                </div>
+            )}
+            
             <div className="flex justify-between items-start gap-2">
                 <p className="font-bold text-sm font-mono">{order.id}</p>
                 <div className="flex gap-2 items-center">
@@ -454,6 +484,13 @@ const LogisticsKanbanCard: FC<{
                 </div>
             </div>
             <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{order.clientName}</p>
+            
+            {/* StatusBadge para status de exceção */}
+            {isExceptionStatus && (
+                <div className="mt-2">
+                    <StatusBadge status={order.status} statusMap={productionStatusMap} />
+                </div>
+            )}
             {startDate && (
                 <div className="mt-2 text-sm text-text-secondary dark:text-slate-300">
                     <div className="font-semibold text-primary">

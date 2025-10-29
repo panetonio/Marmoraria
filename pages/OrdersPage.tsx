@@ -72,6 +72,19 @@ const ServiceOrderItem: FC<{
         console.log(`🏷️ Label clicked for item ${item.id}`);
         onToggle(item.id);
     };
+
+    // Função para formatar categoria
+    const formatCategory = (category?: string) => {
+        if (!category) return '';
+        const categoryMap: Record<string, string> = {
+            'pia': 'Pia',
+            'bancada': 'Bancada',
+            'soleira': 'Soleira',
+            'revestimento': 'Revestimento',
+            'outro': 'Outro'
+        };
+        return categoryMap[category] || category;
+    };
     
     return (
         <div className="flex items-center p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -87,7 +100,21 @@ const ServiceOrderItem: FC<{
                 className="ml-3 text-sm text-text-primary dark:text-slate-200 cursor-pointer flex-1"
                 onClick={handleLabelClick}
             >
-                {item.description} ({item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                <div className="flex items-center justify-between">
+                    <div>
+                        <span className="font-medium">{item.description}</span>
+                        {item.type === 'material' && item.category && (
+                            <span className="ml-2 px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                                {formatCategory(item.category)}
+                            </span>
+                        )}
+                    </div>
+                    <div className="text-right">
+                        <span className="font-semibold text-primary">
+                            {item.totalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                    </div>
+                </div>
             </label>
         </div>
     );
@@ -104,6 +131,7 @@ const CreateServiceOrderModal: FC<{
     const [deliveryDate, setDeliveryDate] = useState('');
     const [error, setError] = useState<string>('');
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState<string>('');
 
     // Resetar estado quando o modal abrir ou o pedido mudar
     useEffect(() => {
@@ -112,8 +140,20 @@ const CreateServiceOrderModal: FC<{
             setDeliveryDate('');
             setError('');
             setSelectedTemplateId('');
+            setCategoryFilter('');
         }
     }, [isOpen, order.id]);
+
+    // Resetar estado quando o modal for fechado
+    useEffect(() => {
+        if (!isOpen) {
+            setSelectedItemIds([]);
+            setDeliveryDate('');
+            setError('');
+            setSelectedTemplateId('');
+            setCategoryFilter('');
+        }
+    }, [isOpen]);
 
     const availableItems = useMemo(() => {
         console.log('🔍 Calculating availableItems for order:', order.id);
@@ -195,6 +235,36 @@ const CreateServiceOrderModal: FC<{
         return allAvailableItems;
     }, [order, serviceOrders, orderAddendums]);
 
+    const uniqueCategories = useMemo(() => {
+        const categories = new Set<string>();
+        availableItems.forEach(item => {
+            if (item.type === 'material' && item.category) {
+                categories.add(item.category);
+            }
+        });
+        return Array.from(categories).sort();
+    }, [availableItems]);
+
+    const filteredAvailableItems = useMemo(() => {
+        if (!categoryFilter) {
+            return availableItems;
+        }
+        
+        return availableItems.filter(item => {
+            // Incluir serviços e produtos sempre
+            if (item.type !== 'material') return true;
+            
+            // Para materiais, verificar categoria
+            if (categoryFilter === 'outro') {
+                // Se filtro é "outro", mostrar itens sem categoria ou com categoria "outro"
+                return !item.category || item.category === 'outro';
+            } else {
+                // Para outras categorias, mostrar apenas itens com categoria correspondente
+                return item.category === categoryFilter;
+            }
+        });
+    }, [availableItems, categoryFilter]);
+
     const selectedItems = useMemo(() => {
         return availableItems.filter(item => selectedItemIds.includes(item.id));
     }, [selectedItemIds, availableItems]);
@@ -202,6 +272,19 @@ const CreateServiceOrderModal: FC<{
     const selectedItemsTotal = useMemo(() => {
         return selectedItems.reduce((sum, item) => sum + item.totalPrice, 0);
     }, [selectedItems]);
+
+    // Contadores para exibição
+    const itemCounters = useMemo(() => {
+        const totalAvailable = availableItems.length;
+        const visibleItems = filteredAvailableItems.length;
+        const selectedCount = selectedItemIds.length;
+        
+        return {
+            selected: selectedCount,
+            visible: visibleItems,
+            total: totalAvailable
+        };
+    }, [availableItems.length, filteredAvailableItems.length, selectedItemIds.length]);
 
     const handleToggleItem = useCallback((itemId: string) => {
         console.log('🔄 handleToggleItem called with itemId:', itemId);
@@ -226,6 +309,20 @@ const CreateServiceOrderModal: FC<{
             return newSelection;
         });
     }, [selectedItemIds, availableItems]);
+
+    const handleSelectAllVisible = useCallback(() => {
+        const visibleItemIds = filteredAvailableItems.map(item => item.id);
+        setSelectedItemIds(prev => {
+            const newSelection = [...new Set([...prev, ...visibleItemIds])];
+            console.log('✅ Select all visible - New selection:', newSelection);
+            return newSelection;
+        });
+    }, [filteredAvailableItems]);
+
+    const handleClearSelection = useCallback(() => {
+        setSelectedItemIds([]);
+        console.log('✅ Clear selection');
+    }, []);
 
     const selectedTemplate = useMemo(() => {
         return checklistTemplates.find(template => template.id === selectedTemplateId) || null;
@@ -298,9 +395,64 @@ const CreateServiceOrderModal: FC<{
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`Gerar OS para ${order.id}`}>
             <div className="mb-4">
-                <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Itens do Pedido Disponíveis</label>
+                <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-text-secondary dark:text-slate-400">
+                        Itens do Pedido Disponíveis
+                    </label>
+                    <div className="text-xs text-text-secondary dark:text-slate-400">
+                        <span className="font-semibold text-primary">{itemCounters.selected}</span> selecionados / 
+                        <span className="font-semibold text-blue-600 dark:text-blue-400"> {itemCounters.visible}</span> visíveis / 
+                        <span className="font-semibold text-gray-600 dark:text-gray-400"> {itemCounters.total}</span> total
+                    </div>
+                </div>
+                
+                {/* Filtros e Controles */}
+                <div className="mb-3 space-y-3">
+                    {/* Filtro por Categoria */}
+                    {uniqueCategories.length > 0 && (
+                        <div>
+                            <Select
+                                label="Filtrar por Categoria"
+                                value={categoryFilter}
+                                onChange={e => setCategoryFilter(e.target.value)}
+                            >
+                                <option value="">Todas as Categorias</option>
+                                {uniqueCategories.map(category => (
+                                    <option key={category} value={category}>
+                                        {category === 'pia' ? 'Pia' : 
+                                         category === 'bancada' ? 'Bancada' : 
+                                         category === 'soleira' ? 'Soleira' : 
+                                         category === 'revestimento' ? 'Revestimento' : 
+                                         category === 'outro' ? 'Outro' : category}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
+                    )}
+                    
+                    {/* Botões de Controle */}
+                    <div className="flex space-x-2">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleSelectAllVisible}
+                            disabled={filteredAvailableItems.length === 0}
+                        >
+                            Selecionar Todos Visíveis
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={handleClearSelection}
+                            disabled={selectedItemIds.length === 0}
+                        >
+                            Limpar Seleção
+                        </Button>
+                    </div>
+                </div>
+                
                 <div className="max-h-60 overflow-y-auto border border-border dark:border-slate-700 rounded-lg p-2 space-y-2">
-                    {availableItems.length > 0 ? availableItems.map((item, index) => (
+                    {filteredAvailableItems.length > 0 ? filteredAvailableItems.map((item, index) => (
                         <ServiceOrderItem
                             key={`${item.id}-${index}`}
                             item={item}
@@ -308,7 +460,9 @@ const CreateServiceOrderModal: FC<{
                             isSelected={selectedItemIds.includes(item.id)}
                             onToggle={handleToggleItem}
                         />
-                    )) : <p className="text-sm text-text-secondary dark:text-slate-400 p-4 text-center">Todos os itens deste pedido já foram alocados em Ordens de Serviço.</p>}
+                    )) : <p className="text-sm text-text-secondary dark:text-slate-400 p-4 text-center">
+                        {categoryFilter ? 'Nenhum item encontrado para a categoria selecionada.' : 'Todos os itens deste pedido já foram alocados em Ordens de Serviço.'}
+                    </p>}
                 </div>
             </div>
              {selectedItems.length > 0 && (

@@ -59,6 +59,7 @@ app.use('/api/delivery-routes', require('./routes/deliveryRoutes'));
 app.use('/api/production-employees', require('./routes/productionEmployees'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/assets', require('./routes/assets'));
+app.use('/api/cut-pieces', require('./routes/cutPieces'));
 app.use('/api/checklist-templates', require('./routes/checklistTemplates'));
 app.use('/api/reports', require('./routes/reports'));
 

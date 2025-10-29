@@ -128,6 +128,7 @@ export interface Product {
 }
 
 export type QuoteItemType = 'material' | 'service' | 'product';
+export type ItemCategory = 'pia' | 'bancada' | 'soleira' | 'revestimento' | 'outro';
 
 export interface Point {
     x: number;
@@ -142,6 +143,7 @@ export interface QuoteItem {
   unitPrice: number;
   discount?: number;
   totalPrice: number;
+  category?: ItemCategory | string; // Categoria do item, permitindo string para categorias customizadas
   // Material specific
   width?: number;
   height?: number;
@@ -174,6 +176,19 @@ export interface Quote {
 }
 
 export type ProductionStatus = 'pending_production' | 'cutting' | 'finishing' | 'quality_check' | 'awaiting_logistics';
+
+export type ServiceOrderStatus = 
+  // Status normais de produção
+  | 'pending_production' | 'cutting' | 'finishing' | 'quality_check' | 'ready_for_logistics'
+  // Status normais de logística
+  | 'scheduled' | 'in_transit' | 'delivered' | 'awaiting_installation' | 'completed'
+  // Status de exceção
+  | 'rework_needed' | 'delivery_issue' | 'installation_pending_review'
+  // Status de exceção adicionais
+  | 'installation_issue' | 'quality_issue' | 'material_shortage' | 'equipment_failure'
+  | 'customer_not_available' | 'weather_delay' | 'permit_issue' | 'measurement_error' | 'design_change'
+  // Status finais
+  | 'cancelled';
 
 export type LogisticsStatus = 'awaiting_scheduling' | 'scheduled' | 'in_transit' | 'delivered' | 'in_installation' | 'completed' | 'picked_up' | 'canceled';
 
@@ -224,8 +239,9 @@ export interface ServiceOrder {
   total: number;
   deliveryDate: string;
   assignedToIds: string[];
-  productionStatus: ProductionStatus;
-  logisticsStatus: LogisticsStatus;
+  status: ServiceOrderStatus; // Status unificado da OS
+  productionStatus: ProductionStatus; // Legacy, mantido para compatibilidade
+  logisticsStatus: LogisticsStatus; // Legacy, mantido para compatibilidade
   isFinalized: boolean;
   allocatedSlabId?: string;
   priority?: Priority;
@@ -244,6 +260,13 @@ export interface ServiceOrder {
   deliveryTeamIds?: string[];
   departureChecklist?: { id: string; text: string; checked: boolean; }[];
   observations?: string;
+  history?: Array<{
+    status: ServiceOrderStatus;
+    timestamp: string;
+    action: string;
+    details?: string;
+    userId?: string;
+  }>;
 }
 
 export interface ChecklistTemplateItem {
@@ -367,6 +390,25 @@ export interface Receipt {
 
 export type EquipmentStatus = 'operacional' | 'em_manutencao' | 'desativado';
 export type EquipmentCategory = 'maquina' | 'veiculo';
+
+export type CutPieceStatus = 'pending_cut' | 'cut' | 'finishing' | 'assembly' | 'quality_check' | 'ready_for_delivery' | 'delivered' | 'installed' | 'defective' | 'rework';
+
+export interface CutPiece {
+  id: string;
+  pieceId: string;
+  serviceOrderId: string;
+  originalQuoteItemId: string;
+  originalStockItemId: string;
+  materialId: string;
+  description: string;
+  category?: string;
+  dimensions: string;
+  status: CutPieceStatus;
+  location?: string;
+  qrCodeValue: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type VehicleType = 'van' | 'caminhao';
 export type VehicleStatus = 'disponivel' | 'em_uso' | 'em_manutencao';

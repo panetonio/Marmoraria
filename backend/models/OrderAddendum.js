@@ -17,6 +17,7 @@ const orderItemSchema = new mongoose.Schema({
   unitPrice: Number,
   discount: { type: Number, default: 0 },
   totalPrice: Number,
+  category: { type: String, trim: true },
   width: Number,
   height: Number,
   perimeter: Number,
