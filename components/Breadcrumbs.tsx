@@ -10,9 +10,7 @@ const PAGE_LABELS: Record<Page, string> = {
   dashboard: 'Dashboard',
   quotes: 'Orçamentos',
   orders: 'Pedidos',
-  production: 'Produção',
-  assembly: 'Montagem',
-  logistics: 'Logística',
+  shopfloor_dashboard: 'Chão de Fábrica',
   stock: 'Estoque',
   suppliers: 'Fornecedores',
   crm: 'CRM',
@@ -26,8 +24,6 @@ const PAGE_LABELS: Record<Page, string> = {
   activity_log: 'Histórico',
   users: 'Usuários',
   checklist_templates: 'Checklists',
-  operations_dashboard: 'Operações',
-  shopfloor_dashboard: 'Shopfloor',
   productivity: 'Produtividade',
 };
 

@@ -11,22 +11,17 @@ interface LoginPageProps {
 const LoginPage: React.FC<LoginPageProps> = ({ onRegisterClick }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Email ou senha incorretos');
-      }
+      await login(email, password);
     } catch (err) {
-      setError('Erro ao fazer login. Tente novamente.');
+      // Erro já tratado pelo toast no AuthContext
     } finally {
       setLoading(false);
     }
@@ -69,11 +64,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onRegisterClick }) => {
             />
           </div>
 
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
 
           <Button
             type="submit"

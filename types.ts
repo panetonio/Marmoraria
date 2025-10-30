@@ -1,11 +1,21 @@
 import { ROLES } from './roles';
 
-export type Page = 'dashboard' | 'quotes' | 'orders' | 'production' | 'assembly' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'logistics' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log' | 'checklist_templates' | 'operations_dashboard' | 'shopfloor_dashboard' | 'productivity';
+export type Page = 'dashboard' | 'quotes' | 'orders' | 'stock' | 'suppliers' | 'crm' | 'finance' | 'invoices' | 'receipts' | 'catalog' | 'users' | 'equipment' | 'vehicles' | 'production_employees' | 'activity_log' | 'checklist_templates' | 'shopfloor_dashboard' | 'productivity';
 export type Role = keyof typeof ROLES;
 export type SortDirection = 'ascending' | 'descending';
 export type PaymentMethod = 'pix' | 'cartao_credito' | 'boleto' | 'dinheiro';
 export type Priority = 'normal' | 'alta' | 'urgente';
 export type OrderAddendumStatus = 'pending' | 'approved' | 'rejected';
+
+// Interface genérica para configuração de colunas Kanban
+export interface KanbanColumnConfig<T extends string> {
+  id: T;
+  title: string;
+  color: string;
+}
+
+// Tipo para visualização do card
+export type OrderCardView = 'production' | 'logistics' | 'assembly' | 'installation';
 
 export interface Address {
   cep: string;

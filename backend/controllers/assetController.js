@@ -45,8 +45,8 @@ const assetTypeConfigs = {
   product: {
     aliases: ['product', 'produto'],
     model: Product,
-    statusField: null,
-    locationField: null,
+    statusField: null, // Product não tem campo de status gerenciado desta forma
+    locationField: null, // Product não tem campo de localização gerenciado desta forma
     allowedStatuses: null,
     logLabel: 'produto',
   },
@@ -55,7 +55,7 @@ const assetTypeConfigs = {
     model: CutPiece,
     statusField: 'status',
     locationField: 'location',
-    allowedStatuses: ['pending_cut', 'cut', 'finishing', 'assembly', 'ready_for_delivery', 'delivered', 'installed'],
+    allowedStatuses: ['pending_cut', 'cut', 'finishing', 'assembly', 'quality_check', 'ready_for_delivery', 'delivered', 'installed', 'defective', 'rework'],
     logLabel: 'peça cortada',
     idField: 'pieceId',
   },
@@ -181,16 +181,24 @@ exports.scanByQrData = async (req, res) => {
 
     const assetData = asset.toObject({ virtuals: true });
 
+    // Obter status e localização de forma genérica usando os campos configurados
+    const currentStatus = config.statusField && assetData.hasOwnProperty(config.statusField) 
+      ? assetData[config.statusField] 
+      : undefined;
+    const currentLocation = config.locationField && assetData.hasOwnProperty(config.locationField) 
+      ? assetData[config.locationField] 
+      : undefined;
+
     await ActivityLog.create(
       buildAssetLogPayload({
         action: 'asset_scanned',
         asset,
         config,
         description: `Leitura de ${config.logLabel} via QR Code`,
-        previousStatus: config.statusField ? assetData[config.statusField] : undefined,
-        newStatus: config.statusField ? assetData[config.statusField] : undefined,
-        previousLocation: config.locationField ? assetData[config.locationField] : undefined,
-        newLocation: config.locationField ? assetData[config.locationField] : undefined,
+        previousStatus: currentStatus,
+        newStatus: currentStatus,
+        previousLocation: currentLocation,
+        newLocation: currentLocation,
         user: req.user,
         metadata: {
           qrData: data,
@@ -244,7 +252,8 @@ exports.updateAssetStatus = async (req, res) => {
       });
     }
 
-    const previousStatus = asset[config.statusField];
+    // Acessar campo de status de forma genérica
+    const previousStatus = asset[config.statusField] || null;
 
     if (previousStatus === status) {
       return res.status(400).json({
@@ -253,10 +262,16 @@ exports.updateAssetStatus = async (req, res) => {
       });
     }
 
+    // Atualizar status de forma genérica usando o campo configurado
     asset[config.statusField] = status;
     await asset.save();
 
     const updated = asset.toObject({ virtuals: true });
+
+    // Obter localização de forma genérica após atualização
+    const currentLocation = config.locationField && updated.hasOwnProperty(config.locationField) 
+      ? updated[config.locationField] 
+      : undefined;
 
     await ActivityLog.create(
       buildAssetLogPayload({
@@ -266,8 +281,8 @@ exports.updateAssetStatus = async (req, res) => {
         description: `Status do ${config.logLabel} atualizado de ${previousStatus || 'indefinido'} para ${status}`,
         previousStatus,
         newStatus: status,
-        previousLocation: config.locationField ? updated[config.locationField] : undefined,
-        newLocation: config.locationField ? updated[config.locationField] : undefined,
+        previousLocation: currentLocation,
+        newLocation: currentLocation,
         user: req.user,
       })
     );
@@ -312,6 +327,7 @@ exports.updateAssetLocation = async (req, res) => {
       });
     }
 
+    // Acessar campo de localização de forma genérica usando o campo configurado
     const previousLocation = asset[config.locationField] || '';
     const trimmedLocation = typeof location === 'string' ? location.trim() : '';
 
@@ -329,10 +345,16 @@ exports.updateAssetLocation = async (req, res) => {
       });
     }
 
+    // Atualizar localização de forma genérica usando o campo configurado
     asset[config.locationField] = trimmedLocation;
     await asset.save();
 
     const updated = asset.toObject({ virtuals: true });
+
+    // Obter status de forma genérica após atualização
+    const currentStatus = config.statusField && updated.hasOwnProperty(config.statusField) 
+      ? updated[config.statusField] 
+      : undefined;
 
     await ActivityLog.create(
       buildAssetLogPayload({
@@ -340,8 +362,8 @@ exports.updateAssetLocation = async (req, res) => {
         asset,
         config,
         description: `Localização do ${config.logLabel} atualizada de ${previousLocation || 'indefinido'} para ${trimmedLocation}`,
-        previousStatus: config.statusField ? updated[config.statusField] : undefined,
-        newStatus: config.statusField ? updated[config.statusField] : undefined,
+        previousStatus: currentStatus,
+        newStatus: currentStatus,
         previousLocation,
         newLocation: trimmedLocation,
         user: req.user,

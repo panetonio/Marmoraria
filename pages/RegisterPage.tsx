@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import { ROLES } from '../roles';
 import type { Role } from '../types';
+import toast from 'react-hot-toast';
 
 interface RegisterPageProps {
   onLoginClick: () => void;
@@ -17,24 +18,20 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onLoginClick }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<Role>('vendedor');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setSuccess(false);
 
     // Validações
     if (password !== confirmPassword) {
-      setError('As senhas não coincidem');
+      toast.error('As senhas não coincidem');
       return;
     }
 
     if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres');
+      toast.error('A senha deve ter pelo menos 6 caracteres');
       return;
     }
 
@@ -49,7 +46,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onLoginClick }) => {
       });
 
       if (registered) {
-        setSuccess(true);
         setName('');
         setEmail('');
         setPassword('');
@@ -60,11 +56,9 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onLoginClick }) => {
         setTimeout(() => {
           onLoginClick();
         }, 2000);
-      } else {
-        setError('Este email já está cadastrado');
       }
     } catch (err) {
-      setError('Erro ao criar conta. Tente novamente.');
+      // Erro já tratado pelo toast no AuthContext
     } finally {
       setLoading(false);
     }
@@ -146,17 +140,6 @@ const RegisterPage: React.FC<RegisterPageProps> = ({ onLoginClick }) => {
             />
           </div>
 
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-lg text-sm">
-              Conta criada com sucesso! Redirecionando para login...
-            </div>
-          )}
 
           <Button
             type="submit"

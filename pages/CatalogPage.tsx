@@ -1,4 +1,4 @@
-import React, { useState, FC, useMemo, useEffect } from 'react';
+import React, { useState, FC, useMemo, useEffect, useRef } from 'react';
 import type { Material, Service, Product } from '../types';
 import { useData } from '../context/DataContext';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
@@ -7,6 +7,7 @@ import Modal from '../components/ui/Modal';
 import Tabs from '../components/ui/Tabs';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import QRCode from '../lib/qrcode-react';
 
 type CatalogView = 'materials' | 'services' | 'products';
 
@@ -234,11 +235,106 @@ const ServiceManagement = () => {
 };
 
 // --- Product Management ---
+const ProductDetailModal: FC<{ product: Product; isOpen: boolean; onClose: () => void }> = ({ product, isOpen, onClose }) => {
+    const qrCodeRef = useRef<HTMLCanvasElement | null>(null);
+
+    const handlePrint = () => {
+        const canvas = qrCodeRef.current;
+        if (!canvas) {
+            console.warn('QR code ainda não foi renderizado para impressão.');
+            return;
+        }
+
+        const dataUrl = canvas.toDataURL('image/png');
+        if (!dataUrl) {
+            console.warn('Não foi possível gerar a imagem do QR code.');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html><head><title>Etiqueta de Produto</title>
+            <style>
+                body { font-family: sans-serif; text-align: center; padding: 24px; color: #0f172a; }
+                .qr-img { margin: 16px auto; width: 180px; height: 180px; }
+                @media print { body { margin: 0; } }
+            </style>
+            </head><body>
+            <h2>${product.name}</h2>
+            <p>ID: <strong>${product.id}</strong></p>
+            <img id="print-qr" src="${dataUrl}" alt="QR code do produto ${product.id}" class="qr-img" />
+            <p>Preço: R$ ${product.price.toFixed(2)}</p>
+            <p>Estoque: ${product.stock}</p>
+            <script>
+                const img = document.getElementById('print-qr');
+                if (img && img.complete) {
+                    window.focus();
+                    window.print();
+                } else if (img) {
+                    img.addEventListener('load', () => {
+                        window.focus();
+                        window.print();
+                    });
+                }
+            </script>
+            </body></html>
+        `);
+        printWindow.document.close();
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Detalhes do Produto: ${product.name}`} className="max-w-4xl">
+            <div className="flex flex-col md:flex-row gap-6">
+                <div className="md:w-1/2">
+                    <div className="bg-slate-100 dark:bg-dark p-4 rounded-lg text-center">
+                        <h4 className="font-semibold mb-2">QR Code de Identificação</h4>
+                        <div className="flex justify-center">
+                            <QRCode
+                                ref={qrCodeRef}
+                                value={`marmoraria://asset/product/${product.id}`}
+                                size={180}
+                                includeMargin
+                                aria-label={`QR code para ${product.name}`}
+                                style={{ width: 180, height: 180 }}
+                            />
+                        </div>
+                        <Button onClick={handlePrint} className="mt-4" size="sm">Imprimir Etiqueta</Button>
+                    </div>
+                </div>
+                <div className="md:w-1/2 bg-slate-50 dark:bg-slate-700/50 p-6 rounded-lg">
+                    <h3 className="text-2xl font-bold text-text-primary dark:text-slate-100 mb-1">{product.name}</h3>
+                    
+                    <div className="space-y-3 text-text-secondary dark:text-slate-300">
+                        <p><strong>ID:</strong> <span className="font-mono text-text-primary dark:text-slate-100">{product.id}</span></p>
+                        <div className="grid grid-cols-1 gap-2 text-sm text-text-secondary dark:text-slate-400 sm:grid-cols-3">
+                            <div>
+                                <span className="font-semibold text-text-primary dark:text-slate-100">Custo</span>
+                                <p>R$ {product.cost.toFixed(2)}</p>
+                            </div>
+                            <div>
+                                <span className="font-semibold text-text-primary dark:text-slate-100">Preço</span>
+                                <p>R$ {product.price.toFixed(2)}</p>
+                            </div>
+                            <div>
+                                <span className="font-semibold text-text-primary dark:text-slate-100">Estoque</span>
+                                <p>{product.stock}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 const ProductManagement = () => {
     // Similar to MaterialManagement but for Products
     const { products, saveProduct, deleteProduct } = useData();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [viewingProduct, setViewingProduct] = useState<Product | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const handleNew = () => {
@@ -265,6 +361,13 @@ const ProductManagement = () => {
     
     return (
         <Card className="p-0">
+            {viewingProduct && (
+                <ProductDetailModal
+                    product={viewingProduct}
+                    isOpen={!!viewingProduct}
+                    onClose={() => setViewingProduct(null)}
+                />
+            )}
             {editingProduct && <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Editar Produto">
                 <div className="space-y-4">
                     <Input label="Nome do Produto" value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} />
@@ -290,7 +393,7 @@ const ProductManagement = () => {
                  <table className="w-full text-left">
                     <thead><tr className="border-b"><th className="p-3">Nome</th><th className="p-3 text-right">Custo</th><th className="p-3 text-right">Preço Venda</th><th className="p-3 text-center">Estoque</th><th className="p-3 text-center">Ações</th></tr></thead>
                     <tbody>
-                        {products.map(prd => (<tr key={prd.id} className="border-b"><td className="p-3">{prd.name}</td><td className="p-3 text-right">{prd.cost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td className="p-3 text-right">{prd.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td className="p-3 text-center">{prd.stock}</td><td className="p-3 text-center space-x-2"><Button size="sm" variant="ghost" onClick={() => handleEdit(prd)}>Editar</Button><Button size="sm" variant="destructive" onClick={() => setDeletingId(prd.id)}>Excluir</Button></td></tr>))}
+                        {products.map(prd => (<tr key={prd.id} className="border-b"><td className="p-3">{prd.name}</td><td className="p-3 text-right">{prd.cost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td className="p-3 text-right">{prd.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td className="p-3 text-center">{prd.stock}</td><td className="p-3 text-center space-x-2"><Button size="sm" variant="secondary" onClick={() => setViewingProduct(prd)}>Ver QR Code</Button><Button size="sm" variant="ghost" onClick={() => handleEdit(prd)}>Editar</Button><Button size="sm" variant="destructive" onClick={() => setDeletingId(prd.id)}>Excluir</Button></td></tr>))}
                     </tbody>
                 </table>
             </CardContent>

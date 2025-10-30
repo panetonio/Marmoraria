@@ -1,17 +1,23 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import type { ServiceOrder, ProductionStatus, LogisticsStatus, Vehicle, ProductionEmployee, DeliveryRoute, ChecklistTemplate } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Collapse, Badge } from 'antd';
+import type { ServiceOrder, ProductionStatus, LogisticsStatus, User, Vehicle, ProductionEmployee } from '../types';
+
+type DeliveryScheduleInput = {
+  vehicleId: string;
+  start: string;
+  end: string;
+  teamIds: string[];
+};
 import { useData } from '../context/DataContext';
-import { api } from '../utils/api';
-import Card, { CardHeader, CardContent } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Tabs from '../components/ui/Tabs';
-import OperationsFilters from '../components/OperationsFilters';
 import ProductionKanban from '../components/ProductionKanban';
 import LogisticsKanban from '../components/LogisticsKanban';
 import AssemblyKanban from '../components/AssemblyKanban';
 import ProductivityDashboard from '../components/ProductivityDashboard';
-
-type ShopfloorTab = 'production' | 'logistics' | 'assembly' | 'productivity';
+import OperationsFilters from '../components/OperationsFilters';
+import PostDeliverySchedulingModal from '../components/PostDeliverySchedulingModal';
+import ReceiptTermModal from '../components/ReceiptTermModal';
+import InstallationTermModal from '../components/InstallationTermModal';
+import Modal from '../components/ui/Modal';
 
 interface FilterState {
   dateRange: { start: string; end: string };
@@ -23,9 +29,21 @@ interface FilterState {
 }
 
 const ShopfloorDashboard: React.FC = () => {
-  const { serviceOrders, vehicles, productionEmployees, deliveryRoutes, checklistTemplates } = useData();
-  
-  const [activeTab, setActiveTab] = useState<ShopfloorTab>('production');
+  const { 
+    serviceOrders, 
+    users, 
+    vehicles, 
+    productionEmployees,
+    updateServiceOrderStatus,
+    scheduleDelivery,
+    confirmDelivery,
+    confirmInstallation,
+    updateDepartureChecklist,
+    refreshServiceOrder,
+    deliveryRoutes
+  } = useData();
+
+  // Estados de filtro
   const [filters, setFilters] = useState<FilterState>({
     dateRange: {
       start: new Date().toISOString().split('T')[0],
@@ -38,89 +56,172 @@ const ShopfloorDashboard: React.FC = () => {
     priority: ''
   });
 
-  // Filtrar dados baseado nos filtros
-  const filteredServiceOrders = useMemo(() => {
+  // Estados para modais
+  const [viewingOrder, setViewingOrder] = useState<ServiceOrder | null>(null);
+  const [schedulingOrder, setSchedulingOrder] = useState<ServiceOrder | null>(null);
+  const [generatingReceiptTermOrder, setGeneratingReceiptTermOrder] = useState<ServiceOrder | null>(null);
+  const [generatingInstallTermOrder, setGeneratingInstallTermOrder] = useState<ServiceOrder | null>(null);
+  const [activeChecklistOrder, setActiveChecklistOrder] = useState<ServiceOrder | null>(null);
+
+  // Filtrar OSs de produção
+  const productionOrders = useMemo(() => {
+    const productionStatuses: ProductionStatus[] = ['cutting', 'finishing'];
     return serviceOrders.filter(order => {
-      const dateMatch = new Date(order.deliveryDate) >= new Date(filters.dateRange.start) &&
+      const statusMatch = productionStatuses.includes(order.productionStatus);
+      const dateMatch = new Date(order.deliveryDate) >= new Date(filters.dateRange.start) && 
                        new Date(order.deliveryDate) <= new Date(filters.dateRange.end);
       const clientMatch = !filters.client || order.clientName.toLowerCase().includes(filters.client.toLowerCase());
+      const statusFilterMatch = !filters.status || order.status === filters.status || order.productionStatus === filters.status;
       const teamMatch = !filters.team || order.assignedToIds.includes(filters.team);
       const priorityMatch = !filters.priority || order.priority === filters.priority;
       
-      return dateMatch && clientMatch && teamMatch && priorityMatch;
+      return statusMatch && dateMatch && clientMatch && statusFilterMatch && teamMatch && priorityMatch;
     });
   }, [serviceOrders, filters]);
 
-  const filteredDeliveryRoutes = useMemo(() => {
-    return deliveryRoutes.filter(route => {
-      const dateMatch = new Date(route.scheduledStart) >= new Date(filters.dateRange.start) &&
-                       new Date(route.scheduledStart) <= new Date(filters.dateRange.end);
-      const vehicleMatch = !filters.vehicle || route.vehicleId === filters.vehicle;
-      
-      return dateMatch && vehicleMatch;
-    });
-  }, [deliveryRoutes, filters]);
-
-  // Separar OSs por tipo de operação
-  const productionOrders = useMemo(() => {
-    const productionStatuses: ProductionStatus[] = ['pending_production', 'cutting', 'finishing', 'quality_check', 'awaiting_logistics'];
-    return filteredServiceOrders.filter(order => productionStatuses.includes(order.productionStatus));
-  }, [filteredServiceOrders]);
-
+  // Filtrar OSs de logística
   const logisticsOrders = useMemo(() => {
-    const logisticsStatuses: LogisticsStatus[] = ['awaiting_scheduling', 'scheduled', 'in_transit', 'delivered'];
-    return filteredServiceOrders.filter(order => logisticsStatuses.includes(order.logisticsStatus));
-  }, [filteredServiceOrders]);
+    const logisticsStatuses: LogisticsStatus[] = ['awaiting_scheduling', 'scheduled', 'in_transit', 'delivered', 'completed'];
+    return serviceOrders.filter(order => {
+      const statusMatch = logisticsStatuses.includes(order.logisticsStatus);
+      const dateMatch = new Date(order.deliveryDate) >= new Date(filters.dateRange.start) && 
+                       new Date(order.deliveryDate) <= new Date(filters.dateRange.end);
+      const clientMatch = !filters.client || order.clientName.toLowerCase().includes(filters.client.toLowerCase());
+      const statusFilterMatch = !filters.status || order.status === filters.status || order.logisticsStatus === filters.status;
+      const teamMatch = !filters.team || order.assignedToIds.includes(filters.team);
+      const vehicleMatch = !filters.vehicle || order.vehicleId === filters.vehicle;
+      const priorityMatch = !filters.priority || order.priority === filters.priority;
+      
+      return statusMatch && dateMatch && clientMatch && statusFilterMatch && teamMatch && vehicleMatch && priorityMatch;
+    });
+  }, [serviceOrders, filters]);
 
+  // Filtrar OSs de montagem
   const assemblyOrders = useMemo(() => {
-    return filteredServiceOrders.filter(order => 
-      order.finalizationType === 'delivery_installation' && 
-      (order.logisticsStatus === 'delivered' || order.installation_confirmed)
-    );
-  }, [filteredServiceOrders]);
+    const assemblyStatuses: ProductionStatus[] = ['cutting', 'finishing'];
+    return serviceOrders.filter(order => {
+      const statusMatch = assemblyStatuses.includes(order.productionStatus);
+      const dateMatch = new Date(order.deliveryDate) >= new Date(filters.dateRange.start) && 
+                       new Date(order.deliveryDate) <= new Date(filters.dateRange.end);
+      const clientMatch = !filters.client || order.clientName.toLowerCase().includes(filters.client.toLowerCase());
+      const statusFilterMatch = !filters.status || order.status === filters.status || order.productionStatus === filters.status;
+      const teamMatch = !filters.team || order.assignedToIds.includes(filters.team);
+      const priorityMatch = !filters.priority || order.priority === filters.priority;
+      
+      return statusMatch && dateMatch && clientMatch && statusFilterMatch && teamMatch && priorityMatch;
+    });
+  }, [serviceOrders, filters]);
 
-  // Handlers para atualização de status
-  const handleProductionStatusChange = useCallback((orderId: string, newStatus: ProductionStatus) => {
-    // Implementar lógica de atualização
-    console.log(`Atualizando OS ${orderId} para status de produção: ${newStatus}`);
-  }, []);
-
-  const handleLogisticsStatusChange = useCallback((orderId: string, newStatus: LogisticsStatus) => {
-    // Implementar lógica de atualização
-    console.log(`Atualizando OS ${orderId} para status de logística: ${newStatus}`);
-  }, []);
-
-  const handleAssemblyStatusChange = useCallback((orderId: string, newStatus: string) => {
-    // Implementar lógica de atualização
-    console.log(`Atualizando OS ${orderId} para status de montagem: ${newStatus}`);
-  }, []);
-
-  // Handler para confirmação de entrega
-  const handleDeliveryConfirmed = useCallback(async (orderId: string, deliveryData: {
-    checklistCompleted: boolean;
-    photos: Array<{ url: string; description?: string }>;
-    customerSignature: { url: string; timestamp: string };
-  }) => {
+  // Handlers para logística
+  const handleStartRoute = async (orderId: string) => {
     try {
-      // Atualizar OS com dados da entrega
-      console.log('Confirmando entrega para OS:', orderId, deliveryData);
-      
-      // Aqui você implementaria a lógica para:
-      // 1. Atualizar o status da OS para 'delivered'
-      // 2. Salvar as fotos e assinatura
-      // 3. Marcar checklist como concluído
-      // 4. Atualizar o banco de dados
-      
-      // Por enquanto, apenas log
-      console.log('Entrega confirmada com sucesso');
+      const route = deliveryRoutes.find(r => r.serviceOrderId === orderId);
+      if (route) {
+        const response = await fetch(`/api/delivery-routes/${route.id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: 'in_progress' })
+        });
+        
+        if (response.ok) {
+          await refreshServiceOrder(orderId);
+        } else {
+          console.error('Failed to start route');
+        }
+      }
     } catch (error) {
-      console.error('Erro ao confirmar entrega:', error);
-      throw error;
+      console.error('Error starting route:', error);
     }
-  }, []);
+  };
 
-  // Handler para agendamento de instalação
-  const handleInstallationScheduled = useCallback(async (orderId: string, installationData: {
+  const handleArriveAtDestination = async (orderId: string) => {
+    try {
+      const route = deliveryRoutes.find(r => r.serviceOrderId === orderId);
+      if (route) {
+        const response = await fetch(`/api/delivery-routes/${route.id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ status: 'completed' })
+        });
+        
+        if (response.ok) {
+          await refreshServiceOrder(orderId);
+        } else {
+          console.error('Failed to complete route');
+        }
+      }
+    } catch (error) {
+      console.error('Error completing route:', error);
+    }
+  };
+
+  // Handlers para montagem
+  const handleAddNote = (orderId: string, note: string) => {
+    console.log(`Adicionando nota ao pedido ${orderId}: ${note}`);
+  };
+
+  const handleAssignEmployee = (orderId: string, employeeId: string) => {
+    console.log(`Atribuindo funcionário ${employeeId} ao pedido ${orderId}`);
+  };
+
+  // Handlers para produção
+  const handleAssign = (order: ServiceOrder) => {
+    console.log('Atribuindo profissional ao pedido:', order.id);
+  };
+
+  const handleAllocate = (order: ServiceOrder) => {
+    console.log('Alocando recursos para o pedido:', order.id);
+  };
+
+  const handleView = (order: ServiceOrder) => {
+    setViewingOrder(order);
+  };
+
+  const handleFinalize = async (order: ServiceOrder) => {
+    try {
+      await updateServiceOrderStatus(order.id, 'ready_for_logistics');
+      await refreshServiceOrder(order.id);
+    } catch (error) {
+      console.error('Erro ao finalizar produção:', error);
+    }
+  };
+
+  // Handlers para logística
+  const handleSchedule = (order: ServiceOrder) => {
+    setSchedulingOrder(order);
+  };
+
+  const handleGenerateReceiptTerm = (order: ServiceOrder) => {
+    setGeneratingReceiptTermOrder(order);
+  };
+
+  const handleGenerateInstallTerm = (order: ServiceOrder) => {
+    setGeneratingInstallTermOrder(order);
+  };
+
+  const handleOpenChecklist = (order: ServiceOrder) => {
+    setActiveChecklistOrder(order);
+  };
+
+  // Handler para agendamento de entrega
+  const handleDeliveryScheduled = async (orderId: string, schedule: DeliveryScheduleInput) => {
+    try {
+      await scheduleDelivery(orderId, schedule);
+      setSchedulingOrder(null);
+      await refreshServiceOrder(orderId);
+    } catch (error) {
+      console.error('Erro ao agendar entrega:', error);
+    }
+  };
+
+  // Handler para instalação agendada
+  const handleInstallationScheduled = async (orderId: string, installationData: {
     scheduledStart: string;
     scheduledEnd: string;
     teamIds: string[];
@@ -128,72 +229,129 @@ const ShopfloorDashboard: React.FC = () => {
     notes?: string;
   }) => {
     try {
-      console.log('Agendando instalação para OS:', orderId, installationData);
-      
-      // Criar rota de instalação via API
-      const response = await api.createInstallationRoute({
-        serviceOrderId: orderId,
-        scheduledStart: installationData.scheduledStart,
-        scheduledEnd: installationData.scheduledEnd,
-        teamIds: installationData.teamIds,
-        vehicleId: installationData.vehicleId,
-        notes: installationData.notes
-      });
-
-      if (response.success) {
-        console.log('Instalação agendada com sucesso:', response.data);
-        // Aqui você poderia atualizar o estado local se necessário
-      } else {
-        throw new Error(response.message || 'Erro ao agendar instalação');
-      }
+      // Implementar lógica de agendamento de instalação
+      console.log('Agendando instalação:', orderId, installationData);
+      setSchedulingOrder(null);
+      await refreshServiceOrder(orderId);
     } catch (error) {
       console.error('Erro ao agendar instalação:', error);
-      throw error;
     }
-  }, []);
+  };
 
-  const tabs = [
-    { 
-      id: 'production' as ShopfloorTab, 
-      label: `Produção (${productionOrders.length})`,
-      icon: '🏭'
-    },
-    { 
-      id: 'logistics' as ShopfloorTab, 
-      label: `Logística (${logisticsOrders.length})`,
-      icon: '🚚'
-    },
-    { 
-      id: 'assembly' as ShopfloorTab, 
-      label: `Montagem (${assemblyOrders.length})`,
-      icon: '🔧'
-    },
-    { 
-      id: 'productivity' as ShopfloorTab, 
-      label: 'Produtividade',
-      icon: '📊'
-    }
-  ];
+  // Função para criar header dos painéis
+  const getPanelHeader = (title: string, count: number) => (
+    <div className="flex justify-between items-center w-full">
+      <span className="font-semibold">{title}</span>
+      <Badge count={count} style={{ backgroundColor: '#1e40af' }} />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Modais */}
+      {viewingOrder && (
+        <Modal 
+          isOpen={!!viewingOrder} 
+          onClose={() => setViewingOrder(null)} 
+          title={`Detalhes da OS: ${viewingOrder.id}`}
+          className="max-w-4xl"
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Cliente</label>
+                <p className="text-sm text-text-primary dark:text-slate-100">{viewingOrder.clientName}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Status</label>
+                <p className="text-sm text-text-primary dark:text-slate-100">{viewingOrder.status}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Total</label>
+                <p className="text-sm text-text-primary dark:text-slate-100">R$ {viewingOrder.total.toFixed(2)}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Data de Entrega</label>
+                <p className="text-sm text-text-primary dark:text-slate-100">{new Date(viewingOrder.deliveryDate).toLocaleDateString()}</p>
+              </div>
+            </div>
+            {viewingOrder.observations && (
+              <div>
+                <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Observações</label>
+                <p className="text-sm text-text-primary dark:text-slate-100">{viewingOrder.observations}</p>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {schedulingOrder && (
+        <PostDeliverySchedulingModal
+          isOpen={!!schedulingOrder}
+          serviceOrder={schedulingOrder}
+          onClose={() => setSchedulingOrder(null)}
+          onDeliveryConfirmed={(orderId, deliveryData) => {
+            confirmDelivery(orderId, deliveryData);
+            setSchedulingOrder(null);
+          }}
+          onInstallationScheduled={handleInstallationScheduled}
+          vehicles={vehicles}
+          productionEmployees={productionEmployees}
+        />
+      )}
+
+      {generatingReceiptTermOrder && (
+        <ReceiptTermModal
+          isOpen={!!generatingReceiptTermOrder}
+          order={generatingReceiptTermOrder}
+          onClose={() => setGeneratingReceiptTermOrder(null)}
+        />
+      )}
+
+      {generatingInstallTermOrder && (
+        <InstallationTermModal
+          isOpen={!!generatingInstallTermOrder}
+          order={generatingInstallTermOrder}
+          onClose={() => setGeneratingInstallTermOrder(null)}
+        />
+      )}
+
+      {activeChecklistOrder && (
+        <Modal
+          isOpen={!!activeChecklistOrder}
+          onClose={() => setActiveChecklistOrder(null)}
+          title={`Checklist - ${activeChecklistOrder.id}`}
+        >
+          <div className="space-y-4">
+            {activeChecklistOrder.departureChecklist && activeChecklistOrder.departureChecklist.length > 0 ? (
+              <div className="space-y-2">
+                {activeChecklistOrder.departureChecklist.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                    <input
+                      type="checkbox"
+                      checked={item.checked}
+                      readOnly
+                      className="rounded"
+                    />
+                    <span className={item.checked ? 'line-through text-text-secondary' : ''}>
+                      {item.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-text-secondary dark:text-slate-400">Nenhum item no checklist ainda.</p>
+            )}
+          </div>
+        </Modal>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">
-            Shopfloor Dashboard
-          </h1>
-          <p className="text-text-secondary dark:text-slate-400 mt-1">
-            Controle operacional integrado de produção, logística e montagem
+          <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Chão de Fábrica Unificado</h1>
+          <p className="mt-2 text-text-secondary dark:text-slate-400">
+            Visão integrada de produção, logística, montagem e produtividade
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" size="sm">
-            📊 Relatórios
-          </Button>
-          <Button variant="secondary" size="sm">
-            ⚙️ Configurações
-          </Button>
         </div>
       </div>
 
@@ -205,55 +363,70 @@ const ShopfloorDashboard: React.FC = () => {
         productionEmployees={productionEmployees}
       />
 
-      {/* Tabs */}
-      <Tabs
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabClick={setActiveTab}
-        className="bg-white dark:bg-slate-800 rounded-lg shadow-sm"
-      />
-
-      {/* Conteúdo das Abas */}
-      <div className="mt-6">
-        {activeTab === 'production' && (
+      {/* Dashboard com Collapse */}
+      <Collapse defaultActiveKey={['production']} accordion>
+        <Collapse.Panel 
+          header={getPanelHeader('🏭 Produção', productionOrders.length)} 
+          key="production"
+        >
           <ProductionKanban
-            orders={productionOrders}
-            onStatusChange={handleProductionStatusChange}
+            serviceOrders={productionOrders}
+            users={users}
             vehicles={vehicles}
-            productionEmployees={productionEmployees}
+            onUpdateServiceOrders={(orders) => {
+              // Atualizar serviceOrders no contexto se necessário
+              console.log('Atualizando OSs de produção:', orders);
+            }}
+            onAssign={handleAssign}
+            onAllocate={handleAllocate}
+            onView={handleView}
+            onFinalize={handleFinalize}
           />
-        )}
+        </Collapse.Panel>
 
-        {activeTab === 'logistics' && (
+        <Collapse.Panel 
+          header={getPanelHeader('🚚 Logística', logisticsOrders.length)} 
+          key="logistics"
+        >
           <LogisticsKanban
-            orders={logisticsOrders}
-            routes={filteredDeliveryRoutes}
-            onStatusChange={handleLogisticsStatusChange}
-            onDeliveryConfirmed={handleDeliveryConfirmed}
-            onInstallationScheduled={handleInstallationScheduled}
+            serviceOrders={logisticsOrders}
             vehicles={vehicles}
-            productionEmployees={productionEmployees}
-            checklistTemplates={checklistTemplates}
+            onView={handleView}
+            onSchedule={handleSchedule}
+            onStartRoute={handleStartRoute}
+            onArrive={handleArriveAtDestination}
+            onConfirmDelivery={confirmDelivery}
+            onConfirmInstallation={confirmInstallation}
+            onGenerateReceiptTerm={handleGenerateReceiptTerm}
+            onGenerateInstallTerm={handleGenerateInstallTerm}
+            onOpenChecklist={handleOpenChecklist}
           />
-        )}
+        </Collapse.Panel>
 
-        {activeTab === 'assembly' && (
+        <Collapse.Panel 
+          header={getPanelHeader('🔧 Montagem', assemblyOrders.length)} 
+          key="assembly"
+        >
           <AssemblyKanban
-            orders={assemblyOrders}
-            onStatusChange={handleAssemblyStatusChange}
+            serviceOrders={assemblyOrders}
             productionEmployees={productionEmployees}
+            onView={handleView}
+            onUpdateStatus={updateServiceOrderStatus}
+            onAddNote={handleAddNote}
+            onAssignEmployee={handleAssignEmployee}
           />
-        )}
+        </Collapse.Panel>
 
-        {activeTab === 'productivity' && (
-          <ProductivityDashboard
-            serviceOrders={filteredServiceOrders}
-            productionEmployees={productionEmployees}
-          />
-        )}
-      </div>
+        <Collapse.Panel 
+          header={getPanelHeader('📊 Produtividade', 0)} 
+          key="productivity"
+        >
+          <ProductivityDashboard />
+        </Collapse.Panel>
+      </Collapse>
     </div>
   );
 };
 
 export default ShopfloorDashboard;
+

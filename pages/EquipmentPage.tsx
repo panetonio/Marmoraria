@@ -1,4 +1,4 @@
-import React, { useState, useMemo, FC, useEffect } from 'react';
+import React, { useState, useMemo, FC, useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
 import type { Equipment, MaintenanceLog, EquipmentStatus, EquipmentCategory, Page } from '../types';
 import { mockProductionProfessionals, mockUsers } from '../data/mockData';
@@ -10,6 +10,7 @@ import Select from '../components/ui/Select';
 import StatusBadge from '../components/ui/StatusBadge';
 import type { StatusMap } from '../components/ui/StatusBadge';
 import Textarea from '../components/ui/Textarea';
+import QRCode from '../lib/qrcode-react';
 
 const equipmentStatusMap: StatusMap<EquipmentStatus> = {
     operacional: { label: 'Operacional', variant: 'success' },
@@ -156,10 +157,101 @@ interface EquipmentPageProps {
     clearSearchTarget: () => void;
 }
 
+const EquipmentDetailModal: FC<{ equipment: Equipment; isOpen: boolean; onClose: () => void }> = ({ equipment, isOpen, onClose }) => {
+    const qrCodeRef = useRef<HTMLCanvasElement | null>(null);
+
+    const handlePrint = () => {
+        const canvas = qrCodeRef.current;
+        if (!canvas) {
+            console.warn('QR code ainda não foi renderizado para impressão.');
+            return;
+        }
+
+        const dataUrl = canvas.toDataURL('image/png');
+        if (!dataUrl) {
+            console.warn('Não foi possível gerar a imagem do QR code.');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html><head><title>Etiqueta de Equipamento</title>
+            <style>
+                body { font-family: sans-serif; text-align: center; padding: 24px; color: #0f172a; }
+                .qr-img { margin: 16px auto; width: 180px; height: 180px; }
+                @media print { body { margin: 0; } }
+            </style>
+            </head><body>
+            <h2>${equipment.name}</h2>
+            <p>Serial: <strong>${equipment.serialNumber}</strong></p>
+            <p>Categoria: <strong>${equipmentCategoryMap[equipment.category]}</strong></p>
+            <img id="print-qr" src="${dataUrl}" alt="QR code do equipamento ${equipment.id}" class="qr-img" />
+            <p>Localização: ${equipment.currentLocation}</p>
+            <p>Status: ${equipmentStatusMap[equipment.status].label}</p>
+            <script>
+                const img = document.getElementById('print-qr');
+                if (img && img.complete) {
+                    window.focus();
+                    window.print();
+                } else if (img) {
+                    img.addEventListener('load', () => {
+                        window.focus();
+                        window.print();
+                    });
+                }
+            </script>
+            </body></html>
+        `);
+        printWindow.document.close();
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Detalhes do Equipamento: ${equipment.name}`} className="max-w-4xl">
+            <div className="flex flex-col md:flex-row gap-6">
+                <div className="md:w-1/2">
+                    <div className="bg-slate-100 dark:bg-dark p-4 rounded-lg text-center">
+                        <h4 className="font-semibold mb-2">QR Code de Identificação</h4>
+                        <div className="flex justify-center">
+                            <QRCode
+                                ref={qrCodeRef}
+                                value={`marmoraria://asset/equipment/${equipment.id}`}
+                                size={180}
+                                includeMargin
+                                aria-label={`QR code para ${equipment.name}`}
+                                style={{ width: 180, height: 180 }}
+                            />
+                        </div>
+                        <Button onClick={handlePrint} className="mt-4" size="sm">Imprimir Etiqueta</Button>
+                    </div>
+                </div>
+                <div className="md:w-1/2 bg-slate-50 dark:bg-slate-700/50 p-6 rounded-lg">
+                    <h3 className="text-2xl font-bold text-text-primary dark:text-slate-100 mb-1">{equipment.name}</h3>
+                    <div className="mb-4"><StatusBadge status={equipment.status} statusMap={equipmentStatusMap} /></div>
+                    
+                    <div className="space-y-3 text-text-secondary dark:text-slate-300">
+                        <p><strong>Número de Série:</strong> <span className="font-mono text-text-primary dark:text-slate-100">{equipment.serialNumber}</span></p>
+                        <p><strong>Categoria:</strong> {equipmentCategoryMap[equipment.category]}</p>
+                        <p><strong>Localização:</strong> {equipment.currentLocation}</p>
+                        <p><strong>Responsável:</strong> {mockProductionProfessionals.find(p => p.id === equipment.assignedTo)?.name || 'Não atribuído'}</p>
+                        <p><strong>Data de Compra:</strong> {new Date(equipment.purchaseDate).toLocaleDateString()}</p>
+                        <p><strong>Fim da Garantia:</strong> {new Date(equipment.warrantyEndDate).toLocaleDateString()}</p>
+                        <p><strong>NF de Compra:</strong> {equipment.purchaseInvoiceNumber}</p>
+                        <p><strong>CNPJ Fornecedor:</strong> {equipment.supplierCnpj}</p>
+                        {equipment.notes && <p><strong>Observações:</strong> {equipment.notes}</p>}
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 const EquipmentPage: FC<EquipmentPageProps> = ({ searchTarget, clearSearchTarget }) => {
     const { equipment, maintenanceLogs, saveEquipment, addMaintenanceLog } = useData();
     const [view, setView] = useState<'list' | 'form'>('list');
     const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+    const [viewingEquipment, setViewingEquipment] = useState<Equipment | null>(null);
     const [isMaintModalOpen, setIsMaintModalOpen] = useState(false);
     const [categoryFilter, setCategoryFilter] = useState<EquipmentCategory | 'all'>('all');
     
@@ -223,6 +315,13 @@ const EquipmentPage: FC<EquipmentPageProps> = ({ searchTarget, clearSearchTarget
 
     return (
         <div>
+            {viewingEquipment && (
+                <EquipmentDetailModal
+                    equipment={viewingEquipment}
+                    isOpen={!!viewingEquipment}
+                    onClose={() => setViewingEquipment(null)}
+                />
+            )}
             {isMaintModalOpen && editingEquipment && (
                 <MaintenanceFormModal 
                     isOpen={isMaintModalOpen}
@@ -295,6 +394,7 @@ const EquipmentPage: FC<EquipmentPageProps> = ({ searchTarget, clearSearchTarget
                                         <td className="p-3"><StatusBadge status={eq.status} statusMap={equipmentStatusMap} /></td>
                                         <td className="p-3">{nextMaint ? new Date(nextMaint).toLocaleDateString() : '-'}</td>
                                         <td className="p-3 text-center space-x-2">
+                                            <Button size="sm" variant="secondary" onClick={() => setViewingEquipment(eq)}>Detalhes/QR</Button>
                                             <Button size="sm" variant="secondary" onClick={() => handleAddMaintenance(eq)}>+ Manutenção</Button>
                                             <Button size="sm" variant="ghost" onClick={() => handleEdit(eq)}>Editar</Button>
                                         </td>

@@ -115,7 +115,7 @@ const StockDetailModal: FC<{ item: StockItem, isOpen: boolean, onClose: () => vo
                         <div className="flex justify-center">
                             <QRCode
                                 ref={qrCodeRef}
-                                value={item.id}
+                                value={`marmoraria://asset/stock_item/${item.id}`}
                                 size={180}
                                 includeMargin
                                 aria-label={`QR code para ${item.id}`}

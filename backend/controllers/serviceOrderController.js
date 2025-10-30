@@ -948,3 +948,48 @@ exports.confirmDeliveryData = async (req, res) => {
     });
   }
 };
+
+// Listar todas as ServiceOrders
+exports.getAllServiceOrders = async (req, res) => {
+  try {
+    const serviceOrders = await ServiceOrder.find({}).lean();
+    return res.json({
+      success: true,
+      count: serviceOrders.length,
+      data: serviceOrders,
+    });
+  } catch (error) {
+    console.error('Erro ao listar ServiceOrders:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro interno ao listar ServiceOrders',
+      error: error.message,
+    });
+  }
+};
+
+// Atualização genérica de ServiceOrder (PUT/PATCH)
+exports.updateServiceOrder = async (req, res) => {
+  try {
+    const { id } = req.params; // id lógico (string) da OS
+    const update = req.body || {};
+
+    // Não permitir a mudança do id lógico
+    if (update.id) delete update.id;
+
+    const updated = await ServiceOrder.findOneAndUpdate(
+      { id },
+      { $set: update },
+      { new: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: 'ServiceOrder não encontrada' });
+    }
+
+    return res.json({ success: true, message: 'ServiceOrder atualizada com sucesso', data: updated });
+  } catch (error) {
+    console.error('Erro ao atualizar ServiceOrder:', error);
+    return res.status(500).json({ success: false, message: 'Erro interno ao atualizar ServiceOrder', error: error.message });
+  }
+};

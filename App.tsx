@@ -4,9 +4,6 @@ import Breadcrumbs from './components/Breadcrumbs';
 import Dashboard from './pages/Dashboard';
 import QuotesPage from './pages/QuotesPage';
 import OrdersPage from './pages/OrdersPage';
-import ProductionPage from './pages/ProductionPage';
-import AssemblyPage from './pages/AssemblyPage';
-import LogisticsPage from './pages/LogisticsPage';
 import StockPage from './pages/StockPage';
 import CatalogPage from './pages/CatalogPage';
 import SuppliersPage from './pages/SuppliersPage';
@@ -20,7 +17,6 @@ import ProductionEmployeesPage from './pages/ProductionEmployeesPage';
 import ActivityLogPage from './pages/ActivityLogPage';
 import UsersPage from './pages/UsersPage';
 import ChecklistTemplatesPage from './pages/ChecklistTemplatesPage';
-import OperationsDashboardPage from './pages/OperationsDashboardPage';
 import ShopfloorDashboard from './pages/ShopfloorDashboard';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -30,6 +26,7 @@ import GlobalSearch from './components/GlobalSearch';
 import Button from './components/ui/Button';
 import { DataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { Toaster } from 'react-hot-toast';
 
 const UserInfo: React.FC = () => {
   const { currentUser, logout } = useAuth();
@@ -120,12 +117,6 @@ const MainApp: React.FC = () => {
         return <QuotesPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
       case 'orders':
         return <OrdersPage searchTarget={searchTarget} clearSearchTarget={clearSearchTarget} />;
-      case 'production':
-        return <ProductionPage />;
-      case 'assembly':
-        return <AssemblyPage />;
-      case 'logistics':
-        return <LogisticsPage />;
       case 'stock':
         return <StockPage />;
       case 'catalog':
@@ -152,8 +143,6 @@ const MainApp: React.FC = () => {
         return <UsersPage />;
       case 'checklist_templates':
         return <ChecklistTemplatesPage />;
-      case 'operations_dashboard':
-        return <OperationsDashboardPage />;
       case 'shopfloor_dashboard':
         return <ShopfloorDashboard />;
       default:
@@ -197,6 +186,36 @@ const App: React.FC = () => {
 
   return (
     <AuthProvider>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#fff',
+            color: '#333',
+          },
+          success: {
+            style: {
+              background: '#16a34a', // Cor de sucesso
+              color: '#fff',
+            },
+            iconTheme: {
+              primary: '#fff',
+              secondary: '#16a34a',
+            },
+          },
+          error: {
+            style: {
+              background: '#dc2626', // Cor de erro
+              color: '#fff',
+            },
+            iconTheme: {
+              primary: '#fff',
+              secondary: '#dc2626',
+            },
+          },
+        }}
+      />
       <AuthWrapper showRegister={showRegister} setShowRegister={setShowRegister} />
     </AuthProvider>
   );

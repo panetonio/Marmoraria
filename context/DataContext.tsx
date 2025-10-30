@@ -23,6 +23,7 @@ type DeliveryScheduleResult = {
     route?: DeliveryRoute;
 };
 import { api } from '../utils/api';
+import toast from 'react-hot-toast';
 
 // Define the shape of the context data
 interface DataContextType {
@@ -173,13 +174,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>(mockAgendaEvents);
     const [notes, setNotes] = useState<Note[]>(mockNotes);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-    const [materials, setMaterials] = useState<Material[]>(mockMaterials);
+    const [materials, setMaterials] = useState<Material[]>([]);
     const [services, setServices] = useState<Service[]>(mockServices);
     const [products, setProducts] = useState<Product[]>(mockProducts);
     const [stockItems, setStockItems] = useState<StockItem[]>(mockStockItems);
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [orders, setOrders] = useState<Order[]>(mockOrders);
-    const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(mockServiceOrders);
+    const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
     const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
     const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>(mockFinancialTransactions);
     const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -201,8 +202,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loadSuppliers();
         loadQuotes();
         loadOrders();
+        loadServiceOrders();
         loadUsers();
         loadChecklistTemplates();
+        loadMaterials();
     }, []);
 
     const generateChecklistItemId = () => {
@@ -210,6 +213,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return crypto.randomUUID();
         }
         return `chk-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    };
+
+    const loadServiceOrders = async () => {
+        try {
+            const result = await api.getAllServiceOrders();
+            if (result.success && Array.isArray(result.data)) {
+                const mapped: ServiceOrder[] = result.data.map((so: any) => ({
+                    ...so,
+                    id: so.id || so._id,
+                }));
+                setServiceOrders(mapped);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar ServiceOrders:', error);
+        }
     };
 
     const loadClients = async () => {
@@ -242,6 +260,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } catch (error) {
             console.error('Erro ao carregar fornecedores:', error);
             setSuppliers(mockSuppliers);
+        }
+    };
+
+    const loadMaterials = async () => {
+        try {
+            const result = await api.getMaterials();
+            if (result.success) {
+                const mapped = result.data.map((m: any) => ({
+                    ...m,
+                    id: m._id || m.id,
+                }));
+                setMaterials(mapped);
+            }
+        } catch (error) {
+            console.error('Erro ao carregar materiais:', error);
         }
     };
 
@@ -370,23 +403,41 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Define modifier functions
     const addClient = async (clientToSave: Client) => {
         try {
-            const result = await api.createClient(clientToSave);
-            if (result.success) {
-                await loadClients();
-            }
+            await toast.promise(
+                api.createClient(clientToSave).then(async (result: any) => {
+                    if (!result?.success) throw new Error(result?.message || 'Falha ao adicionar cliente');
+                    await loadClients();
+                    return result;
+                }),
+                {
+                    loading: 'Adicionando cliente...',
+                    success: (r: any) => r?.message || 'Cliente adicionado com sucesso!',
+                    error: (e: Error) => e?.message || 'Erro ao adicionar cliente.',
+                }
+            );
         } catch (error) {
-            console.error('Erro ao adicionar cliente:', error);
+            console.error('Erro de conexão ao adicionar cliente:', error);
+            toast.error('Erro de conexão. Tente novamente.');
         }
     };
 
     const updateClient = async (clientToUpdate: Client) => {
         try {
-            const result = await api.updateClient(clientToUpdate.id, clientToUpdate);
-            if (result.success) {
-                await loadClients();
-            }
+            await toast.promise(
+                api.updateClient(clientToUpdate.id, clientToUpdate).then(async (result: any) => {
+                    if (!result?.success) throw new Error(result?.message || 'Falha ao atualizar cliente');
+                    await loadClients();
+                    return result;
+                }),
+                {
+                    loading: 'Atualizando cliente...',
+                    success: (r: any) => r?.message || 'Cliente atualizado com sucesso!',
+                    error: (e: Error) => e?.message || 'Erro ao atualizar cliente.',
+                }
+            );
         } catch (error) {
-            console.error('Erro ao atualizar cliente:', error);
+            console.error('Erro de conexão ao atualizar cliente:', error);
+            toast.error('Erro de conexão. Tente novamente.');
         }
     };
 
@@ -404,40 +455,45 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const saveQuote = async (quoteToSave: Quote) => {
         try {
             const isNewQuote = quoteToSave.id.startsWith('new-');
-            
+
             if (isNewQuote) {
-                const result = await api.createQuote(quoteToSave);
-                if (result.success) {
-                    console.log('✅ Orçamento criado com sucesso:', result.message);
-                    await loadQuotes();
-                    // Se o novo orçamento já foi criado como aprovado, recarregar pedidos
-                    if (quoteToSave.status === 'approved') {
-                        console.log('📦 Carregando pedidos após aprovação...');
-                        await loadOrders();
-                        if (result.order) {
-                            console.log('✨ Pedido criado automaticamente:', result.order.id || result.order._id);
+                await toast.promise(
+                    api.createQuote(quoteToSave).then(async (result: any) => {
+                        if (!result?.success) throw new Error(result?.message || 'Falha ao criar orçamento');
+                        await loadQuotes();
+                        if (quoteToSave.status === 'approved') {
+                            await loadOrders();
                         }
+                        return result;
+                    }),
+                    {
+                        loading: 'Criando orçamento...',
+                        success: (r: any) => r?.message || 'Orçamento criado com sucesso!',
+                        error: (e: Error) => e?.message || 'Erro ao criar orçamento.',
                     }
-                    return;
-                }
+                );
+                return;
             } else {
-                const result = await api.updateQuote(quoteToSave.id, quoteToSave);
-                if (result.success) {
-                    console.log('✅ Orçamento atualizado com sucesso:', result.message);
-                    await loadQuotes();
-                    // Se o orçamento foi aprovado, recarregar pedidos pois um novo foi criado
-                    if (quoteToSave.status === 'approved') {
-                        console.log('📦 Carregando pedidos após aprovação...');
-                        await loadOrders();
-                        if (result.order) {
-                            console.log('✨ Pedido criado automaticamente:', result.order.id || result.order._id);
+                await toast.promise(
+                    api.updateQuote(quoteToSave.id, quoteToSave).then(async (result: any) => {
+                        if (!result?.success) throw new Error(result?.message || 'Falha ao atualizar orçamento');
+                        await loadQuotes();
+                        if (quoteToSave.status === 'approved') {
+                            await loadOrders();
                         }
+                        return result;
+                    }),
+                    {
+                        loading: 'Atualizando orçamento...',
+                        success: (r: any) => r?.message || 'Orçamento atualizado com sucesso!',
+                        error: (e: Error) => e?.message || 'Erro ao atualizar orçamento.',
                     }
-                    return;
-                }
+                );
+                return;
             }
         } catch (error) {
             console.error('❌ Erro ao salvar orçamento:', error);
+            toast.error('Erro de conexão. Tente novamente.');
         }
 
         let savedQuote = { ...quoteToSave };
@@ -477,37 +533,66 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const createServiceOrder = async (newOsData: Omit<ServiceOrder, 'id'>) => {
         try {
-            const result = await api.createServiceOrder(newOsData);
-            if (result.success && result.data) {
-                // Adicionar a nova ServiceOrder ao estado local
+            const result = await toast.promise(
+                api.createServiceOrder(newOsData),
+                {
+                    loading: 'Criando OS...',
+                    success: (r: any) => r?.message || 'OS criada com sucesso!',
+                    error: (e: Error) => e?.message || 'Erro ao criar OS.',
+                }
+            );
+            if (result?.success && result?.data) {
                 setServiceOrders(prev => [...prev, result.data]);
-                
-                // Atualizar o pedido correspondente para incluir a nova ServiceOrder
                 setOrders(prev => prev.map(order => 
                     order.id === newOsData.orderId 
                         ? { ...order, serviceOrderIds: [...(order.serviceOrderIds || []), result.data.id] }
                         : order
                 ));
-                
                 return { success: true, message: result.message };
             }
-            return { success: false, message: result.message || 'Erro ao criar ServiceOrder' };
-        } catch (error) {
+            return { success: false, message: result?.message || 'Erro ao criar ServiceOrder' };
+        } catch (error: any) {
             console.error('Erro ao criar ServiceOrder:', error);
-            return { success: false, message: 'Erro inesperado ao criar ServiceOrder' };
+            return { success: false, message: error?.message || 'Erro inesperado ao criar ServiceOrder' };
         }
     };
 
-    const updateServiceOrderPriority = (serviceOrderId: string, priority: Priority) => {
-        setServiceOrders(prev => prev.map(so => 
-            so.id === serviceOrderId ? { ...so, priority } : so
-        ));
+    const updateServiceOrderPriority = async (serviceOrderId: string, priority: Priority) => {
+        try {
+            await toast.promise(
+                api.updateServiceOrder(serviceOrderId, { priority }).then((result: any) => {
+                    if (!result?.success || !result?.data) throw new Error(result?.message || 'Falha ao atualizar prioridade');
+                    setServiceOrders(prev => prev.map(so => so.id === serviceOrderId ? result.data : so));
+                    return result;
+                }),
+                {
+                    loading: 'Atualizando prioridade...',
+                    success: (r: any) => r?.message || 'Prioridade atualizada com sucesso!',
+                    error: (e: Error) => e?.message || 'Erro ao atualizar prioridade.',
+                }
+            );
+        } catch (error) {
+            console.error('Erro ao atualizar prioridade da OS:', error);
+        }
     };
 
-    const updateServiceOrderObservations = (serviceOrderId: string, observations: string) => {
-        setServiceOrders(prev => prev.map(so => 
-            so.id === serviceOrderId ? { ...so, observations } : so
-        ));
+    const updateServiceOrderObservations = async (serviceOrderId: string, observations: string) => {
+        try {
+            await toast.promise(
+                api.updateServiceOrder(serviceOrderId, { observations }).then((result: any) => {
+                    if (!result?.success || !result?.data) throw new Error(result?.message || 'Falha ao atualizar observações');
+                    setServiceOrders(prev => prev.map(so => so.id === serviceOrderId ? result.data : so));
+                    return result;
+                }),
+                {
+                    loading: 'Salvando observações...',
+                    success: (r: any) => r?.message || 'Observações salvas!',
+                    error: (e: Error) => e?.message || 'Erro ao salvar observações.',
+                }
+            );
+        } catch (error) {
+            console.error('Erro ao atualizar observações da OS:', error);
+        }
     };
     
     const saveInvoice = (invoiceToSave: Invoice) => {
@@ -525,19 +610,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const saveSupplier = async (supplierToSave: Supplier) => {
         try {
-            if (supplierToSave.id.startsWith('new-')) {
-                const result = await api.createSupplier(supplierToSave);
-                if (result.success) {
+            const savePromise = supplierToSave.id.startsWith('new-')
+                ? api.createSupplier(supplierToSave)
+                : api.updateSupplier(supplierToSave.id, supplierToSave);
+
+            await toast.promise(
+                savePromise.then(async (result: any) => {
+                    if (!result?.success) {
+                        throw new Error(result?.message || 'Falha ao salvar');
+                    }
                     await loadSuppliers();
+                    return result;
+                }),
+                {
+                    loading: 'Salvando fornecedor...',
+                    success: (result: any) => result?.message || 'Fornecedor salvo com sucesso!',
+                    error: (err: Error) => err?.message || 'Erro ao salvar fornecedor.',
                 }
-            } else {
-                const result = await api.updateSupplier(supplierToSave.id, supplierToSave);
-                if (result.success) {
-                    await loadSuppliers();
-                }
-            }
+            );
         } catch (error) {
-            console.error('Erro ao salvar fornecedor:', error);
+            console.error('Erro de conexão ao salvar fornecedor:', error);
+            // Evitar toasts duplicados caso a promise acima já tenha mostrado um erro
+            toast.error('Erro de conexão. Tente novamente.');
         }
     };
     
@@ -588,15 +682,46 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setReceipts(prev => [...prev, newReceipt]);
     };
 
-    const saveMaterial = (material: Material) => {
-        if (material.id.startsWith('new-')) {
-            const newId = `mat-${(mockMaterials.length + materials.length + 1).toString().padStart(3, '0')}`;
-            setMaterials(prev => [...prev, { ...material, id: newId }]);
-        } else {
-            setMaterials(prev => prev.map(m => m.id === material.id ? material : m));
+    const saveMaterial = async (material: Material) => {
+        try {
+            const savePromise = !material.id || material.id.startsWith('new-')
+                ? api.createMaterial(material)
+                : api.updateMaterial(material.id, material);
+            await toast.promise(
+                savePromise.then(async (result: any) => {
+                    if (!result?.success) throw new Error(result?.message || 'Falha ao salvar material');
+                    await loadMaterials();
+                    return result;
+                }),
+                {
+                    loading: 'Salvando material...',
+                    success: (r: any) => r?.message || 'Material salvo com sucesso!',
+                    error: (e: Error) => e?.message || 'Erro ao salvar material.',
+                }
+            );
+        } catch (error) {
+            console.error('Erro ao salvar material:', error);
+            toast.error('Erro de conexão. Tente novamente.');
         }
     };
-    const deleteMaterial = (materialId: string) => setMaterials(prev => prev.filter(m => m.id !== materialId));
+    const deleteMaterial = async (materialId: string) => {
+        try {
+            await toast.promise(
+                api.deleteMaterial(materialId).then((result: any) => {
+                    if (!result?.success) throw new Error(result?.message || 'Falha ao remover material');
+                    setMaterials(prev => prev.filter(m => m.id !== materialId));
+                    return result;
+                }),
+                {
+                    loading: 'Removendo material...',
+                    success: (r: any) => r?.message || 'Material removido!',
+                    error: (e: Error) => e?.message || 'Erro ao remover material.',
+                }
+            );
+        } catch (error) {
+            console.error('Erro ao remover material:', error);
+        }
+    };
 
     const saveService = (service: Service) => {
         if (service.id.startsWith('new-')) {
@@ -767,7 +892,14 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
 
         try {
-            const result = await api.updateServiceOrderChecklist(serviceOrderId, normalized);
+            const result = await toast.promise(
+                api.updateServiceOrderChecklist(serviceOrderId, normalized),
+                {
+                    loading: 'Atualizando checklist...',
+                    success: 'Checklist atualizado!',
+                    error: 'Erro ao atualizar checklist.',
+                }
+            );
             if (result?.success) {
                 const updatedChecklist = Array.isArray(result.data?.departureChecklist)
                     ? result.data.departureChecklist.map((item: any) => ({
@@ -829,31 +961,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         customerSignature: { url: string; timestamp: string };
     }) => {
         try {
-            console.log('📋 Confirmando entrega via API para OS:', orderId);
-            
-            // Preparar dados para a API de confirmação
             const confirmationData = {
-                checklistItems: [], // Será preenchido pelo modal se necessário
+                checklistItems: [],
                 photoUrls: deliveryData.photos,
                 signatureUrl: deliveryData.customerSignature.url,
-                signatoryName: '', // Será preenchido pelo usuário se necessário
-                signatoryDocument: '' // Será preenchido pelo usuário se necessário
+                signatoryName: '',
+                signatoryDocument: ''
             };
 
-            // Chamar a API de confirmação de entrega
-            const result = await api.confirmDeliveryData(orderId, confirmationData);
-            
+            const result = await toast.promise(
+                api.confirmDeliveryData(orderId, confirmationData),
+                {
+                    loading: 'Confirmando entrega...',
+                    success: 'Entrega confirmada com sucesso!',
+                    error: 'Erro ao confirmar entrega.',
+                }
+            );
+
             if (result.success && result.data) {
-                console.log('✅ Entrega confirmada com sucesso:', result.data);
-                
-                // Atualizar o estado local com a ServiceOrder retornada pela API
                 setServiceOrders(prev => prev.map(so => 
                     so.id === orderId ? result.data : so
                 ));
-                
                 return { success: true, message: result.message };
             }
-            
             return { success: false, message: result.message || 'Erro ao confirmar entrega' };
         } catch (error) {
             console.error('❌ Erro ao confirmar entrega:', error);

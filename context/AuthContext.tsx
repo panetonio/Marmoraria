@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 import type { AuthUser, Page } from '../types';
 import { ROLES, PERMISSIONS } from '../roles';
 import { api } from '../utils/api';
+import toast from 'react-hot-toast';
 
 interface AuthContextType {
   currentUser: AuthUser | null;
@@ -48,13 +49,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             localStorage.removeItem(TOKEN_KEY);
             localStorage.removeItem(USER_KEY);
           }
+          setIsLoading(false);
         } catch (error) {
           console.error('Erro ao validar token:', error);
+          // Limpar dados mesmo em caso de erro (ex: 401 do apiFetch)
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
+          // Garantir que isLoading seja definido como false mesmo em caso de erro
+          // (importante para evitar que o usuário fique preso em loading)
+          setIsLoading(false);
+          // O apiFetch já faz redirecionamento em caso de 401, mas garantimos que
+          // o estado seja atualizado antes do redirecionamento
         }
+      } else {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     checkAuth();
@@ -79,11 +88,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setCurrentUser(user);
         localStorage.setItem(TOKEN_KEY, result.data.token);
         localStorage.setItem(USER_KEY, JSON.stringify(user));
+        toast.success('Login realizado com sucesso!');
         return true;
       }
+      toast.error('Email ou senha incorretos');
       return false;
     } catch (error) {
       console.error('Erro no login:', error);
+      toast.error('Erro ao fazer login. Tente novamente.');
       return false;
     }
   };
@@ -106,11 +118,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       
       if (result.success) {
+        toast.success('Conta criada com sucesso! Redirecionando...');
         return true;
       }
+      toast.error('Este email já está cadastrado');
       return false;
     } catch (error) {
       console.error('Erro no registro:', error);
+      toast.error('Erro ao criar conta. Tente novamente.');
       return false;
     }
   };

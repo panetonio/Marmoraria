@@ -20,11 +20,17 @@ const validateRequest = (req, res, next) => {
 
 router.use(authenticate);
 
+// Listar todas as ServiceOrders
+router.get('/', authorize('production', 'logistics', 'admin'), serviceOrderController.getAllServiceOrders);
+
 // Criar ServiceOrder
 router.post('/', authorize('production', 'admin'), serviceOrderController.createServiceOrder);
 
 // Atualizar status da ServiceOrder
 router.patch('/:id/status', authorize('production', 'admin'), serviceOrderController.updateServiceOrderStatus);
+
+// Atualização genérica da ServiceOrder
+router.put('/:id', authorize('production', 'logistics', 'admin'), serviceOrderController.updateServiceOrder);
 
 router.put(
   '/:id/checklist',

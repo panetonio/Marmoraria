@@ -13,7 +13,7 @@ const parseDate = (value, field) => {
   return date;
 };
 
-// Endpoint de produtividade de funcionários
+// Endpoint de produtividade de funcionários usando Aggregation Framework
 exports.getEmployeeProductivity = async (req, res) => {
   try {
     const { startDate, endDate, role, employeeId } = req.query;
@@ -36,135 +36,144 @@ exports.getEmployeeProductivity = async (req, res) => {
       });
     }
 
-    // Construir filtros para funcionários
-    const employeeFilters = { active: true };
-    if (role) {
-      employeeFilters.role = role;
-    }
-    if (employeeId) {
-      employeeFilters._id = employeeId;
-    }
-
-    // Buscar funcionários
-    const employees = await ProductionEmployee.find(employeeFilters);
-
-    // Agregar dados de produtividade para cada funcionário
-    const productivityData = await Promise.all(
-      employees.map(async (employee) => {
-        // Buscar OSs atribuídas ao funcionário no período
-        const serviceOrders = await ServiceOrder.find({
-          assignedToIds: employee._id,
-          deliveryDate: { $gte: start, $lte: end }
-        });
-
-        // Buscar rotas de entrega/instalação do funcionário no período
-        const deliveryRoutes = await DeliveryRoute.find({
-          teamIds: employee._id,
-          scheduledStart: { $gte: start, $lte: end }
-        });
-
-        // Buscar logs de atividade do funcionário no período
-        const activityLogs = await ActivityLog.find({
-          userId: employee._id,
-          timestamp: { $gte: start, $lte: end }
-        });
-
-        // Calcular métricas
-        const totalOrders = serviceOrders.length;
-        const completedOrders = serviceOrders.filter(so => so.isFinalized).length;
-        const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
-
-        const totalRoutes = deliveryRoutes.length;
-        const completedRoutes = deliveryRoutes.filter(route => route.status === 'completed').length;
-        const routeCompletionRate = totalRoutes > 0 ? (completedRoutes / totalRoutes) * 100 : 0;
-
-        // Calcular tempo médio de conclusão
-        const completedOrderTimes = serviceOrders
-          .filter(so => so.isFinalized)
-          .map(so => {
-            const createdAt = new Date(so.createdAt);
-            const finalizedAt = new Date(so.updatedAt);
-            return finalizedAt.getTime() - createdAt.getTime();
-          });
-
-        const avgCompletionTime = completedOrderTimes.length > 0 
-          ? completedOrderTimes.reduce((sum, time) => sum + time, 0) / completedOrderTimes.length
-          : 0;
-
-        // Calcular atividades por dia
-        const activitiesByDay = {};
-        activityLogs.forEach(log => {
-          const day = new Date(log.timestamp).toISOString().split('T')[0];
-          activitiesByDay[day] = (activitiesByDay[day] || 0) + 1;
-        });
-
-        const avgActivitiesPerDay = Object.keys(activitiesByDay).length > 0
-          ? Object.values(activitiesByDay).reduce((sum, count) => sum + count, 0) / Object.keys(activitiesByDay).length
-          : 0;
-
-        // Calcular eficiência por função
-        let efficiencyScore = 0;
-        if (employee.role === 'cortador') {
-          efficiencyScore = completionRate * 0.4 + routeCompletionRate * 0.3 + avgActivitiesPerDay * 0.3;
-        } else if (employee.role === 'acabador') {
-          efficiencyScore = completionRate * 0.5 + routeCompletionRate * 0.2 + avgActivitiesPerDay * 0.3;
-        } else if (employee.role === 'montador') {
-          efficiencyScore = routeCompletionRate * 0.6 + completionRate * 0.2 + avgActivitiesPerDay * 0.2;
-        } else if (employee.role === 'entregador') {
-          efficiencyScore = routeCompletionRate * 0.7 + completionRate * 0.1 + avgActivitiesPerDay * 0.2;
-        } else {
-          efficiencyScore = (completionRate + routeCompletionRate + avgActivitiesPerDay) / 3;
+    // Pipeline de agregação para calcular produtividade por funcionário
+    const pipeline = [
+      // 1. Filtrar OSs completadas no período
+      {
+        $match: {
+          status: 'completed',
+          updatedAt: { $gte: start, $lte: end }
         }
-
-        return {
-          employeeId: employee._id,
-          name: employee.name,
-          role: employee.role,
-          email: employee.email,
-          phone: employee.phone,
-          hireDate: employee.hireDate,
-          metrics: {
-            totalOrders,
-            completedOrders,
-            completionRate: Math.round(completionRate * 100) / 100,
-            totalRoutes,
-            completedRoutes,
-            routeCompletionRate: Math.round(routeCompletionRate * 100) / 100,
-            avgCompletionTime: Math.round(avgCompletionTime / (1000 * 60 * 60 * 24) * 100) / 100, // em dias
-            totalActivities: activityLogs.length,
-            avgActivitiesPerDay: Math.round(avgActivitiesPerDay * 100) / 100,
-            efficiencyScore: Math.round(efficiencyScore * 100) / 100
+      },
+      // 2. Desagrupar o array assignedToIds
+      {
+        $unwind: '$assignedToIds'
+      },
+      // 3. Agrupar por funcionário
+      {
+        $group: {
+          _id: '$assignedToIds',
+          totalOSCompleted: { $sum: 1 },
+          totalValueCompleted: { $sum: '$total' },
+          completedOrders: {
+            $push: {
+              serviceOrderId: '$_id',
+              clientName: '$clientName',
+              total: '$total',
+              completedAt: '$updatedAt'
+            }
+          }
+        }
+      },
+      // 4. Fazer lookup com ProductionEmployee (convertendo string para ObjectId com tratamento de erro)
+      {
+        $lookup: {
+          from: 'productionemployees',
+          let: { 
+            employeeId: {
+              $cond: {
+                if: { $eq: [{ $strLenCP: '$_id' }, 24] },
+                then: { $toObjectId: '$_id' },
+                else: null
+              }
+            }
           },
-          activitiesByDay,
-          recentOrders: serviceOrders.slice(0, 5).map(so => ({
-            id: so._id,
-            clientName: so.clientName,
-            status: so.productionStatus,
-            deliveryDate: so.deliveryDate,
-            total: so.total
-          })),
-          recentRoutes: deliveryRoutes.slice(0, 5).map(route => ({
-            id: route._id,
-            type: route.type,
-            status: route.status,
-            scheduledStart: route.scheduledStart,
-            scheduledEnd: route.scheduledEnd
-          }))
-        };
-      })
-    );
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $ne: ['$$employeeId', null] },
+                    { $eq: ['$_id', '$$employeeId'] }
+                  ]
+                }
+              }
+            }
+          ],
+          as: 'employeeData'
+        }
+      },
+      // 5. Desagrupar o array employeeData (deve ter apenas 1 elemento)
+      {
+        $unwind: {
+          path: '$employeeData',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // 6. Aplicar filtros adicionais se fornecidos
+      ...(role ? [{
+        $match: {
+          'employeeData.role': role
+        }
+      }] : []),
+      ...(employeeId ? [{
+        $match: {
+          '_id': employeeId
+        }
+      }] : []),
+      // 7. Filtrar apenas funcionários ativos
+      {
+        $match: {
+          'employeeData.active': true
+        }
+      },
+      // 8. Projetar dados formatados
+      {
+        $project: {
+          employeeId: '$_id',
+          name: '$employeeData.name',
+          role: '$employeeData.role',
+          email: '$employeeData.email',
+          phone: '$employeeData.phone',
+          hireDate: '$employeeData.hireDate',
+          totalOSCompleted: 1,
+          totalValueCompleted: 1,
+          averageValuePerOS: {
+            $cond: {
+              if: { $gt: ['$totalOSCompleted', 0] },
+              then: { $divide: ['$totalValueCompleted', '$totalOSCompleted'] },
+              else: 0
+            }
+          },
+          completedOrders: {
+            $slice: ['$completedOrders', 5] // Últimas 5 OSs
+          }
+        }
+      },
+      // 9. Ordenar por total de OSs completadas (descendente)
+      {
+        $sort: {
+          totalOSCompleted: -1,
+          totalValueCompleted: -1
+        }
+      }
+    ];
 
-    // Ordenar por score de eficiência
-    productivityData.sort((a, b) => b.metrics.efficiencyScore - a.metrics.efficiencyScore);
+    // Executar agregação
+    const result = await ServiceOrder.aggregate(pipeline);
 
     // Calcular estatísticas gerais
-    const totalEmployees = productivityData.length;
-    const avgEfficiency = productivityData.length > 0 
-      ? productivityData.reduce((sum, emp) => sum + emp.metrics.efficiencyScore, 0) / productivityData.length
-      : 0;
+    const totalEmployees = result.length;
+    const totalOSCompleted = result.reduce((sum, emp) => sum + emp.totalOSCompleted, 0);
+    const totalValueCompleted = result.reduce((sum, emp) => sum + emp.totalValueCompleted, 0);
+    const avgOSPerEmployee = totalEmployees > 0 ? Math.round((totalOSCompleted / totalEmployees) * 100) / 100 : 0;
+    const avgValuePerEmployee = totalEmployees > 0 ? Math.round((totalValueCompleted / totalEmployees) * 100) / 100 : 0;
 
-    const topPerformers = productivityData.slice(0, 3);
-    const needsImprovement = productivityData.slice(-3).reverse();
+    // Top performers (top 3)
+    const topPerformers = result.slice(0, 3).map(emp => ({
+      name: emp.name,
+      role: emp.role,
+      totalOSCompleted: emp.totalOSCompleted,
+      totalValueCompleted: emp.totalValueCompleted
+    }));
+
+    // Funcionários que precisam melhorar (últimos 3)
+    const needsImprovement = result.slice(-3).reverse().map(emp => ({
+      name: emp.name,
+      role: emp.role,
+      totalOSCompleted: emp.totalOSCompleted,
+      totalValueCompleted: emp.totalValueCompleted
+    }));
 
     res.json({
       success: true,
@@ -172,26 +181,22 @@ exports.getEmployeeProductivity = async (req, res) => {
         period: { start, end },
         summary: {
           totalEmployees,
-          avgEfficiency: Math.round(avgEfficiency * 100) / 100,
-          topPerformers: topPerformers.map(emp => ({
-            name: emp.name,
-            role: emp.role,
-            efficiencyScore: emp.metrics.efficiencyScore
-          })),
-          needsImprovement: needsImprovement.map(emp => ({
-            name: emp.name,
-            role: emp.role,
-            efficiencyScore: emp.metrics.efficiencyScore
-          }))
+          totalOSCompleted,
+          totalValueCompleted,
+          avgOSPerEmployee,
+          avgValuePerEmployee,
+          topPerformers,
+          needsImprovement
         },
-        employees: productivityData
+        employees: result
       }
     });
 
   } catch (error) {
+    console.error('Erro ao buscar produtividade de funcionários:', error);
     res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : 'Erro ao buscar dados de produtividade',
+      message: error.statusCode ? error.message : 'Erro ao buscar dados de produtividade de funcionários',
       error: error.message,
     });
   }
@@ -304,6 +309,229 @@ exports.getCompanyProductivity = async (req, res) => {
     res.status(error.statusCode || 500).json({
       success: false,
       message: error.statusCode ? error.message : 'Erro ao buscar dados de produtividade da empresa',
+      error: error.message,
+    });
+  }
+};
+
+// Endpoint de estatísticas de produção usando Aggregation Framework
+exports.getProductionStats = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Validar datas
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parâmetros obrigatórios: startDate e endDate'
+      });
+    }
+
+    const start = parseDate(startDate, 'startDate');
+    const end = parseDate(endDate, 'endDate');
+
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        message: 'Data final deve ser posterior à data inicial'
+      });
+    }
+
+    // Pipeline simplificado para calcular tempos de produção
+    const pipeline = [
+      // 1. Filtrar logs de atualização de status de OS no período
+      {
+        $match: {
+          action: 'service_order_status_updated',
+          createdAt: { $gte: start, $lte: end }
+        }
+      },
+      // 2. Ordenar por serviceOrder e createdAt
+      {
+        $sort: {
+          serviceOrder: 1,
+          createdAt: 1
+        }
+      },
+      // 3. Agrupar por serviceOrder para coletar todas as mudanças de status
+      {
+        $group: {
+          _id: '$serviceOrder',
+          statusChanges: {
+            $push: {
+              status: '$metadata.newStatus',
+              timestamp: '$createdAt',
+              oldStatus: '$metadata.oldStatus'
+            }
+          }
+        }
+      },
+      // 4. Calcular tempos de cada fase
+      {
+        $project: {
+          _id: 1,
+          cuttingTime: {
+            $let: {
+              vars: {
+                cuttingStart: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: '$statusChanges',
+                        cond: { $eq: ['$$this.status', 'cutting'] }
+                      }
+                    },
+                    0
+                  ]
+                },
+                cuttingEnd: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: '$statusChanges',
+                        cond: { $eq: ['$$this.status', 'finishing'] }
+                      }
+                    },
+                    0
+                  ]
+                }
+              },
+              in: {
+                $cond: {
+                  if: { $and: ['$$cuttingStart', '$$cuttingEnd'] },
+                  then: { $subtract: ['$$cuttingEnd.timestamp', '$$cuttingStart.timestamp'] },
+                  else: null
+                }
+              }
+            }
+          },
+          finishingTime: {
+            $let: {
+              vars: {
+                finishingStart: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: '$statusChanges',
+                        cond: { $eq: ['$$this.status', 'finishing'] }
+                      }
+                    },
+                    0
+                  ]
+                },
+                finishingEnd: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: '$statusChanges',
+                        cond: { $eq: ['$$this.status', 'quality_check'] }
+                      }
+                    },
+                    0
+                  ]
+                }
+              },
+              in: {
+                $cond: {
+                  if: { $and: ['$$finishingStart', '$$finishingEnd'] },
+                  then: { $subtract: ['$$finishingEnd.timestamp', '$$finishingStart.timestamp'] },
+                  else: null
+                }
+              }
+            }
+          },
+          qualityCheckTime: {
+            $let: {
+              vars: {
+                qualityStart: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: '$statusChanges',
+                        cond: { $eq: ['$$this.status', 'quality_check'] }
+                      }
+                    },
+                    0
+                  ]
+                },
+                qualityEnd: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: '$statusChanges',
+                        cond: { $eq: ['$$this.status', 'awaiting_logistics'] }
+                      }
+                    },
+                    0
+                  ]
+                }
+              },
+              in: {
+                $cond: {
+                  if: { $and: ['$$qualityStart', '$$qualityEnd'] },
+                  then: { $subtract: ['$$qualityEnd.timestamp', '$$qualityStart.timestamp'] },
+                  else: null
+                }
+              }
+            }
+          }
+        }
+      },
+      // 5. Agrupar para calcular médias gerais
+      {
+        $group: {
+          _id: null,
+          averageCuttingTime: { $avg: '$cuttingTime' },
+          averageFinishingTime: { $avg: '$finishingTime' },
+          averageQualityCheckTime: { $avg: '$qualityCheckTime' },
+          totalServiceOrders: { $sum: 1 },
+          totalCuttingPhases: { $sum: { $cond: [{ $ne: ['$cuttingTime', null] }, 1, 0] } },
+          totalFinishingPhases: { $sum: { $cond: [{ $ne: ['$finishingTime', null] }, 1, 0] } },
+          totalQualityCheckPhases: { $sum: { $cond: [{ $ne: ['$qualityCheckTime', null] }, 1, 0] } }
+        }
+      }
+    ];
+
+    // Executar agregação
+    const result = await ActivityLog.aggregate(pipeline);
+
+    // Processar resultado
+    const stats = result.length > 0 ? result[0] : {
+      averageCuttingTime: null,
+      averageFinishingTime: null,
+      averageQualityCheckTime: null,
+      totalServiceOrders: 0,
+      totalCuttingPhases: 0,
+      totalFinishingPhases: 0,
+      totalQualityCheckPhases: 0
+    };
+
+    // Converter tempos de milissegundos para horas
+    const convertToHours = (ms) => ms ? Math.round((ms / (1000 * 60 * 60)) * 100) / 100 : null;
+
+    res.json({
+      success: true,
+      data: {
+        period: { start, end },
+        productionStats: {
+          averageCuttingTime: convertToHours(stats.averageCuttingTime),
+          averageFinishingTime: convertToHours(stats.averageFinishingTime),
+          averageQualityCheckTime: convertToHours(stats.averageQualityCheckTime)
+        },
+        summary: {
+          totalServiceOrders: stats.totalServiceOrders,
+          totalCuttingPhases: stats.totalCuttingPhases,
+          totalFinishingPhases: stats.totalFinishingPhases,
+          totalQualityCheckPhases: stats.totalQualityCheckPhases
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas de produção:', error);
+    res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.statusCode ? error.message : 'Erro ao buscar estatísticas de produção',
       error: error.message,
     });
   }

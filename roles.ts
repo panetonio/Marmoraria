@@ -4,9 +4,7 @@ export const PERMISSIONS: Record<Page, string> = {
   dashboard: 'view_dashboard',
   quotes: 'view_quotes',
   orders: 'view_orders',
-  production: 'view_production',
-  assembly: 'view_assembly',
-  logistics: 'view_logistics',
+  shopfloor_dashboard: 'view_shopfloor',
   stock: 'view_stock',
   suppliers: 'manage_suppliers',
   crm: 'manage_crm',
@@ -19,8 +17,6 @@ export const PERMISSIONS: Record<Page, string> = {
   activity_log: 'view_activity_log',
   users: 'manage_users',
   checklist_templates: 'manage_checklists',
-  operations_dashboard: 'view_operations',
-  shopfloor_dashboard: 'view_shopfloor',
   productivity: 'view_productivity',
   vehicles: 'manage_vehicles',
 };
@@ -30,11 +26,11 @@ export const ROLES = {
     displayName: 'Administrador',
     permissions: [
         'view_dashboard', 'manage_quotes', 'view_quotes', 'view_orders',
-        'view_production', 'view_assembly', 'view_logistics', 'manage_stock', 'view_stock', 'manage_suppliers',
+        'view_shopfloor', 'manage_stock', 'view_stock', 'manage_suppliers',
         'manage_crm', 'manage_finance', 'manage_invoices', 'view_receipts',
         'manage_catalog', 'manage_stock_levels', 'assign_production_resources', 'manage_users',
         'manage_equipment', 'manage_production_employees', 'view_activity_log',
-        'manage_checklists', 'view_operations', 'view_shopfloor', 'view_productivity'
+        'manage_checklists', 'view_productivity', 'manage_vehicles'
     ],
   },
   vendedor: {
@@ -54,9 +50,7 @@ export const ROLES = {
     permissions: [
       PERMISSIONS.dashboard,
       PERMISSIONS.orders,
-      PERMISSIONS.production,
-      PERMISSIONS.assembly,
-      PERMISSIONS.logistics,
+      PERMISSIONS.shopfloor_dashboard, // Dashboard unificado de operações
       PERMISSIONS.stock, // Permite ver a página de estoque
       'manage_stock',   // Permite ações como alocar chapas
       PERMISSIONS.suppliers,
@@ -65,9 +59,8 @@ export const ROLES = {
       PERMISSIONS.equipment, // Produção precisa gerenciar equipamentos
       PERMISSIONS.production_employees, // Produção precisa gerenciar funcionários
       PERMISSIONS.checklist_templates,
-      PERMISSIONS.operations_dashboard, // Dashboard de operações
-      PERMISSIONS.shopfloor_dashboard, // Dashboard de shopfloor
       PERMISSIONS.productivity, // Relatórios de produtividade
+      PERMISSIONS.vehicles, // Produção precisa gerenciar veículos
     ],
   },
   aux_administrativo: {
@@ -76,7 +69,7 @@ export const ROLES = {
       PERMISSIONS.dashboard,
       PERMISSIONS.quotes, // Apenas visualiza orçamentos
       PERMISSIONS.orders,
-      PERMISSIONS.logistics,
+      PERMISSIONS.shopfloor_dashboard, // Dashboard unificado de operações
       PERMISSIONS.suppliers,
       PERMISSIONS.crm,
       PERMISSIONS.finance,
@@ -86,9 +79,8 @@ export const ROLES = {
       PERMISSIONS.equipment, // Auxiliar administrativo pode gerenciar equipamentos
       PERMISSIONS.production_employees, // Auxiliar administrativo pode gerenciar funcionários
       PERMISSIONS.checklist_templates,
-      PERMISSIONS.operations_dashboard, // Dashboard de operações
-      PERMISSIONS.shopfloor_dashboard, // Dashboard de shopfloor
       PERMISSIONS.productivity, // Relatórios de produtividade
+      PERMISSIONS.vehicles, // Auxiliar administrativo pode gerenciar veículos
     ],
   },
 };

@@ -64,11 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
       dashboard: <DashboardOutlined />,
       quotes: <FileTextOutlined />,
       orders: <ShoppingCartOutlined />,
-      production: <ToolOutlined />,
-      assembly: <BuildOutlined />,
-      logistics: <TruckOutlined />,
-      operations_dashboard: <FileDoneOutlined />,
-      shopfloor_dashboard: <SettingOutlined />,
+      shopfloor_dashboard: <ToolOutlined />,
       stock: <InboxOutlined />,
       catalog: <AppstoreOutlined />,
       suppliers: <TeamOutlined />,
@@ -93,11 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
       dashboard: 'Dashboard',
       quotes: 'Orçamentos',
       orders: 'Pedidos',
-      production: 'Produção',
-      assembly: 'Montagem',
-      logistics: 'Logística',
-      operations_dashboard: 'Operações',
-      shopfloor_dashboard: 'Shopfloor',
+      shopfloor_dashboard: 'Operações',
       stock: 'Estoque',
       catalog: 'Catálogo',
       suppliers: 'Fornecedores',
@@ -121,19 +113,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
     { key: 'dashboard', icon: getIcon('dashboard'), label: getLabel('dashboard') },
     { key: 'quotes', icon: getIcon('quotes'), label: getLabel('quotes') },
     { key: 'orders', icon: getIcon('orders'), label: getLabel('orders') },
-    { key: 'operations_dashboard', icon: getIcon('operations_dashboard'), label: getLabel('operations_dashboard') },
-    { 
-      key: 'shopfloor', 
-      icon: getIcon('shopfloor_dashboard'), 
-      label: getLabel('shopfloor_dashboard'),
-      children: [
-        { key: 'shopfloor_dashboard', icon: getIcon('shopfloor_dashboard'), label: 'Dashboard' },
-        { key: 'production', icon: getIcon('production'), label: getLabel('production') },
-        { key: 'logistics', icon: getIcon('logistics'), label: getLabel('logistics') },
-        { key: 'assembly', icon: getIcon('assembly'), label: getLabel('assembly') },
-        { key: 'productivity', icon: getIcon('productivity'), label: 'Produtividade' },
-      ].filter(subItem => hasAccessToPage(subItem.key as Page))
-    },
+    { key: 'shopfloor_dashboard', icon: getIcon('shopfloor_dashboard'), label: getLabel('shopfloor_dashboard') },
     { key: 'checklist_templates', icon: getIcon('checklist_templates'), label: getLabel('checklist_templates') },
     { key: 'stock', icon: getIcon('stock'), label: getLabel('stock') },
     { key: 'catalog', icon: getIcon('catalog'), label: getLabel('catalog') },
@@ -147,13 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
     { key: 'production_employees', icon: getIcon('production_employees'), label: getLabel('production_employees') },
     { key: 'activity_log', icon: getIcon('activity_log'), label: getLabel('activity_log') },
     { key: 'users', icon: getIcon('users'), label: getLabel('users') },
-  ].filter(item => {
-    // Para itens com children, verificar se tem pelo menos um filho acessível
-    if (item.children) {
-      return item.children.length > 0;
-    }
-    return hasAccessToPage(item.key as Page);
-  });
+  ].filter(item => hasAccessToPage(item.key as Page));
 
   const handleMenuClick = ({ key }: { key: string }) => {
     setCurrentPage(key as Page);

@@ -19,10 +19,33 @@ const getHeaders = (includeAuth = true) => {
   return headers;
 };
 
+// Interceptor global para erros 401
+const apiFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  const response = await fetch(url, options);
+  
+  // Verificar se é erro 401 e não é a rota de login
+  if (response.status === 401 && !url.includes('/auth/login')) {
+    console.error('🔒 Sessão expirada ou não autorizada. Redirecionando para login...');
+    
+    // Limpar dados do localStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    // Redirecionar para a raiz (página de login)
+    window.location.href = '/';
+    
+    // Lançar erro para interromper o fluxo
+    throw new Error('Sessão expirada. Redirecionando...');
+  }
+  
+  // Retornar a resposta normalmente
+  return response;
+};
+
 export const api = {
   // Autenticação
   async login(email: string, password: string) {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await apiFetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: getHeaders(false),
       body: JSON.stringify({ email, password }),
@@ -36,7 +59,7 @@ export const api = {
     password: string;
     role: string;
   }) {
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const response = await apiFetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: getHeaders(false),
       body: JSON.stringify(userData),
@@ -45,7 +68,7 @@ export const api = {
   },
 
   async getMe() {
-    const response = await fetch(`${API_URL}/auth/me`, {
+    const response = await apiFetch(`${API_URL}/auth/me`, {
       headers: getHeaders(),
     });
     return response.json();
@@ -53,7 +76,7 @@ export const api = {
 
   // Upload de imagens
   async uploadImage(imageData: string) {
-    const response = await fetch(`${API_URL}/uploads/image`, {
+    const response = await apiFetch(`${API_URL}/uploads/image`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ imageData }),
@@ -63,14 +86,14 @@ export const api = {
 
   // Usuários
   async getUsers() {
-    const response = await fetch(`${API_URL}/users`, {
+    const response = await apiFetch(`${API_URL}/users`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createUser(userData: any) {
-    const response = await fetch(`${API_URL}/users`, {
+    const response = await apiFetch(`${API_URL}/users`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(userData),
@@ -79,7 +102,7 @@ export const api = {
   },
 
   async updateUser(id: string, userData: any) {
-    const response = await fetch(`${API_URL}/users/${id}`, {
+    const response = await apiFetch(`${API_URL}/users/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(userData),
@@ -88,7 +111,7 @@ export const api = {
   },
 
   async deleteUser(id: string) {
-    const response = await fetch(`${API_URL}/users/${id}`, {
+    const response = await apiFetch(`${API_URL}/users/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -96,7 +119,7 @@ export const api = {
   },
 
   async toggleUserStatus(id: string) {
-    const response = await fetch(`${API_URL}/users/${id}/toggle-status`, {
+    const response = await apiFetch(`${API_URL}/users/${id}/toggle-status`, {
       method: 'PATCH',
       headers: getHeaders(),
     });
@@ -104,7 +127,7 @@ export const api = {
   },
 
   async updateUserPermissions(id: string, permissions: string[]) {
-    const response = await fetch(`${API_URL}/users/${id}/permissions`, {
+    const response = await apiFetch(`${API_URL}/users/${id}/permissions`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ customPermissions: permissions }),
@@ -114,21 +137,39 @@ export const api = {
 
   // Clientes
   async getClients() {
-    const response = await fetch(`${API_URL}/clients`, {
+    const response = await apiFetch(`${API_URL}/clients`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
+  // Materiais
+  async getMaterials() {
+    const response = await apiFetch(`${API_URL}/materials`, { headers: getHeaders() });
+    return response.json();
+  },
+  async createMaterial(material: any) {
+    const response = await apiFetch(`${API_URL}/materials`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(material) });
+    return response.json();
+  },
+  async updateMaterial(id: string, material: any) {
+    const response = await apiFetch(`${API_URL}/materials/${id}`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(material) });
+    return response.json();
+  },
+  async deleteMaterial(id: string) {
+    const response = await apiFetch(`${API_URL}/materials/${id}`, { method: 'DELETE', headers: getHeaders() });
+    return response.json();
+  },
+
   async getClientById(id: string) {
-    const response = await fetch(`${API_URL}/clients/${id}`, {
+    const response = await apiFetch(`${API_URL}/clients/${id}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createClient(clientData: any) {
-    const response = await fetch(`${API_URL}/clients`, {
+    const response = await apiFetch(`${API_URL}/clients`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(clientData),
@@ -137,7 +178,7 @@ export const api = {
   },
 
   async updateClient(id: string, clientData: any) {
-    const response = await fetch(`${API_URL}/clients/${id}`, {
+    const response = await apiFetch(`${API_URL}/clients/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(clientData),
@@ -146,7 +187,7 @@ export const api = {
   },
 
   async deleteClient(id: string) {
-    const response = await fetch(`${API_URL}/clients/${id}`, {
+    const response = await apiFetch(`${API_URL}/clients/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -155,14 +196,14 @@ export const api = {
 
   // Anotações de clientes
   async getClientNotes(clientId: string) {
-    const response = await fetch(`${API_URL}/clients/${clientId}/notes`, {
+    const response = await apiFetch(`${API_URL}/clients/${clientId}/notes`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createClientNote(clientId: string, content: string) {
-    const response = await fetch(`${API_URL}/clients/${clientId}/notes`, {
+    const response = await apiFetch(`${API_URL}/clients/${clientId}/notes`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ content }),
@@ -171,7 +212,7 @@ export const api = {
   },
 
   async updateClientNote(clientId: string, noteId: string, content: string) {
-    const response = await fetch(`${API_URL}/clients/${clientId}/notes/${noteId}`, {
+    const response = await apiFetch(`${API_URL}/clients/${clientId}/notes/${noteId}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify({ content }),
@@ -180,7 +221,7 @@ export const api = {
   },
 
   async deleteClientNote(clientId: string, noteId: string) {
-    const response = await fetch(`${API_URL}/clients/${clientId}/notes/${noteId}`, {
+    const response = await apiFetch(`${API_URL}/clients/${clientId}/notes/${noteId}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -188,14 +229,14 @@ export const api = {
   },
 
   async getChecklistTemplates() {
-    const response = await fetch(`${API_URL}/checklist-templates`, {
+    const response = await apiFetch(`${API_URL}/checklist-templates`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createChecklistTemplate(template: { name: string; type: 'entrega' | 'montagem'; items: { text: string }[] }) {
-    const response = await fetch(`${API_URL}/checklist-templates`, {
+    const response = await apiFetch(`${API_URL}/checklist-templates`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(template),
@@ -204,7 +245,7 @@ export const api = {
   },
 
   async updateChecklistTemplate(id: string, template: { name: string; type: 'entrega' | 'montagem'; items: { text: string }[] }) {
-    const response = await fetch(`${API_URL}/checklist-templates/${id}`, {
+    const response = await apiFetch(`${API_URL}/checklist-templates/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(template),
@@ -213,7 +254,7 @@ export const api = {
   },
 
   async deleteChecklistTemplate(id: string) {
-    const response = await fetch(`${API_URL}/checklist-templates/${id}`, {
+    const response = await apiFetch(`${API_URL}/checklist-templates/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -221,7 +262,7 @@ export const api = {
   },
 
   async updateServiceOrderChecklist(id: string, checklist: { id: string; text: string; checked: boolean }[]) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/checklist`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/checklist`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify({ checklist }),
@@ -231,21 +272,21 @@ export const api = {
 
   // Fornecedores
   async getSuppliers() {
-    const response = await fetch(`${API_URL}/suppliers`, {
+    const response = await apiFetch(`${API_URL}/suppliers`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async getSupplierById(id: string) {
-    const response = await fetch(`${API_URL}/suppliers/${id}`, {
+    const response = await apiFetch(`${API_URL}/suppliers/${id}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createSupplier(supplierData: any) {
-    const response = await fetch(`${API_URL}/suppliers`, {
+    const response = await apiFetch(`${API_URL}/suppliers`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(supplierData),
@@ -254,7 +295,7 @@ export const api = {
   },
 
   async updateSupplier(id: string, supplierData: any) {
-    const response = await fetch(`${API_URL}/suppliers/${id}`, {
+    const response = await apiFetch(`${API_URL}/suppliers/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(supplierData),
@@ -263,7 +304,7 @@ export const api = {
   },
 
   async deleteSupplier(id: string) {
-    const response = await fetch(`${API_URL}/suppliers/${id}`, {
+    const response = await apiFetch(`${API_URL}/suppliers/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -272,21 +313,21 @@ export const api = {
 
   // Orçamentos
   async getQuotes() {
-    const response = await fetch(`${API_URL}/quotes`, {
+    const response = await apiFetch(`${API_URL}/quotes`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async getQuoteById(id: string) {
-    const response = await fetch(`${API_URL}/quotes/${id}`, {
+    const response = await apiFetch(`${API_URL}/quotes/${id}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createQuote(quoteData: any) {
-    const response = await fetch(`${API_URL}/quotes`, {
+    const response = await apiFetch(`${API_URL}/quotes`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(quoteData),
@@ -295,7 +336,7 @@ export const api = {
   },
 
   async updateQuote(id: string, quoteData: any) {
-    const response = await fetch(`${API_URL}/quotes/${id}`, {
+    const response = await apiFetch(`${API_URL}/quotes/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(quoteData),
@@ -304,7 +345,7 @@ export const api = {
   },
 
   async deleteQuote(id: string) {
-    const response = await fetch(`${API_URL}/quotes/${id}`, {
+    const response = await apiFetch(`${API_URL}/quotes/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -313,21 +354,21 @@ export const api = {
 
   // Pedidos
   async getOrders() {
-    const response = await fetch(`${API_URL}/orders`, {
+    const response = await apiFetch(`${API_URL}/orders`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async getOrderById(id: string) {
-    const response = await fetch(`${API_URL}/orders/${id}`, {
+    const response = await apiFetch(`${API_URL}/orders/${id}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createOrder(orderData: any) {
-    const response = await fetch(`${API_URL}/orders`, {
+    const response = await apiFetch(`${API_URL}/orders`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(orderData),
@@ -336,7 +377,7 @@ export const api = {
   },
 
   async updateOrder(id: string, orderData: any) {
-    const response = await fetch(`${API_URL}/orders/${id}`, {
+    const response = await apiFetch(`${API_URL}/orders/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(orderData),
@@ -345,7 +386,7 @@ export const api = {
   },
 
   async deleteOrder(id: string) {
-    const response = await fetch(`${API_URL}/orders/${id}`, {
+    const response = await apiFetch(`${API_URL}/orders/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -354,14 +395,14 @@ export const api = {
 
   // Veículos
   async getVehicles() {
-    const response = await fetch(`${API_URL}/vehicles`, {
+    const response = await apiFetch(`${API_URL}/vehicles`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createVehicle(vehicleData: any) {
-    const response = await fetch(`${API_URL}/vehicles`, {
+    const response = await apiFetch(`${API_URL}/vehicles`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(vehicleData),
@@ -370,7 +411,7 @@ export const api = {
   },
 
   async updateVehicle(id: string, vehicleData: any) {
-    const response = await fetch(`${API_URL}/vehicles/${id}`, {
+    const response = await apiFetch(`${API_URL}/vehicles/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(vehicleData),
@@ -379,7 +420,7 @@ export const api = {
   },
 
   async deleteVehicle(id: string) {
-    const response = await fetch(`${API_URL}/vehicles/${id}`, {
+    const response = await apiFetch(`${API_URL}/vehicles/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -394,14 +435,14 @@ export const api = {
     if (params.end) query.append('end', params.end);
 
     const qs = query.toString();
-    const response = await fetch(`${API_URL}/delivery-routes${qs ? `?${qs}` : ''}`, {
+    const response = await apiFetch(`${API_URL}/delivery-routes${qs ? `?${qs}` : ''}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createDeliveryRoute(routeData: any) {
-    const response = await fetch(`${API_URL}/delivery-routes`, {
+    const response = await apiFetch(`${API_URL}/delivery-routes`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(routeData),
@@ -417,7 +458,7 @@ export const api = {
     vehicleId?: string;
     notes?: string;
   }) {
-    const response = await fetch(`${API_URL}/delivery-routes/installation`, {
+    const response = await apiFetch(`${API_URL}/delivery-routes/installation`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(routeData),
@@ -426,7 +467,7 @@ export const api = {
   },
 
   async updateDeliveryRoute(id: string, routeData: any) {
-    const response = await fetch(`${API_URL}/delivery-routes/${id}`, {
+    const response = await apiFetch(`${API_URL}/delivery-routes/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(routeData),
@@ -435,7 +476,7 @@ export const api = {
   },
 
   async deleteDeliveryRoute(id: string) {
-    const response = await fetch(`${API_URL}/delivery-routes/${id}`, {
+    const response = await apiFetch(`${API_URL}/delivery-routes/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -447,7 +488,7 @@ export const api = {
     if (routeId) {
       query.append('routeId', routeId);
     }
-    const response = await fetch(`${API_URL}/delivery-routes/availability/check?${query.toString()}`, {
+    const response = await apiFetch(`${API_URL}/delivery-routes/availability/check?${query.toString()}`, {
       headers: getHeaders(),
     });
     return response.json();
@@ -467,7 +508,7 @@ export const api = {
     if (params.role) {
       query.append('role', params.role);
     }
-    const response = await fetch(`${API_URL}/delivery-routes/resources/availability?${query.toString()}`, {
+    const response = await apiFetch(`${API_URL}/delivery-routes/resources/availability?${query.toString()}`, {
       headers: getHeaders(),
     });
     return response.json();
@@ -481,21 +522,21 @@ export const api = {
     if (params.active !== undefined) query.append('active', String(params.active));
 
     const qs = query.toString();
-    const response = await fetch(`${API_URL}/production-employees${qs ? `?${qs}` : ''}`, {
+    const response = await apiFetch(`${API_URL}/production-employees${qs ? `?${qs}` : ''}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async getProductionEmployeeById(id: string) {
-    const response = await fetch(`${API_URL}/production-employees/${id}`, {
+    const response = await apiFetch(`${API_URL}/production-employees/${id}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createProductionEmployee(employeeData: any) {
-    const response = await fetch(`${API_URL}/production-employees`, {
+    const response = await apiFetch(`${API_URL}/production-employees`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(employeeData),
@@ -504,7 +545,7 @@ export const api = {
   },
 
   async updateProductionEmployee(id: string, employeeData: any) {
-    const response = await fetch(`${API_URL}/production-employees/${id}`, {
+    const response = await apiFetch(`${API_URL}/production-employees/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(employeeData),
@@ -513,7 +554,7 @@ export const api = {
   },
 
   async deleteProductionEmployee(id: string) {
-    const response = await fetch(`${API_URL}/production-employees/${id}`, {
+    const response = await apiFetch(`${API_URL}/production-employees/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -521,7 +562,7 @@ export const api = {
   },
 
   async assignEmployeeToTask(id: string, taskData: { taskId: string; taskType: 'delivery_route' | 'service_order' }) {
-    const response = await fetch(`${API_URL}/production-employees/${id}/assign`, {
+    const response = await apiFetch(`${API_URL}/production-employees/${id}/assign`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(taskData),
@@ -530,41 +571,24 @@ export const api = {
   },
 
   async releaseEmployeeFromTask(id: string) {
-    const response = await fetch(`${API_URL}/production-employees/${id}/release`, {
+    const response = await apiFetch(`${API_URL}/production-employees/${id}/release`, {
       method: 'POST',
       headers: getHeaders(),
     });
     return response.json();
   },
 
-  // Estoque
-  async getStockItemByQrCode(id: string) {
-    const response = await fetch(`${API_URL}/stock/qrcode/${encodeURIComponent(id)}`, {
-      headers: getHeaders(),
-    });
-    return response.json();
-  },
-
-  async updateStockItemStatus(id: string, data: { status?: string; location?: string }) {
-    const response = await fetch(`${API_URL}/stock/qrcode/${encodeURIComponent(id)}/status`, {
-      method: 'PUT',
-      headers: getHeaders(),
-      body: JSON.stringify(data),
-    });
-    return response.json();
-  },
-
-  // Ativos
+  // Ativos (Endpoints Universais de Assets)
   async scanAssetQrCode(data: string) {
     const query = new URLSearchParams({ data });
-    const response = await fetch(`${API_URL}/assets/qrcode-scan?${query.toString()}`, {
+    const response = await apiFetch(`${API_URL}/assets/qrcode-scan?${query.toString()}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async updateAssetStatus(type: string, id: string, payload: { status: string }) {
-    const response = await fetch(`${API_URL}/assets/${encodeURIComponent(type)}/${encodeURIComponent(id)}/status`, {
+    const response = await apiFetch(`${API_URL}/assets/${encodeURIComponent(type)}/${encodeURIComponent(id)}/status`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -573,7 +597,7 @@ export const api = {
   },
 
   async updateAssetLocation(type: string, id: string, payload: { location: string }) {
-    const response = await fetch(`${API_URL}/assets/${encodeURIComponent(type)}/${encodeURIComponent(id)}/location`, {
+    const response = await apiFetch(`${API_URL}/assets/${encodeURIComponent(type)}/${encodeURIComponent(id)}/location`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -595,7 +619,7 @@ export const api = {
     if (params.role) query.append('role', params.role);
     if (params.employeeId) query.append('employeeId', params.employeeId);
 
-    const response = await fetch(`${API_URL}/reports/productivity/employees?${query.toString()}`, {
+    const response = await apiFetch(`${API_URL}/reports/productivity/employees?${query.toString()}`, {
       headers: getHeaders(),
     });
     return response.json();
@@ -610,7 +634,7 @@ export const api = {
       endDate: params.endDate
     });
 
-    const response = await fetch(`${API_URL}/reports/productivity/company?${query.toString()}`, {
+    const response = await apiFetch(`${API_URL}/reports/productivity/company?${query.toString()}`, {
       headers: getHeaders(),
     });
     return response.json();
@@ -618,14 +642,14 @@ export const api = {
 
   // Order Addendums
   async getOrderAddendums(orderId: string) {
-    const response = await fetch(`${API_URL}/order-addendums/order/${orderId}`, {
+    const response = await apiFetch(`${API_URL}/order-addendums/order/${orderId}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async createOrderAddendum(orderId: string, addendumData: any) {
-    const response = await fetch(`${API_URL}/order-addendums/order/${orderId}`, {
+    const response = await apiFetch(`${API_URL}/order-addendums/order/${orderId}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(addendumData),
@@ -634,7 +658,7 @@ export const api = {
   },
 
   async updateOrderAddendumStatus(addendumId: string, status: 'approved' | 'rejected') {
-    const response = await fetch(`${API_URL}/order-addendums/${addendumId}/status`, {
+    const response = await apiFetch(`${API_URL}/order-addendums/${addendumId}/status`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ status }),
@@ -644,7 +668,7 @@ export const api = {
 
   // Service Order Exception Management
   async markOrderForRework(id: string, reason?: string) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/mark-rework`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/mark-rework`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ reason }),
@@ -653,7 +677,7 @@ export const api = {
   },
 
   async reportDeliveryIssue(id: string, details: string) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/report-delivery-issue`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/report-delivery-issue`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ reason: details }),
@@ -662,7 +686,7 @@ export const api = {
   },
 
   async requestInstallationReview(id: string, reason?: string) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/request-review`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/request-review`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ reason }),
@@ -671,7 +695,7 @@ export const api = {
   },
 
   async resolveOrderIssue(id: string, resolutionDetails?: string, nextStatus?: string) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/resolve-issue`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/resolve-issue`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ resolutionDetails, nextStatus }),
@@ -680,7 +704,7 @@ export const api = {
   },
 
   async resolveRework(id: string, resolutionDetails?: string, nextStatus?: string) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/resolve-rework`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/resolve-rework`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ resolutionDetails, nextStatus }),
@@ -689,7 +713,7 @@ export const api = {
   },
 
   async resolveDeliveryIssue(id: string, resolutionDetails?: string, nextStatus?: string) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/resolve-delivery-issue`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/resolve-delivery-issue`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ resolutionDetails, nextStatus }),
@@ -698,7 +722,7 @@ export const api = {
   },
 
   async completeReview(id: string, resolutionDetails?: string, nextStatus?: string) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/complete-review`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/complete-review`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ resolutionDetails, nextStatus }),
@@ -707,8 +731,14 @@ export const api = {
   },
 
   // Service Order Management
+  async getAllServiceOrders() {
+    const response = await apiFetch(`${API_URL}/serviceorders`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
   async createServiceOrder(serviceOrderData: any) {
-    const response = await fetch(`${API_URL}/serviceorders`, {
+    const response = await apiFetch(`${API_URL}/serviceorders`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(serviceOrderData),
@@ -717,7 +747,7 @@ export const api = {
   },
 
   async updateServiceOrderStatus(id: string, status: string, allocatedSlabId?: string) {
-    const response = await fetch(`${API_URL}/serviceorders/${id}/status`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}/status`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ status, allocatedSlabId }),
@@ -725,23 +755,32 @@ export const api = {
     return response.json();
   },
 
+  async updateServiceOrder(id: string, updateData: any) {
+    const response = await apiFetch(`${API_URL}/serviceorders/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(updateData),
+    });
+    return response.json();
+  },
+
   // CutPiece Management
   async getCutPiecesForOS(serviceOrderId: string) {
-    const response = await fetch(`${API_URL}/cut-pieces/by-os/${encodeURIComponent(serviceOrderId)}`, {
+    const response = await apiFetch(`${API_URL}/cut-pieces/by-os/${encodeURIComponent(serviceOrderId)}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async getCutPieceByPieceId(pieceId: string) {
-    const response = await fetch(`${API_URL}/cut-pieces/by-id/${encodeURIComponent(pieceId)}`, {
+    const response = await apiFetch(`${API_URL}/cut-pieces/by-id/${encodeURIComponent(pieceId)}`, {
       headers: getHeaders(),
     });
     return response.json();
   },
 
   async updateCutPieceStatus(pieceId: string, status: string, reason?: string) {
-    const response = await fetch(`${API_URL}/cut-pieces/${encodeURIComponent(pieceId)}/status`, {
+    const response = await apiFetch(`${API_URL}/cut-pieces/${encodeURIComponent(pieceId)}/status`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ status, reason }),
@@ -750,7 +789,7 @@ export const api = {
   },
 
   async updateCutPieceLocation(pieceId: string, location: string) {
-    const response = await fetch(`${API_URL}/cut-pieces/${encodeURIComponent(pieceId)}/location`, {
+    const response = await apiFetch(`${API_URL}/cut-pieces/${encodeURIComponent(pieceId)}/location`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ location }),
@@ -766,7 +805,7 @@ export const api = {
     signatoryName?: string;
     signatoryDocument?: string;
   }) {
-    const response = await fetch(`${API_URL}/serviceorders/${encodeURIComponent(serviceOrderId)}/confirm-delivery`, {
+    const response = await apiFetch(`${API_URL}/serviceorders/${encodeURIComponent(serviceOrderId)}/confirm-delivery`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
