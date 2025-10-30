@@ -339,11 +339,19 @@ export interface ResourceAvailability {
 export interface Invoice {
   id: string;
   orderId: string;
+  clientId?: string;
   clientName: string;
+  buyerDocument?: string;
+  buyerAddress?: Address;
+  items: QuoteItem[]; // espelha os itens do pedido
   total: number;
   status: InvoiceStatus;
-  issueDate: string | null;
+  issueDate?: string | null;
+  nfeKey?: string;
+  nfeXmlUrl?: string;
+  nfePdfUrl?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type StockItemStatus =
@@ -497,4 +505,23 @@ export interface ActivityLog {
   ipAddress?: string; // IP do usuário (para auditoria)
   userAgent?: string; // User agent do navegador
   createdAt: string;
+}
+
+export type ContractStatus = 'draft' | 'sent' | 'signed' | 'archived';
+
+export interface Contract {
+  id: string;
+  orderId: string;
+  quoteId: string;
+  clientId: string;
+  documentNumber?: string;
+  status: ContractStatus;
+  contentTemplate?: string;
+  variables?: Record<string, any>;
+  signatoryInfo?: { name: string; documentNumber: string };
+  digitalSignatureUrl?: string;
+  signedAt?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
 }

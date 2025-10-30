@@ -640,6 +640,36 @@ export const api = {
     return response.json();
   },
 
+  async getMaintenanceAlerts() {
+    const response = await apiFetch(`${API_URL}/reports/maintenance-alerts`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  // Relatórios adicionais
+  async getStageDurationStats(params: { startDate: string; endDate: string }) {
+    const query = new URLSearchParams({
+      startDate: params.startDate,
+      endDate: params.endDate,
+    });
+    const response = await apiFetch(`${API_URL}/reports/stage-durations?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async getEmployeeRouteStats(params: { startDate: string; endDate: string }) {
+    const query = new URLSearchParams({
+      startDate: params.startDate,
+      endDate: params.endDate,
+    });
+    const response = await apiFetch(`${API_URL}/reports/employee-route-stats?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
   // Order Addendums
   async getOrderAddendums(orderId: string) {
     const response = await apiFetch(`${API_URL}/order-addendums/order/${orderId}`, {
@@ -809,6 +839,64 @@ export const api = {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data),
+    });
+    return response.json();
+  },
+
+  // Invoices (NF-e)
+  async getInvoices() {
+    const response = await apiFetch(`${API_URL}/invoices`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async getInvoiceById(id: string) {
+    const response = await apiFetch(`${API_URL}/invoices/${encodeURIComponent(id)}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async createInvoiceFromOrder(orderId: string) {
+    const response = await apiFetch(`${API_URL}/invoices/from-order`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ orderId }),
+    });
+    return response.json();
+  },
+
+  async simulateIssueNFe(id: string) {
+    const response = await apiFetch(`${API_URL}/invoices/${encodeURIComponent(id)}/issue`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  // Contracts
+  async createContractFromOrder(orderId: string) {
+    const response = await apiFetch(`${API_URL}/contracts/from-order`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ orderId }),
+    });
+    return response.json();
+  },
+
+  async getContractById(id: string) {
+    const response = await apiFetch(`${API_URL}/contracts/${encodeURIComponent(id)}`, {
+      headers: getHeaders(),
+    });
+    return response.json();
+  },
+
+  async signContract(id: string, signData: { name: string; documentNumber: string; signatureDataUrl: string }) {
+    const response = await apiFetch(`${API_URL}/contracts/${encodeURIComponent(id)}/sign`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(signData),
     });
     return response.json();
   },

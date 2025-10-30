@@ -12,4 +12,17 @@ router.get('/productivity/company', authorize('admin', 'production', 'finance'),
 // Relatórios de estatísticas de produção
 router.get('/production/stats', authorize('admin', 'production', 'finance'), reportsController.getProductionStats);
 
+// Duração média por etapa de produção
+router.get('/stage-durations', authorize('admin', 'production', 'finance'), reportsController.getStageDurationStats);
+
+// Estatísticas de rotas por funcionário
+router.get('/employee-route-stats', authorize('admin', 'production', 'finance'), reportsController.getEmployeeRouteStats);
+
+// Alertas de manutenção (garantias e próximas manutenções)
+router.get(
+  '/maintenance-alerts',
+  authorize('admin', 'producao', 'aux_administrativo', 'equipment'),
+  reportsController.getMaintenanceAlerts
+);
+
 module.exports = router;

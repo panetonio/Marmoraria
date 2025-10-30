@@ -48,6 +48,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Servir arquivos estáticos (uploads)
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+// Servir arquivos estáticos da NF-e simulada
+app.use('/nfe_simulada', express.static(path.join(__dirname, 'public/nfe_simulada')));
 
 // Rotas
 app.use('/api/auth', require('./routes/auth'));
@@ -67,6 +69,8 @@ app.use('/api/checklist-templates', require('./routes/checklistTemplates'));
 app.use('/api/materials', require('./routes/materials'));
 app.use('/api/uploads', require('./routes/uploads'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/contracts', require('./routes/contracts'));
 
 // Rota de teste
 app.get('/', (req, res) => {

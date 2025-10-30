@@ -12,9 +12,10 @@ declare const jspdf: any;
 interface DocumentPreviewProps {
     document: Quote | Order;
     onClose: () => void;
+    onGenerateContract?: (orderId: string) => void;
 }
 
-const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) => {
+const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose, onGenerateContract }) => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [addendums, setAddendums] = useState<OrderAddendum[]>([]);
     const [isLoadingAddendums, setIsLoadingAddendums] = useState(false);
@@ -148,13 +149,21 @@ const DocumentPreview: React.FC<DocumentPreviewProps> = ({ document, onClose }) 
 
     return (
         <Modal isOpen={true} onClose={onClose} title={`Pré-visualização do ${docTypeLabel}`} className="max-w-4xl">
-             <div className="flex justify-end mb-4">
+            <div className="flex justify-end mb-4 gap-2">
                 <Button 
                     onClick={handleGeneratePdf} 
                     disabled={isGenerating} 
                 >
                     {isGenerating ? 'Gerando PDF...' : 'Salvar PDF'}
                 </Button>
+                {isOrder && onGenerateContract && (
+                    <Button 
+                        variant="secondary"
+                        onClick={() => onGenerateContract(document.id)}
+                    >
+                        Gerar Contrato
+                    </Button>
+                )}
             </div>
             <div className="w-full bg-white mx-auto p-8 border border-border" id="printable-area">
                 <header className="flex justify-between items-center pb-6 border-b border-border">

@@ -26,6 +26,7 @@ import GlobalSearch from './components/GlobalSearch';
 import Button from './components/ui/Button';
 import { DataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import MaintenanceAlerter from './components/MaintenanceAlerter';
 import { Toaster } from 'react-hot-toast';
 
 const UserInfo: React.FC = () => {
@@ -156,6 +157,7 @@ const MainApp: React.FC = () => {
 
   return (
     <DataProvider>
+      <MaintenanceAlerter setCurrentPage={(page, id) => handleSearchNavigate(page as Page, id)} />
       <div className="flex h-screen font-sans overflow-hidden">
         <Sidebar 
           currentPage={currentPage} 

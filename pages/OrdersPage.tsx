@@ -1,10 +1,14 @@
 import React, { useState, useMemo, FC, useEffect } from 'react';
 import { mockUsers } from '../data/mockData';
-import type { Order, QuoteItem, ServiceOrder, Page, SortDirection, ProductionStatus, OrderAddendum } from '../types';
+import type { Order, QuoteItem, ServiceOrder, Page, SortDirection, ProductionStatus, OrderAddendum, Contract } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import DocumentPreview from '../components/QuotePreview';
+import { useMutation } from '@tanstack/react-query';
+import { api } from '../utils/api';
+import toast from 'react-hot-toast';
+import ContractSignModal from '../components/ContractSignModal';
 import OrderAddendumForm from '../components/OrderAddendumForm';
 import { useData } from '../context/DataContext';
 import Select from '../components/ui/Select';
@@ -542,6 +546,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
     const [addendumOrder, setAddendumOrder] = useState<Order | null>(null);
     const [orderIdFilter, setOrderIdFilter] = useState('');
+    const [contractForSign, setContractForSign] = useState<Contract | null>(null);
     const [clientFilter, setClientFilter] = useState('');
     const [startDateFilter, setStartDateFilter] = useState('');
     const [endDateFilter, setEndDateFilter] = useState('');
@@ -621,6 +626,25 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
         setAddendumOrder(order);
     };
 
+    const createContractMutation = useMutation({
+        mutationFn: (orderId: string) => api.createContractFromOrder(orderId),
+        onSuccess: (result: any) => {
+            if (result?.success && result?.data) {
+                toast.success('Contrato criado com sucesso!');
+                const c: Contract = {
+                    ...result.data,
+                    id: result.data._id || result.data.id,
+                };
+                setContractForSign(c);
+            } else {
+                toast.error(result?.message || 'Falha ao criar contrato');
+            }
+        },
+        onError: () => {
+            toast.error('Erro ao criar contrato. Tente novamente.');
+        },
+    });
+
     const handleSaveAddendum = async (addendumData: any) => {
         if (!addendumOrder) return;
         
@@ -693,7 +717,19 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                 </Modal>
             )}
             {viewingOrder && (
-                <DocumentPreview document={viewingOrder} onClose={() => setViewingOrder(null)} />
+                <DocumentPreview 
+                    document={viewingOrder} 
+                    onClose={() => setViewingOrder(null)}
+                    onGenerateContract={(orderId) => {
+                        createContractMutation.mutate(orderId);
+                    }}
+                />
+            )}
+            {contractForSign && (
+                <ContractSignModal 
+                    contract={contractForSign}
+                    onClose={() => setContractForSign(null)}
+                />
             )}
             <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Pedidos Aprovados</h1>
             <p className="mt-2 text-text-secondary dark:text-slate-400">

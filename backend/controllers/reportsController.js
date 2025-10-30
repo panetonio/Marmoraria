@@ -2,6 +2,8 @@ const ServiceOrder = require('../models/ServiceOrder');
 const DeliveryRoute = require('../models/DeliveryRoute');
 const ProductionEmployee = require('../models/ProductionEmployee');
 const ActivityLog = require('../models/ActivityLog');
+const Equipment = require('../models/Equipment');
+const MaintenanceLog = require('../models/MaintenanceLog');
 
 const parseDate = (value, field) => {
   const date = new Date(value);
@@ -534,5 +536,289 @@ exports.getProductionStats = async (req, res) => {
       message: error.statusCode ? error.message : 'Erro ao buscar estatísticas de produção',
       error: error.message,
     });
+  }
+};
+
+// Endpoint para calcular duração média por etapa de produção
+exports.getStageDurationStats = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parâmetros obrigatórios: startDate e endDate'
+      });
+    }
+
+    const start = parseDate(startDate, 'startDate');
+    const end = parseDate(endDate, 'endDate');
+
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        message: 'Data final deve ser posterior à data inicial'
+      });
+    }
+
+    // Considerar ações de atualização de status de OS
+    const statusUpdateActions = ['service_order_status_updated', 'asset_status_updated'];
+
+    const pipeline = [
+      // 1) Filtrar logs de mudança de status de OS no período
+      {
+        $match: {
+          action: { $in: statusUpdateActions },
+          relatedEntityType: 'service_order',
+          createdAt: { $gte: start, $lte: end },
+        },
+      },
+      // 2) Ordenar por OS e por tempo
+      {
+        $sort: { relatedEntityId: 1, createdAt: 1 },
+      },
+      // 3) Agrupar por OS e empilhar mudanças de status
+      {
+        $group: {
+          _id: '$relatedEntityId',
+          statusChanges: {
+            $push: {
+              status: '$metadata.newStatus',
+              timestamp: '$createdAt',
+            },
+          },
+        },
+      },
+      // 4) Projetar pares consecutivos (prev -> next) e suas durações
+      {
+        $project: {
+          transitions: {
+            $let: {
+              vars: {
+                a: '$statusChanges',
+                b: { $slice: ['$statusChanges', 1, { $size: '$statusChanges' }] },
+              },
+              in: {
+                $map: {
+                  input: { $range: [0, { $subtract: [{ $size: '$$b' }, 0] }] },
+                  as: 'idx',
+                  in: {
+                    prevStatus: { $arrayElemAt: ['$$a.status', '$$idx'] },
+                    nextStatus: { $arrayElemAt: ['$$b.status', '$$idx'] },
+                    durationMs: {
+                      $subtract: [
+                        { $arrayElemAt: ['$$b.timestamp', '$$idx'] },
+                        { $arrayElemAt: ['$$a.timestamp', '$$idx'] },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      // 5) Desmembrar as transições por OS
+      { $unwind: '$transitions' },
+      // 6) Agregar por etapa (prevStatus) e calcular média
+      {
+        $group: {
+          _id: '$transitions.prevStatus',
+          avgDurationMs: { $avg: '$transitions.durationMs' },
+          count: { $sum: 1 },
+        },
+      },
+      // 7) Projetar resposta amigável
+      {
+        $project: {
+          _id: 0,
+          stage: '$_id',
+          avgDurationHours: {
+            $cond: [
+              { $gt: ['$avgDurationMs', 0] },
+              { $round: [{ $divide: ['$avgDurationMs', 1000 * 60 * 60] }, 2] },
+              null,
+            ],
+          },
+          samples: '$count',
+        },
+      },
+      { $sort: { stage: 1 } },
+    ];
+
+    const data = await ActivityLog.aggregate(pipeline);
+
+    return res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error('Erro ao calcular duração média por etapa:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao calcular duração média por etapa',
+      error: error.message,
+    });
+  }
+};
+
+// Estatísticas de rotas por funcionário (entregas/instalações)
+exports.getEmployeeRouteStats = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parâmetros obrigatórios: startDate e endDate'
+      });
+    }
+
+    const start = parseDate(startDate, 'startDate');
+    const end = parseDate(endDate, 'endDate');
+
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        message: 'Data final deve ser posterior à data inicial'
+      });
+    }
+
+    const pipeline = [
+      // 1) Rotas concluídas no período (considera actualEnd quando houver; fallback em scheduledEnd)
+      {
+        $match: {
+          status: 'completed',
+          $or: [
+            { actualEnd: { $gte: start, $lte: end } },
+            { scheduledEnd: { $gte: start, $lte: end } },
+          ],
+        },
+      },
+      // 2) Desagrupar equipe
+      { $unwind: '$teamIds' },
+      // 3) Agrupar por funcionário
+      {
+        $group: {
+          _id: '$teamIds',
+          totalRoutes: { $sum: 1 },
+          routeTypes: { $push: '$type' },
+        },
+      },
+      // 4) Trazer dados do funcionário
+      {
+        $lookup: {
+          from: 'productionemployees',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'employee',
+        },
+      },
+      { $unwind: { path: '$employee', preserveNullAndEmptyArrays: true } },
+      // 5) Projetar estatísticas formatadas
+      {
+        $project: {
+          _id: 0,
+          employeeId: '$_id',
+          employeeName: '$employee.name',
+          employeeRole: '$employee.role',
+          totalRoutes: 1,
+          totalDeliveries: {
+            $size: {
+              $filter: {
+                input: '$routeTypes',
+                as: 't',
+                cond: { $eq: ['$$t', 'delivery'] },
+              },
+            },
+          },
+          totalInstallations: {
+            $size: {
+              $filter: {
+                input: '$routeTypes',
+                as: 't',
+                cond: { $eq: ['$$t', 'installation'] },
+              },
+            },
+          },
+        },
+      },
+      { $sort: { totalRoutes: -1, employeeName: 1 } },
+    ];
+
+    const data = await DeliveryRoute.aggregate(pipeline);
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('Erro ao obter estatísticas de rotas por funcionário:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao obter estatísticas de rotas por funcionário',
+      error: error.message,
+    });
+  }
+};
+
+// Alertas de manutenção (garantias vencendo e próximas manutenções)
+exports.getMaintenanceAlerts = async (req, res) => {
+  try {
+    const alertWindowDays = 30;
+    const today = new Date();
+    const alertDateLimit = new Date(new Date().setDate(today.getDate() + alertWindowDays));
+
+    // Garantias vencendo
+    const warrantyEquipments = await Equipment.find({
+      warrantyEndDate: { $gte: today, $lte: alertDateLimit },
+    }).select({ _id: 1, name: 1, warrantyEndDate: 1 });
+
+    const warrantyAlerts = warrantyEquipments.map((equipment) => ({
+      type: 'warranty',
+      equipmentName: equipment.name,
+      date: equipment.warrantyEndDate,
+      equipmentId: equipment._id,
+    }));
+
+    // Próximas manutenções (baseado na última nextMaintenanceDate por equipamento)
+    const maintenancePipeline = [
+      { $sort: { equipmentId: 1, maintenanceDate: -1 } },
+      {
+        $group: {
+          _id: '$equipmentId',
+          nextMaintenanceDate: { $first: '$nextMaintenanceDate' },
+        },
+      },
+      {
+        $match: {
+          nextMaintenanceDate: { $gte: today, $lte: alertDateLimit },
+        },
+      },
+      {
+        $lookup: {
+          from: 'equipments',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'equipment',
+        },
+      },
+      { $unwind: { path: '$equipment', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          type: { $literal: 'maintenance' },
+          equipmentName: '$equipment.name',
+          date: '$nextMaintenanceDate',
+          equipmentId: '$_id',
+        },
+      },
+    ];
+
+    const maintenanceAlerts = await MaintenanceLog.aggregate(maintenancePipeline);
+
+    const alertsList = [...warrantyAlerts, ...maintenanceAlerts];
+
+    return res.json({ success: true, data: alertsList });
+  } catch (error) {
+    console.error('Erro ao buscar alertas de manutenção:', error);
+    return res.status(500).json({ success: false, message: 'Erro ao buscar alertas de manutenção' });
   }
 };
