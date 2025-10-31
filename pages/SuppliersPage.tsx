@@ -3,7 +3,7 @@ import type { Supplier, Address } from '../types';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { useData } from '../context/DataContext';
-import { generateWhatsAppLink } from '../utils/helpers';
+import { generateWhatsAppLink, validateAddress } from '../utils/helpers';
 import CreateReceiptModal from '../components/CreateReceiptModal';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
@@ -73,17 +73,13 @@ const SupplierForm: React.FC<{
         if (!supplier.contactPerson.trim()) newErrors.contactPerson = "Nome do contato é obrigatório.";
         if (!supplier.phone.trim()) newErrors.phone = "Telefone é obrigatório.";
         if (!supplier.cpfCnpj.trim()) newErrors.cpfCnpj = "CPF/CNPJ é obrigatório.";
-        if (!supplier.address.address.trim()) newErrors.address = "Logradouro é obrigatório.";
-        if (!supplier.address.number.trim()) newErrors.number = "Número é obrigatório.";
-        if (!supplier.address.neighborhood.trim()) newErrors.neighborhood = "Bairro é obrigatório.";
-        if (!supplier.address.city.trim()) newErrors.city = "Cidade é obrigatória.";
-        if (!supplier.address.uf.trim() || supplier.address.uf.length !== 2) newErrors.uf = "UF inválido.";
-        if (!supplier.address.cep.trim()) newErrors.cep = "CEP é obrigatório.";
         if (!supplier.email.trim()) {
             newErrors.email = "Email é obrigatório.";
         } else if (!/\S+@\S+\.\S+/.test(supplier.email)) {
             newErrors.email = "Formato de email inválido.";
         }
+        const addressErrors = validateAddress(supplier.address);
+        Object.assign(newErrors, addressErrors);
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -99,13 +95,6 @@ const SupplierForm: React.FC<{
             ...prev,
             address: { ...prev.address, [field]: value }
         }));
-         if (errors[field]) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors[field];
-                return newErrors;
-            });
-        }
     };
 
     return (

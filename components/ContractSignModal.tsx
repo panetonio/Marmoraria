@@ -7,7 +7,6 @@ import SignaturePad from './SignaturePad';
 import ContractPreview from './ContractPreview';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 
@@ -17,18 +16,10 @@ interface ContractSignModalProps {
 }
 
 const ContractSignModal: React.FC<ContractSignModalProps> = ({ contract, onClose }) => {
-  const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [documentNumber, setDocumentNumber] = useState('');
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
-
-  const signMutation = useMutation({
-    mutationFn: (payload: { id: string; name: string; documentNumber: string; signatureDataUrl: string }) =>
-      api.signContract(payload.id, { name: payload.name, documentNumber: payload.documentNumber, signatureDataUrl: payload.signatureDataUrl }),
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-    },
-  });
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleDownloadPdf = async () => {
     const el = document.querySelector('#contract-printable-area') as HTMLElement | null;
@@ -63,16 +54,16 @@ const ContractSignModal: React.FC<ContractSignModalProps> = ({ contract, onClose
       return;
     }
 
-    await toast.promise(
-      signMutation.mutateAsync({ id: contract.id, name, documentNumber, signatureDataUrl }),
-      {
-        loading: 'Salvando assinatura...',
-        success: 'Contrato assinado com sucesso!',
-        error: 'Erro ao assinar contrato.',
-      }
-    );
-
-    onClose();
+    setIsLoading(true);
+    try {
+      await api.signContract(contract.id, { name, documentNumber, signatureDataUrl });
+      toast.success('Contrato assinado com sucesso!');
+      onClose();
+    } catch (error) {
+      toast.error('Erro ao assinar contrato.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -90,7 +81,7 @@ const ContractSignModal: React.FC<ContractSignModalProps> = ({ contract, onClose
           <Button variant="outline" onClick={handleDownloadPdf}>Baixar PDF</Button>
           <div className="space-x-2">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleSign} disabled={signMutation.isLoading}>Assinar e Salvar</Button>
+            <Button onClick={handleSign} disabled={isLoading}>Assinar e Salvar</Button>
           </div>
         </div>
       </div>

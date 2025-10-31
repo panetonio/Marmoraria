@@ -21,7 +21,7 @@ router.get('/employee-route-stats', authorize('admin', 'production', 'finance'),
 // Alertas de manutenção (garantias e próximas manutenções)
 router.get(
   '/maintenance-alerts',
-  authorize('admin', 'producao', 'aux_administrativo', 'equipment'),
+  authorize('equipment', 'admin'),
   reportsController.getMaintenanceAlerts
 );
 

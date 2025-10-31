@@ -3,7 +3,7 @@ const DeliveryRoute = require('../models/DeliveryRoute');
 const ProductionEmployee = require('../models/ProductionEmployee');
 const ActivityLog = require('../models/ActivityLog');
 const Equipment = require('../models/Equipment');
-const MaintenanceLog = require('../models/MaintenanceLog');
+// const MaintenanceLog = require('../models/MaintenanceLog');
 
 const parseDate = (value, field) => {
   const date = new Date(value);
@@ -812,9 +812,9 @@ exports.getMaintenanceAlerts = async (req, res) => {
       },
     ];
 
-    const maintenanceAlerts = await MaintenanceLog.aggregate(maintenancePipeline);
+    // const maintenanceAlerts = await MaintenanceLog.aggregate(maintenancePipeline);
 
-    const alertsList = [...warrantyAlerts, ...maintenanceAlerts];
+    const alertsList = [...warrantyAlerts]; // , ...maintenanceAlerts
 
     return res.json({ success: true, data: alertsList });
   } catch (error) {

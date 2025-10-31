@@ -13,7 +13,7 @@ import { quoteStatusMap } from '../config/statusMaps';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
 import FreightCalculator from '../components/FreightCalculator';
-import { calculateQuoteItem, validateQuoteItem } from '../utils/helpers';
+import { calculateQuoteItem, validateQuoteItem, validateAddress } from '../utils/helpers';
 import AddressForm from '../components/AddressForm';
 import Select from '../components/ui/Select';
 
@@ -261,6 +261,9 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
             } else if (quote.paymentMethod === 'cartao_credito' && (!quote.installments || quote.installments < 1 || quote.installments > 12)) {
                 newErrors.installments = "O número de parcelas deve ser entre 1 e 12.";
             }
+            // Validar endereço de entrega quando não for rascunho
+            const addressErrors = validateAddress(quote.deliveryAddress);
+            Object.assign(newErrors, addressErrors);
         }
         
         setErrors(newErrors);

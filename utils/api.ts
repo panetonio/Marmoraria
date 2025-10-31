@@ -900,4 +900,16 @@ export const api = {
     });
     return response.json();
   },
+
+  async uploadFinancialAttachment(file: File) {
+    const formData = new FormData();
+    formData.append('attachment', file);
+
+    const response = await apiFetch(`${API_URL}/financial-transactions/upload`, {
+      method: 'POST',
+      headers: getHeaders(), // não definir Content-Type manualmente
+      body: formData,
+    } as any);
+    return response.json();
+  },
 };

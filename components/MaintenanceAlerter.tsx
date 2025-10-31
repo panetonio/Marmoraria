@@ -12,14 +12,19 @@ interface MaintenanceAlert {
 
 // Adicione a prop setCurrentPage se não estiver usando react-router
 interface MaintenanceAlerterProps {
-  setCurrentPage: (page: 'equipment', id: string) => void;
+  setCurrentPage?: (page: 'equipment', id: string) => void;
+  onAlertClick?: (page: 'equipment', id: string) => void;
 }
 
-const MaintenanceAlerter: React.FC<MaintenanceAlerterProps> = ({ setCurrentPage }) => {
+const MaintenanceAlerter: React.FC<MaintenanceAlerterProps> = ({ setCurrentPage, onAlertClick }) => {
   const { currentUser, hasAccessToPage } = useAuth();
 
   const handleAlertClick = (equipmentId: string, toastId: string) => {
-    setCurrentPage('equipment', equipmentId);
+    if (onAlertClick) {
+      onAlertClick('equipment', equipmentId);
+    } else if (setCurrentPage) {
+      setCurrentPage('equipment', equipmentId);
+    }
     toast.dismiss(toastId);
   };
 

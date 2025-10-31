@@ -30,9 +30,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (token && storedUser) {
         try {
-          // Validar token com o backend
-          const result = await api.getMe();
-          if (result.success) {
+          // Validar token com o backend - usar fetch direto para evitar redirecionamento
+          const response = await fetch('http://localhost:5000/api/auth/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          const result = await response.json();
+          
+          if (response.ok && result.success) {
             const user: AuthUser = {
               id: result.data.user.id,
               name: result.data.user.name,
@@ -52,14 +60,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setIsLoading(false);
         } catch (error) {
           console.error('Erro ao validar token:', error);
-          // Limpar dados mesmo em caso de erro (ex: 401 do apiFetch)
+          // Limpar dados mesmo em caso de erro
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
-          // Garantir que isLoading seja definido como false mesmo em caso de erro
-          // (importante para evitar que o usuário fique preso em loading)
           setIsLoading(false);
-          // O apiFetch já faz redirecionamento em caso de 401, mas garantimos que
-          // o estado seja atualizado antes do redirecionamento
         }
       } else {
         setIsLoading(false);
@@ -67,6 +71,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     checkAuth();
+    
+    // Timeout de segurança para evitar loading infinito
+    const timeout = setTimeout(() => {
+      console.warn('Timeout ao verificar autenticação, limpando estado de loading');
+      setIsLoading(false);
+    }, 10000);
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {

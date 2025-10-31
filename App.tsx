@@ -157,7 +157,7 @@ const MainApp: React.FC = () => {
 
   return (
     <DataProvider>
-      <MaintenanceAlerter setCurrentPage={(page, id) => handleSearchNavigate(page as Page, id)} />
+      <MaintenanceAlerter onAlertClick={(page, id) => handleSearchNavigate(page as Page, id)} />
       <div className="flex h-screen font-sans overflow-hidden">
         <Sidebar 
           currentPage={currentPage} 

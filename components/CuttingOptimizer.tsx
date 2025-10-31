@@ -1,11 +1,19 @@
-import React, { useState, useMemo } from 'react';
-import type { QuoteItem, Material } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { QuoteItem, Material, StockItem } from '../types';
 import { useData } from '../context/DataContext';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
+// External packer and mapper declarations (assumed to exist elsewhere)
+declare class Packer {
+    constructor(width: number, height: number);
+    fit(items: any[]): void;
+}
+declare function mapQuoteItemToPackerItem(item: QuoteItem): any;
+
 interface CuttingOptimizerProps {
-    items: QuoteItem[];
+    pieces: QuoteItem[];
+    initialSlab: StockItem;
     onClose: () => void;
     onComplete: (updatedItems: QuoteItem[], wastePercentage: number) => void;
 }
@@ -55,12 +63,56 @@ const packRects = (slabWidth: number, slabHeight: number, items: QuoteItem[]) =>
 };
 
 
-const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ items, onClose, onComplete }) => {
+const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ pieces, initialSlab, onClose, onComplete }) => {
     const { materials: mockMaterials } = useData();
+    const items = pieces;
     const materialItems = useMemo(() => items.filter(i => i.type === 'material' && i.width && i.height), [items]);
     const uniqueMaterialIds = useMemo(() => [...new Set(materialItems.map(i => i.materialId!))], [materialItems]);
     
     const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(uniqueMaterialIds[0] || null);
+
+    // New states for multi-slab workflow
+    const [slabs, setSlabs] = useState<StockItem[]>([initialSlab]);
+    const [unpackedItems, setUnpackedItems] = useState<any[]>([]);
+    const [packedLayouts, setPackedLayouts] = useState<any[][]>([]);
+    const [currentSlabIndex, setCurrentSlabIndex] = useState(0);
+    const [isSlabSelectorOpen, setIsSlabSelectorOpen] = useState(false);
+
+    // Multi-slab packing logic
+    const packItems = () => {
+        // 1. Map all pieces to packer format
+        let itemsToPack = pieces.map(mapQuoteItemToPackerItem);
+        let layouts: any[][] = [];
+        let remainingItems = [...itemsToPack];
+
+        // 2. Iterate over each available slab
+        slabs.forEach((slab) => {
+            const itemsForThisSlab = remainingItems.filter(item => !item.fit);
+            if (itemsForThisSlab.length === 0) {
+                layouts.push([]);
+                return;
+            }
+
+            // 3. Run the packer for current slab
+            const packer = new Packer((slab as any).width_cm, (slab as any).height_cm);
+            packer.fit(itemsForThisSlab);
+
+            // 4. Save result for this slab
+            layouts.push(itemsForThisSlab);
+
+            // 5. Update remaining items
+            remainingItems = itemsForThisSlab.filter(item => !item.fit);
+        });
+
+        // 6. Update state
+        setPackedLayouts(layouts);
+        setUnpackedItems(remainingItems);
+    };
+
+    // Re-pack whenever slabs or pieces change
+    useEffect(() => {
+        packItems();
+    }, [slabs, pieces]);
 
     const { packedItems, wastePercentage, material } = useMemo(() => {
         if (!selectedMaterialId) return { packedItems: [], wastePercentage: 100, material: null };
@@ -81,7 +133,8 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ items, onClose, onC
 
     }, [materialItems, selectedMaterialId, mockMaterials]);
 
-    const scale = 150; // pixels per meter
+    const scale = 150; // pixels per meter (legacy for meter-based view)
+    const cmScale = 3; // pixels per centimeter for slab-based view
 
     return (
         <Modal isOpen={true} onClose={onClose} title="Otimizador de Corte" className="max-w-6xl">
@@ -89,31 +142,73 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ items, onClose, onC
                 {/* Visualization */}
                 <div className="flex-1 bg-slate-100 dark:bg-slate-900 rounded p-4 overflow-auto">
                     <h4 className="font-semibold mb-2">Visualização da Chapa</h4>
-                    {material ? (
-                        <div 
-                            className="relative bg-slate-300 dark:bg-slate-600 border-2 border-slate-400 dark:border-slate-500"
-                            style={{ width: material.slabWidth * scale, height: material.slabHeight * scale }}
-                            title={`Chapa de ${material.slabWidth}m x ${material.slabHeight}m`}
+                    <div className="flex items-center justify-center gap-4 my-4">
+                        <Button
+                            onClick={() => setCurrentSlabIndex(i => Math.max(0, i - 1))}
+                            disabled={currentSlabIndex === 0}
+                            variant="outline"
                         >
-                            {packedItems.map(item => item.placement?.fit && (
-                                <div 
-                                    key={item.id}
-                                    className="absolute bg-primary/80 border border-blue-800 text-white text-xs flex items-center justify-center p-1 overflow-hidden"
-                                    style={{
-                                        left: item.placement.x * scale,
-                                        top: item.placement.y * scale,
-                                        width: item.width! * scale,
-                                        height: item.height! * scale,
-                                    }}
-                                    title={`${item.description} (${item.width}m x ${item.height}m)`}
+                            Anterior
+                        </Button>
+                        <span className="font-semibold">
+                            Chapa {currentSlabIndex + 1} de {slabs.length}
+                        </span>
+                        <Button
+                            onClick={() => setCurrentSlabIndex(i => Math.min(slabs.length - 1, i + 1))}
+                            disabled={currentSlabIndex >= slabs.length - 1}
+                            variant="outline"
+                        >
+                            Próxima
+                        </Button>
+                    </div>
+
+                    {slabs[currentSlabIndex] && (packedLayouts[currentSlabIndex]?.length ?? 0) >= 0 ? (
+                        (() => {
+                            const currentSlab = slabs[currentSlabIndex];
+                            const currentLayout = packedLayouts[currentSlabIndex] || [];
+                            const itemsToDraw = currentLayout.filter((it: any) => it.fit === true);
+                            return (
+                                <div
+                                    className="relative bg-slate-300 dark:bg-slate-600 border-2 border-slate-400 dark:border-slate-500"
+                                    style={{ width: (currentSlab as any).width_cm * cmScale, height: (currentSlab as any).height_cm * cmScale }}
+                                    title={`Chapa ${(currentSlab as any).width_cm}cm x ${(currentSlab as any).height_cm}cm`}
                                 >
-                                    <span className="truncate">{item.description.split(' - ')[0]}</span>
+                                    {itemsToDraw.map((it: any, idx: number) => (
+                                        <div
+                                            key={idx}
+                                            className="absolute bg-primary/80 border border-blue-800 text-white text-xs flex items-center justify-center p-1 overflow-hidden"
+                                            style={{
+                                                left: (it.x || 0) * cmScale,
+                                                top: (it.y || 0) * cmScale,
+                                                width: (it.w || 0) * cmScale,
+                                                height: (it.h || 0) * cmScale,
+                                            }}
+                                            title={`${it.description || it.id || 'Peça'} (${it.w}x${it.h} cm)`}
+                                        >
+                                            <span className="truncate">{(it.description || it.id || 'Peça').toString()}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            );
+                        })()
                     ) : (
                         <div className="flex items-center justify-center h-full text-text-secondary dark:text-slate-400">
-                           <p>Nenhum material selecionado ou itens válidos para otimizar.</p>
+                            <p>Nenhuma chapa ou layout disponível.</p>
+                        </div>
+                    )}
+
+                    {unpackedItems.length > 0 && (
+                        <div className="p-4 bg-yellow-100 border border-yellow-300 rounded-md text-center mt-4">
+                            <p className="font-semibold text-yellow-800">
+                                {unpackedItems.length} peça(s) não coube(ram) nas chapas selecionadas.
+                            </p>
+                            <Button 
+                                variant="default" 
+                                className="mt-2"
+                                onClick={() => setIsSlabSelectorOpen(true)}
+                            >
+                                Adicionar Chapa
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -172,7 +267,66 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ items, onClose, onC
                     </Button>
                 </div>
             </div>
+            {/* Slab Selector Modal */}
+            {isSlabSelectorOpen && (
+                <Modal isOpen={isSlabSelectorOpen} onClose={() => setIsSlabSelectorOpen(false)} title="Selecionar Chapa">
+                    <SlabSelector
+                        initialSlab={initialSlab}
+                        selectedSlabs={slabs}
+                        onSelect={(slab) => {
+                            setSlabs(prev => [...prev, slab]);
+                            setIsSlabSelectorOpen(false);
+                        }}
+                        onClose={() => setIsSlabSelectorOpen(false)}
+                    />
+                </Modal>
+            )}
         </Modal>
+    );
+};
+
+const SlabSelector: React.FC<{ initialSlab: StockItem; selectedSlabs: StockItem[]; onSelect: (slab: StockItem) => void; onClose: () => void; }> = ({ initialSlab, selectedSlabs, onSelect, onClose }) => {
+    const { stockItems } = useData();
+    const alreadySelectedIds = new Set(selectedSlabs.map(s => s.id));
+    const candidates = useMemo(() =>
+        stockItems.filter(s => s.materialId === initialSlab.materialId && !alreadySelectedIds.has(s.id)),
+        [stockItems, initialSlab.materialId, selectedSlabs]
+    );
+
+    return (
+        <div className="space-y-3">
+            {candidates.length === 0 ? (
+                <p className="text-text-secondary dark:text-slate-400">Nenhuma chapa adicional disponível para este material.</p>
+            ) : (
+                <div className="max-h-80 overflow-auto border border-border dark:border-slate-700 rounded">
+                    <table className="w-full text-left text-sm">
+                        <thead>
+                            <tr className="border-b border-border dark:border-slate-700">
+                                <th className="p-2">ID</th>
+                                <th className="p-2">Dimensões</th>
+                                <th className="p-2">Local</th>
+                                <th className="p-2 text-right">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {candidates.map(slab => (
+                                <tr key={slab.id} className="border-b border-border dark:border-slate-700 last:border-b-0">
+                                    <td className="p-2 font-mono">{slab.id}</td>
+                                    <td className="p-2">{(slab as any).width_cm} x {(slab as any).height_cm} cm</td>
+                                    <td className="p-2">{(slab as any).location || '-'}</td>
+                                    <td className="p-2 text-right">
+                                        <Button size="sm" onClick={() => onSelect(slab)}>Selecionar</Button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+            <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={onClose}>Fechar</Button>
+            </div>
+        </div>
     );
 };
 

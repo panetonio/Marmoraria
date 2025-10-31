@@ -1,4 +1,6 @@
 import React, { useState, useMemo, FC, useEffect, ChangeEvent } from 'react';
+import toast from 'react-hot-toast';
+import { api } from '../utils/api';
 import type { FinancialTransaction, TransactionStatus, TransactionType, PaymentMethod } from '../types';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -266,10 +268,10 @@ const AttachmentModal: FC<{
     transaction: FinancialTransaction;
     isOpen: boolean;
     onClose: () => void;
-    onSave: (transactionId: string, file: File) => void;
-}> = ({ transaction, isOpen, onClose, onSave }) => {
+}> = ({ transaction, isOpen, onClose }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [error, setError] = useState<string>('');
+    const { updateFinancialTransaction } = useData();
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -284,12 +286,34 @@ const AttachmentModal: FC<{
         }
     };
 
-    const handleSave = () => {
-        if (selectedFile) {
-            onSave(transaction.id, selectedFile);
-        } else {
+    const handleUpload = async () => {
+        if (!selectedFile) {
             setError('Por favor, selecione um arquivo.');
+            return;
         }
+        const uploadPromise = api.uploadFinancialAttachment(selectedFile);
+        toast.promise(
+            uploadPromise.then(async (result) => {
+                if (!result.success || !result.url) {
+                    throw new Error(result.message || 'Falha ao enviar arquivo');
+                }
+                const updated = {
+                    ...transaction,
+                    attachmentUrl: result.url as string,
+                    attachmentName: selectedFile.name,
+                } as FinancialTransaction;
+                await updateFinancialTransaction(updated);
+                return { url: result.url, name: selectedFile.name };
+            }),
+            {
+                loading: 'Enviando anexo...',
+                success: () => {
+                    onClose();
+                    return 'Anexo salvo com sucesso!';
+                },
+                error: (err) => err.message || 'Erro ao enviar anexo.',
+            }
+        );
     };
 
     useEffect(() => {
@@ -326,7 +350,7 @@ const AttachmentModal: FC<{
             </div>
             <div className="flex justify-end mt-6 space-x-3">
                 <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleSave} disabled={!selectedFile}>Salvar Anexo</Button>
+                <Button onClick={handleUpload} disabled={!selectedFile}>Salvar Anexo</Button>
             </div>
         </Modal>
     );
@@ -455,25 +479,7 @@ const FinancePage: FC = () => {
         setEditingTransaction(null);
     };
 
-    const handleSaveAttachment = (transactionId: string, file: File) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const url = event.target?.result as string;
-            const transaction = transactions.find(t => t.id === transactionId);
-            if (transaction) {
-                const updatedTransaction = {
-                    ...transaction,
-                    attachment: {
-                        name: file.name,
-                        url: url,
-                    },
-                };
-                updateFinancialTransaction(updatedTransaction);
-                setAttachingTransaction(null);
-            }
-        };
-        reader.readAsDataURL(file);
-    };
+    // Removido: handleSaveAttachment com FileReader (substituído por upload direto via API)
 
     const handleAddTransaction = (transactionData: Omit<FinancialTransaction, 'id'>) => {
         addFinancialTransaction(transactionData);
@@ -593,13 +599,14 @@ const FinancePage: FC = () => {
                                                 {transactionTab === 'entradas' && <th className="p-3">Método Pgto.</th>}
                                                 <th className="p-3 text-right">Valor</th>
                                                 <th className="p-3 text-center">Status</th>
+                                                <th className="p-3">Anexo</th>
                                                 <th className="p-3 text-center">Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {filteredTransactions.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={transactionTab === 'entradas' ? 6 : 5} className="p-8 text-center text-slate-500">
+                                                    <td colSpan={transactionTab === 'entradas' ? 7 : 6} className="p-8 text-center text-slate-500">
                                                         Nenhuma {transactionTab === 'entradas' ? 'entrada' : 'saída'} encontrada
                                                     </td>
                                                 </tr>
@@ -619,6 +626,15 @@ const FinancePage: FC = () => {
                                                             </span>
                                                         </td>
                                                         <td className="p-3 text-center"><StatusBadge status={t.status} statusMap={transactionStatusMap} /></td>
+                                                        <td className="p-3">
+                                                            {t.attachmentUrl ? (
+                                                                <a href={t.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                                                    {t.attachmentName || 'Link'}
+                                                                </a>
+                                                            ) : (
+                                                                'N/A'
+                                                            )}
+                                                        </td>
                                                         <td className="p-3 text-center">
                                                             <div className="flex items-center justify-center space-x-2">
                                                                 {t.status === 'pendente' && (
@@ -629,8 +645,8 @@ const FinancePage: FC = () => {
                                                                 )}
                                                                 {t.status === 'pago' && (
                                                                     <>
-                                                                        {t.attachment ? (
-                                                                            <Button size="sm" variant="ghost" onClick={() => window.open(t.attachment.url, '_blank')}>Ver Comprovante</Button>
+                                                                        {t.attachmentUrl ? (
+                                                                            <Button size="sm" variant="ghost" onClick={() => window.open(t.attachmentUrl!, '_blank')}>Ver Comprovante</Button>
                                                                         ) : (
                                                                             <Button size="sm" variant="secondary" onClick={() => setAttachingTransaction(t)}>Anexar</Button>
                                                                         )}
@@ -780,7 +796,6 @@ const FinancePage: FC = () => {
                     isOpen={!!attachingTransaction}
                     transaction={attachingTransaction}
                     onClose={() => setAttachingTransaction(null)}
-                    onSave={handleSaveAttachment}
                 />
             )}
             <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Módulo Financeiro</h1>

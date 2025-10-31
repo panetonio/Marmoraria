@@ -390,10 +390,8 @@ export interface FinancialTransaction {
   relatedOrderId?: string;
   relatedClientId?: string;
   paymentMethod?: PaymentMethod;
-  attachment?: {
-    name: string;
-    url: string;
-  };
+  attachmentUrl?: string;
+  attachmentName?: string;
 }
 
 export interface Receipt {

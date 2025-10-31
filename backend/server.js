@@ -34,13 +34,13 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Limite de 100 requisições por IP
-  message: 'Muitas requisições deste IP, tente novamente em 15 minutos',
-});
-app.use('/api', limiter);
+// Rate limiting - DESABILITADO TEMPORARIAMENTE PARA DESENVOLVIMENTO
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutos
+//   max: 1000, // Limite de 1000 requisições por IP (aumentado para desenvolvimento)
+//   message: 'Muitas requisições deste IP, tente novamente em 15 minutos',
+// });
+// app.use('/api', limiter);
 
 // Body parser
 app.use(express.json({ limit: '10mb' }));
@@ -70,6 +70,7 @@ app.use('/api/materials', require('./routes/materials'));
 app.use('/api/uploads', require('./routes/uploads'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/invoices', require('./routes/invoices'));
+app.use('/api/financial-transactions', require('./routes/financialTransactions'));
 app.use('/api/contracts', require('./routes/contracts'));
 
 // Rota de teste

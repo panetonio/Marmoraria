@@ -5,7 +5,6 @@ import Button from '../components/ui/Button';
 import { useData } from '../context/DataContext';
 import StatusBadge from '../components/ui/StatusBadge';
 import { invoiceStatusMap } from '../config/statusMaps';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../utils/api';
 import Modal from '../components/ui/Modal';
 import InvoicePreview from '../components/InvoicePreview';
@@ -151,37 +150,30 @@ interface InvoicesPageProps {
 }
 
 const InvoicesPage: FC<InvoicesPageProps> = ({ searchTarget, clearSearchTarget }) => {
-    const queryClient = useQueryClient();
     const { orders } = useData();
     const [currentView, setCurrentView] = useState<'list' | 'form'>('list');
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
 
-    const { data: invoicesResponse } = useQuery({
-        queryKey: ['invoices', 'list'],
-        queryFn: () => api.getInvoices(),
-    });
-    const invoices: Invoice[] = useMemo(() => {
-        const list = invoicesResponse?.data || [];
-        return list.map((inv: any) => ({
-            ...inv,
-            id: inv._id || inv.id,
-        }));
-    }, [invoicesResponse]);
-
-    const createInvoiceMutation = useMutation({
-        mutationFn: (orderId: string) => api.createInvoiceFromOrder(orderId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['invoices', 'list'] });
-        },
-    });
-
-    const issueInvoiceMutation = useMutation({
-        mutationFn: (invoiceId: string) => api.simulateIssueNFe(invoiceId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['invoices', 'list'] });
-        },
-    });
+    // Carregar notas fiscais ao montar o componente
+    useEffect(() => {
+        const loadInvoices = async () => {
+            try {
+                const response = await api.getInvoices();
+                if (response?.data) {
+                    const list = response.data.map((inv: any) => ({
+                        ...inv,
+                        id: inv._id || inv.id,
+                    }));
+                    setInvoices(list);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar notas fiscais:', error);
+            }
+        };
+        loadInvoices();
+    }, []);
 
     const handleNew = () => {
         setSelectedInvoice({
@@ -205,21 +197,48 @@ const InvoicesPage: FC<InvoicesPageProps> = ({ searchTarget, clearSearchTarget }
         if (searchTarget && searchTarget.page === 'invoices') {
             const invoice = invoices.find(i => i.id === searchTarget.id);
             if (invoice) {
-                handleView(invoice);
+                setSelectedInvoice(invoice);
+                setCurrentView('form');
             }
             clearSearchTarget();
         }
     }, [searchTarget, invoices, clearSearchTarget]);
 
-    const handleSave = (invoiceToSave: Invoice) => {
+    const handleSave = async (invoiceToSave: Invoice) => {
         if (!invoiceToSave.orderId) return;
-        createInvoiceMutation.mutate(invoiceToSave.orderId);
+        try {
+            await api.createInvoiceFromOrder(invoiceToSave.orderId);
+            // Recarregar notas fiscais
+            const response = await api.getInvoices();
+            if (response?.data) {
+                const list = response.data.map((inv: any) => ({
+                    ...inv,
+                    id: inv._id || inv.id,
+                }));
+                setInvoices(list);
+            }
+        } catch (error) {
+            console.error('Erro ao salvar nota fiscal:', error);
+        }
         setCurrentView('list');
         setSelectedInvoice(null);
     };
 
-    const handleIssue = (invoiceToIssue: Invoice) => {
-        issueInvoiceMutation.mutate(invoiceToIssue.id);
+    const handleIssue = async (invoiceToIssue: Invoice) => {
+        try {
+            await api.simulateIssueNFe(invoiceToIssue.id);
+            // Recarregar notas fiscais
+            const response = await api.getInvoices();
+            if (response?.data) {
+                const list = response.data.map((inv: any) => ({
+                    ...inv,
+                    id: inv._id || inv.id,
+                }));
+                setInvoices(list);
+            }
+        } catch (error) {
+            console.error('Erro ao emitir nota fiscal:', error);
+        }
         setCurrentView('list');
         setSelectedInvoice(null);
     }
@@ -229,7 +248,7 @@ const InvoicesPage: FC<InvoicesPageProps> = ({ searchTarget, clearSearchTarget }
         setSelectedInvoice(null);
     };
 
-    const handleView = useCallback((invoice: Invoice) => {
+    const handlePreviewView = useCallback((invoice: Invoice) => {
         setSelectedInvoice(invoice);
         setIsPreviewOpen(true);
     }, []);
@@ -266,7 +285,7 @@ const InvoicesPage: FC<InvoicesPageProps> = ({ searchTarget, clearSearchTarget }
         <div>
             <h1 className="text-3xl font-bold text-text-primary dark:text-slate-100">Faturamento</h1>
             <p className="mt-2 text-text-secondary dark:text-slate-400 mb-6">Gere e gerencie as notas fiscais dos pedidos.</p>
-            <InvoiceList invoices={invoices} onNew={handleNew} onView={handleView} />
+            <InvoiceList invoices={invoices} onNew={handleNew} onView={handlePreviewView} />
             {currentView === 'form' && selectedInvoice && (
                 <InvoiceForm 
                     invoice={selectedInvoice} 

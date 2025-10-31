@@ -21,7 +21,7 @@ interface LogisticsKanbanProps {
   onArrive: (orderId: string) => void;
   onConfirmDelivery: (orderId: string) => void;
   onConfirmInstallation: (orderId: string) => void;
-房企 GenerateReceiptTerm: (order: ServiceOrder) => void;
+  onGenerateReceiptTerm: (order: ServiceOrder) => void;
   onGenerateInstallTerm: (order: ServiceOrder) => void;
   onOpenChecklist: (order: ServiceOrder) => void;
 }

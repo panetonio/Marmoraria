@@ -5,7 +5,6 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import DocumentPreview from '../components/QuotePreview';
-import { useMutation } from '@tanstack/react-query';
 import { api } from '../utils/api';
 import toast from 'react-hot-toast';
 import ContractSignModal from '../components/ContractSignModal';
@@ -626,9 +625,9 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
         setAddendumOrder(order);
     };
 
-    const createContractMutation = useMutation({
-        mutationFn: (orderId: string) => api.createContractFromOrder(orderId),
-        onSuccess: (result: any) => {
+    const handleCreateContract = async (orderId: string) => {
+        try {
+            const result = await api.createContractFromOrder(orderId);
             if (result?.success && result?.data) {
                 toast.success('Contrato criado com sucesso!');
                 const c: Contract = {
@@ -639,11 +638,10 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
             } else {
                 toast.error(result?.message || 'Falha ao criar contrato');
             }
-        },
-        onError: () => {
+        } catch (error) {
             toast.error('Erro ao criar contrato. Tente novamente.');
-        },
-    });
+        }
+    };
 
     const handleSaveAddendum = async (addendumData: any) => {
         if (!addendumOrder) return;
@@ -721,7 +719,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                     document={viewingOrder} 
                     onClose={() => setViewingOrder(null)}
                     onGenerateContract={(orderId) => {
-                        createContractMutation.mutate(orderId);
+                        handleCreateContract(orderId);
                     }}
                 />
             )}

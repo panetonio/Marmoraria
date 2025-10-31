@@ -1,4 +1,4 @@
-import type { Point, QuoteItem, QuoteItemType, Service, Product, FinancialTransaction } from '../types';
+import type { Point, QuoteItem, QuoteItemType, Service, Product, FinancialTransaction, Address } from '../types';
 
 export const generateWhatsAppLink = (phone: string): string => {
     if (!phone) return '';
@@ -130,4 +130,32 @@ export const exportTransactionsToCSV = (transactions: FinancialTransaction[], fi
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+};
+
+// Address validation
+export type AddressErrors = Partial<Record<keyof Address, string>>;
+
+export const validateAddress = (address: Address): AddressErrors => {
+    const errors: AddressErrors = {};
+
+    if (!address.address || !address.address.trim()) {
+        errors.address = 'Logradouro é obrigatório.';
+    }
+    if (!address.number || !address.number.trim()) {
+        errors.number = 'Número é obrigatório.';
+    }
+    if (!address.neighborhood || !address.neighborhood.trim()) {
+        errors.neighborhood = 'Bairro é obrigatório.';
+    }
+    if (!address.city || !address.city.trim()) {
+        errors.city = 'Cidade é obrigatória.';
+    }
+    if (!address.uf || !address.uf.trim() || address.uf.length !== 2) {
+        errors.uf = 'UF inválido.';
+    }
+    if (!address.cep || !address.cep.trim()) {
+        errors.cep = 'CEP é obrigatório.';
+    }
+
+    return errors;
 };

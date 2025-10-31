@@ -101,7 +101,7 @@ const ShopfloorDashboard: React.FC = () => {
     const assemblyStatuses: ProductionStatus[] = ['cutting', 'finishing'];
     return serviceOrders.filter(order => {
       const statusMatch = assemblyStatuses.includes(order.productionStatus);
-      const dateMatch = new Date(order.deliveryDate) >= new Date(filters.dateRange.start) && 
+      const dateMatch = new Date(order.deliveryDate) >= new Date(filters.dateRange.start) &&
                        new Date(order.deliveryDate) <= new Date(filters.dateRange.end);
       const clientMatch = !filters.client || order.clientName.toLowerCase().includes(filters.client.toLowerCase());
       const statusFilterMatch = !filters.status || order.status === filters.status || order.productionStatus === filters.status;

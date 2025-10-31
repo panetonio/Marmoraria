@@ -6,7 +6,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Tabs from '../components/ui/Tabs';
 import { useData } from '../context/DataContext';
-import { generateWhatsAppLink } from '../utils/helpers';
+import { generateWhatsAppLink, validateAddress } from '../utils/helpers';
 import Input from '../components/ui/Input';
 import Textarea from '../components/ui/Textarea';
 import AddressForm from '../components/AddressForm';
@@ -149,17 +149,13 @@ const ClientForm: React.FC<{
         if (!client.name.trim()) newErrors.name = "Nome é obrigatório.";
         if (!client.cpfCnpj.trim()) newErrors.cpfCnpj = "CPF/CNPJ é obrigatório.";
         if (!client.phone.trim()) newErrors.phone = "Telefone é obrigatório.";
-        if (!client.address.address.trim()) newErrors.address = "Logradouro é obrigatório.";
-        if (!client.address.number.trim()) newErrors.number = "Número é obrigatório.";
-        if (!client.address.neighborhood.trim()) newErrors.neighborhood = "Bairro é obrigatório.";
-        if (!client.address.city.trim()) newErrors.city = "Cidade é obrigatória.";
-        if (!client.address.uf.trim() || client.address.uf.length !== 2) newErrors.uf = "UF inválido.";
-        if (!client.address.cep.trim()) newErrors.cep = "CEP é obrigatório.";
         if (!client.email.trim()) {
             newErrors.email = "Email é obrigatório.";
         } else if (!/\S+@\S+\.\S+/.test(client.email)) {
             newErrors.email = "Formato de email inválido.";
         }
+        const addressErrors = validateAddress(client.address);
+        Object.assign(newErrors, addressErrors);
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -175,13 +171,6 @@ const ClientForm: React.FC<{
             ...prev,
             address: { ...prev.address, [field]: value }
         }));
-         if (errors[field]) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors[field];
-                return newErrors;
-            });
-        }
     };
 
 

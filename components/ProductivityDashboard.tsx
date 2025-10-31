@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import Card, { CardContent } from './ui/Card';
 import Input from './ui/Input';
@@ -7,18 +6,33 @@ import Input from './ui/Input';
 const ProductivityDashboard: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [stageStats, setStageStats] = useState<any>(null);
+  const [employeeStats, setEmployeeStats] = useState<any>(null);
+  const [isLoadingStageStats, setIsLoadingStageStats] = useState(false);
+  const [isLoadingEmployeeStats, setIsLoadingEmployeeStats] = useState(false);
 
-  const { data: stageStats, isLoading: isLoadingStageStats } = useQuery({
-    queryKey: ['reports', 'stageDurations', startDate, endDate],
-    queryFn: () => api.getStageDurationStats({ startDate, endDate }),
-    enabled: !!startDate && !!endDate,
-  });
-
-  const { data: employeeStats, isLoading: isLoadingEmployeeStats } = useQuery({
-    queryKey: ['reports', 'employeeRouteStats', startDate, endDate],
-    queryFn: () => api.getEmployeeRouteStats({ startDate, endDate }),
-    enabled: !!startDate && !!endDate,
-  });
+  useEffect(() => {
+    const loadStats = async () => {
+      if (startDate && endDate) {
+        setIsLoadingStageStats(true);
+        setIsLoadingEmployeeStats(true);
+        try {
+          const [stageResult, employeeResult] = await Promise.all([
+            api.getStageDurationStats({ startDate, endDate }),
+            api.getEmployeeRouteStats({ startDate, endDate })
+          ]);
+          setStageStats(stageResult);
+          setEmployeeStats(employeeResult);
+        } catch (error) {
+          console.error('Erro ao carregar estatísticas:', error);
+        } finally {
+          setIsLoadingStageStats(false);
+          setIsLoadingEmployeeStats(false);
+        }
+      }
+    };
+    loadStats();
+  }, [startDate, endDate]);
 
   return (
     <div className="space-y-6">
