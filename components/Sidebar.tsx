@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Layout, Menu, Button, Drawer } from 'antd';
 import {
   DashboardOutlined,
@@ -30,6 +30,35 @@ import type { Page } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 const { Sider } = Layout;
+
+type MenuGroup = {
+  title: string;
+  items: Page[];
+};
+
+// Define a configuração dos grupos lógicos
+const menuGroupsConfig: MenuGroup[] = [
+  {
+    title: 'Principal',
+    items: ['dashboard', 'shopfloor_dashboard'], // 'shopfloor_dashboard' consolida produção/logística
+  },
+  {
+    title: 'Comercial',
+    items: ['crm', 'quotes', 'orders'], // CRM, Orçamentos, Pedidos
+  },
+  {
+    title: 'Recursos',
+    items: ['stock', 'equipment', 'vehicles'], // Estoque, Equipamentos, Veículos
+  },
+  {
+    title: 'Administrativo',
+    items: ['finance', 'invoices', 'receipts', 'suppliers'], // Finanças, Faturas, Recibos, Fornecedores
+  },
+  {
+    title: 'Configurações',
+    items: ['catalog', 'production_employees', 'checklist_templates', 'users', 'activity_log'], // Catálogo, Funcionários, Checklists, Usuários, Log
+  },
+];
 
 interface SidebarProps {
   currentPage: Page;
@@ -108,26 +137,54 @@ const Sidebar: React.FC<SidebarProps> = ({ currentPage, setCurrentPage, theme = 
     return labelMap[page] || page;
   };
 
-  // Criar itens do menu baseado nas permissões
-  const menuItems = [
-    { key: 'dashboard', icon: getIcon('dashboard'), label: getLabel('dashboard') },
-    { key: 'quotes', icon: getIcon('quotes'), label: getLabel('quotes') },
-    { key: 'orders', icon: getIcon('orders'), label: getLabel('orders') },
-    { key: 'shopfloor_dashboard', icon: getIcon('shopfloor_dashboard'), label: getLabel('shopfloor_dashboard') },
-    { key: 'checklist_templates', icon: getIcon('checklist_templates'), label: getLabel('checklist_templates') },
-    { key: 'stock', icon: getIcon('stock'), label: getLabel('stock') },
-    { key: 'catalog', icon: getIcon('catalog'), label: getLabel('catalog') },
-    { key: 'suppliers', icon: getIcon('suppliers'), label: getLabel('suppliers') },
-    { key: 'receipts', icon: getIcon('receipts'), label: getLabel('receipts') },
-    { key: 'crm', icon: getIcon('crm'), label: getLabel('crm') },
-    { key: 'invoices', icon: getIcon('invoices'), label: getLabel('invoices') },
-    { key: 'finance', icon: getIcon('finance'), label: getLabel('finance') },
-    { key: 'equipment', icon: getIcon('equipment'), label: getLabel('equipment') },
-    { key: 'vehicles', icon: getIcon('vehicles'), label: getLabel('vehicles') },
-    { key: 'production_employees', icon: getIcon('production_employees'), label: getLabel('production_employees') },
-    { key: 'activity_log', icon: getIcon('activity_log'), label: getLabel('activity_log') },
-    { key: 'users', icon: getIcon('users'), label: getLabel('users') },
-  ].filter(item => hasAccessToPage(item.key as Page));
+  // Criar itens do menu baseado nas permissões usando grupos
+  const filteredMenuGroups = useMemo(() => {
+    return menuGroupsConfig
+      .map(group => ({
+        ...group,
+        // Filtra os itens dentro de cada grupo
+        items: group.items.filter(item => hasAccessToPage(item as Page))
+      }))
+      // Filtra os grupos que ficaram vazios após o filtro de permissão
+      .filter(group => group.items.length > 0);
+  }, [hasAccessToPage]);
+
+  // Criar itens do menu para o Ant Design Menu
+  const menuItems = useMemo(() => {
+    const items: any[] = [];
+    
+    filteredMenuGroups.forEach((group, groupIndex) => {
+      // Adicionar divisor/seção para cada grupo (exceto o primeiro)
+      if (groupIndex > 0) {
+        items.push({ type: 'divider' });
+      }
+      
+      // Adicionar título do grupo (como um item desabilitado se collapsed for false)
+      if (!collapsed) {
+        items.push({
+          key: `group-${groupIndex}`,
+          label: (
+            <span className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 tracking-wider px-2">
+              {group.title}
+            </span>
+          ),
+          disabled: true,
+          style: { height: 'auto', padding: '8px 16px 4px', cursor: 'default' }
+        });
+      }
+      
+      // Adicionar itens do grupo
+      group.items.forEach(page => {
+        items.push({
+          key: page,
+          icon: getIcon(page as Page),
+          label: getLabel(page as Page)
+        });
+      });
+    });
+    
+    return items;
+  }, [filteredMenuGroups, collapsed]);
 
   const handleMenuClick = ({ key }: { key: string }) => {
     setCurrentPage(key as Page);
