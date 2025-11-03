@@ -102,7 +102,14 @@ orderSchema.virtual('addendums', {
 });
 
 // Certifique-se de habilitar virtuais no toJSON e toObject
-orderSchema.set('toJSON', { virtuals: true });
+orderSchema.set('toJSON', { 
+  virtuals: true,
+  transform: function(doc, ret) {
+    ret.id = ret._id.toString();
+    // Manter _id para compatibilidade com MongoDB
+    return ret;
+  }
+});
 orderSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Order', orderSchema);

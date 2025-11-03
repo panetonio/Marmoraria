@@ -1013,7 +1013,8 @@ const QuotesPage: React.FC<QuotesPageProps> = ({ searchTarget, clearSearchTarget
              if (showArchived) {
                 if (quote.status !== 'archived') return false;
             } else {
-                if (quote.status === 'archived') return false;
+                // Não mostrar orçamentos arquivados nem aprovados (aprovados viram pedidos)
+                if (quote.status === 'archived' || quote.status === 'approved') return false;
             }
 
             const clientMatch = clientFilter 

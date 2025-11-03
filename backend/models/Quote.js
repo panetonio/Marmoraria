@@ -94,5 +94,14 @@ const quoteSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Transform _id to id while keeping _id
+quoteSchema.set('toJSON', {
+  transform: function(doc, ret) {
+    ret.id = ret._id.toString();
+    // Manter _id para compatibilidade com MongoDB
+    return ret;
+  }
+});
+
 module.exports = mongoose.model('Quote', quoteSchema);
 
