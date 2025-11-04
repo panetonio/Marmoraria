@@ -69,8 +69,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 // Servir arquivos estáticos da NF-e simulada
 app.use('/nfe_simulada', express.static(path.join(__dirname, 'public/nfe_simulada')));
-// Servir arquivos estáticos do frontend (build da pasta dist)
-app.use(express.static(path.join(__dirname, '../frontend/dist')));
+// Servir arquivos estáticos do frontend (build)
+app.use(express.static(path.join(__dirname, 'public/frontend')));
 
 // Rotas
 app.use('/api/auth', require('./routes/auth'));
@@ -131,8 +131,8 @@ app.get('*', (req, res) => {
       message: 'Rota da API não encontrada',
     });
   }
-  // Caso contrário, servir o index.html do frontend da pasta dist (para React Router)
-  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  // Caso contrário, servir o index.html do frontend (para React Router)
+  res.sendFile(path.join(__dirname, 'public/frontend/index.html'));
 });
 
 // Error handler
