@@ -1,4 +1,8 @@
-const API_URL = 'http://localhost:5000/api';
+// API URL: usar caminho relativo quando servido pelo backend, ou absoluto em desenvolvimento
+const API_URL = "https://marmoraria.onrender.com/api"
+
+// Função auxiliar para obter a URL base da API
+export const getApiUrl = () => API_URL;
 
 // Pegar token do localStorage
 const getToken = () => localStorage.getItem('token');
@@ -20,12 +24,23 @@ const getHeaders = (includeAuth = true) => {
 };
 
 // Interceptor global para erros 401
-const apiFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+const apiFetch = async (url: string, options: RequestInit = {}, skipRedirect = false): Promise<Response> => {
+  // Debug: verificar se token está sendo enviado
+  const token = getToken();
+  if (!token && !url.includes('/auth/login') && !url.includes('/auth/register')) {
+    console.warn('⚠️  Requisição sem token:', url);
+  }
+  
   const response = await fetch(url, options);
   
   // Verificar se é erro 401 e não é a rota de login
-  if (response.status === 401 && !url.includes('/auth/login')) {
-    console.error('🔒 Sessão expirada ou não autorizada. Redirecionando para login...');
+  if (response.status === 401 && !url.includes('/auth/login') && !skipRedirect) {
+    const errorData = await response.clone().json().catch(() => ({}));
+    console.error('🔒 Sessão expirada ou não autorizada:', {
+      url,
+      message: errorData.message || 'Token não fornecido ou inválido',
+      hasToken: !!token
+    });
     
     // Limpar dados do localStorage
     localStorage.removeItem('token');
@@ -40,6 +55,25 @@ const apiFetch = async (url: string, options: RequestInit = {}): Promise<Respons
   
   // Retornar a resposta normalmente
   return response;
+};
+
+// Função para validar token sem redirecionar (usado na verificação inicial)
+export const validateToken = async (): Promise<any> => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return { success: false };
+  }
+  
+  try {
+    const response = await apiFetch(`${API_URL}/auth/me`, {
+      headers: getHeaders(),
+    }, true); // skipRedirect = true para não redirecionar durante validação inicial
+    
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    return { success: false, error };
+  }
 };
 
 export const api = {

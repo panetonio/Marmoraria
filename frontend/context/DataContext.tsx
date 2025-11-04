@@ -198,14 +198,29 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Carregar dados do backend
     useEffect(() => {
-        loadClients();
-        loadSuppliers();
-        loadQuotes();
-        loadOrders();
-        loadServiceOrders();
-        loadUsers();
-        loadChecklistTemplates();
-        loadMaterials();
+        // Verificar se há token antes de carregar dados autenticados
+        const token = localStorage.getItem('token');
+        
+        if (token) {
+            // Só carregar dados se houver token de autenticação
+            loadClients();
+            loadSuppliers();
+            loadQuotes();
+            loadOrders();
+            loadServiceOrders();
+            loadUsers();
+            loadChecklistTemplates();
+            loadMaterials();
+        } else {
+            // Sem token, usar dados mock
+            console.log('ℹ️  Sem token de autenticação, usando dados mock');
+            setClients(mockClients);
+            setSuppliers(mockSuppliers);
+            setQuotes(mockQuotes);
+            setOrders(mockOrders);
+            setServiceOrders(mockServiceOrders);
+            setMaterials(mockMaterials);
+        }
     }, []);
 
     const generateChecklistItemId = () => {

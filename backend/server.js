@@ -13,25 +13,44 @@ connectDB();
 const app = express();
 
 // Middlewares de segurança
-app.use(helmet());
-
-// CORS - Aceita múltiplas origens para desenvolvimento
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  process.env.CORS_ORIGIN
-].filter(Boolean);
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Permitir requisições sem origin (como Postman) ou de origens permitidas
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+// Configurar Helmet com políticas CSP que permitem scripts inline do React/Vite
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'", // Necessário para React/Vite
+        "'unsafe-eval'", // Necessário para desenvolvimento
+        "https://cdn.tailwindcss.com", // Tailwind CSS
+        "https://cdn.jsdelivr.net", // Ant Design CSS
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'", // Necessário para CSS inline
+        "https://cdn.tailwindcss.com",
+        "https://cdn.jsdelivr.net",
+      ],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      fontSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "http://localhost:5000", "https:"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
   },
+}));
+
+// CORS - Liberado para qualquer origem
+app.use(cors({
+  origin: true, // Permite qualquer origem
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // Rate limiting - DESABILITADO TEMPORARIAMENTE PARA DESENVOLVIMENTO
@@ -50,6 +69,8 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 // Servir arquivos estáticos da NF-e simulada
 app.use('/nfe_simulada', express.static(path.join(__dirname, 'public/nfe_simulada')));
+// Servir arquivos estáticos do frontend (build da pasta dist)
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
 // Rotas
 app.use('/api/auth', require('./routes/auth'));
@@ -73,8 +94,8 @@ app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/financial-transactions', require('./routes/financialTransactions'));
 app.use('/api/contracts', require('./routes/contracts'));
 
-// Rota de teste
-app.get('/', (req, res) => {
+// Rota de teste da API (mantida para compatibilidade)
+app.get('/api', (req, res) => {
   res.json({
     success: true,
     message: 'API Marmoraria ERP',
@@ -100,12 +121,18 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 404
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Rota não encontrada',
-  });
+// Rota catch-all: servir index.html para todas as rotas que não são API
+// Isso permite que o React Router funcione corretamente
+app.get('*', (req, res) => {
+  // Se for uma rota de API, retornar 404 JSON
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      success: false,
+      message: 'Rota da API não encontrada',
+    });
+  }
+  // Caso contrário, servir o index.html do frontend da pasta dist (para React Router)
+  res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
 });
 
 // Error handler
@@ -122,7 +149,8 @@ app.listen(PORT, () => {
   if (process.env.CORS_ORIGIN) {
     console.log(`   - ${process.env.CORS_ORIGIN}`);
   }
-  console.log(`\n✅ API disponível em: http://localhost:${PORT}`);
+  console.log(`\n✅ API disponível em: http://localhost:${PORT}/api`);
+  console.log(`🌐 Frontend disponível em: http://localhost:${PORT}`);
   console.log(`📚 Endpoints principais:`);
   console.log(`   - POST   /api/auth/register   (Registrar)`);
   console.log(`   - POST   /api/auth/login      (Login)`);

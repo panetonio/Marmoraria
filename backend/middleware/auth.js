@@ -10,6 +10,7 @@ const authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('⚠️  Token não fornecido para:', req.method, req.path);
       return res.status(401).json({
         success: false,
         message: 'Token de autenticação não fornecido',
@@ -22,6 +23,7 @@ const authenticate = async (req, res, next) => {
     const decoded = verifyToken(token);
     
     if (!decoded) {
+      console.log('⚠️  Token inválido ou expirado para:', req.method, req.path);
       return res.status(401).json({
         success: false,
         message: 'Token inválido ou expirado',

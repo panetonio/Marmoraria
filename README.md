@@ -14,33 +14,64 @@ Certifique-se de ter o [Node.js](https://nodejs.org/) (versão 18 ou superior) i
 
 ### 2. Instalação
 
-Primeiro, instale todas as dependências do projeto. No diretório raiz do projeto, execute o seguinte comando:
-
+#### Frontend
 ```bash
+cd frontend
 npm install
 ```
 
-Este comando irá baixar e instalar todas as bibliotecas e pacotes necessários para a aplicação funcionar corretamente.
+#### Backend
+```bash
+cd backend
+npm install
+```
 
 ### 3. Variáveis de Ambiente
 
-Algumas funcionalidades do ERP, como integrações com APIs externas, podem exigir chaves de API. Crie um arquivo chamado `.env` na raiz do projeto para armazenar essas chaves.
+#### Frontend
+Algumas funcionalidades do ERP, como integrações com APIs externas, podem exigir chaves de API. Crie um arquivo chamado `.env` na pasta `frontend/` para armazenar essas chaves.
 
-**Exemplo de `.env`:**
+**Exemplo de `frontend/.env`:**
 ```
 API_KEY=SUA_CHAVE_DE_API_AQUI
 ```
 *A aplicação está configurada para ler a variável `API_KEY` do ambiente para integrações com serviços de IA.*
 
+#### Backend
+Veja as instruções detalhadas em `backend/INSTALACAO.md` para configurar o arquivo `.env` do backend.
+
 ### 4. Executando a Aplicação
 
-Após a instalação das dependências, você pode iniciar o servidor de desenvolvimento:
-
+#### Opção 1: Modo Produção (Frontend integrado ao Backend)
 ```bash
+cd backend
+npm run build:frontend  # Gera o build do frontend
+npm start                # Inicia o servidor (frontend + backend na porta 5000)
+```
+Acesse: `http://localhost:5000` (Frontend e API integrados)
+
+#### Opção 2: Modo Desenvolvimento (Frontend e Backend separados)
+Na raiz do projeto, execute:
+```bash
+INICIAR_SISTEMA.bat
+```
+Este script iniciará automaticamente o backend e o frontend em modo desenvolvimento.
+
+**Ou manualmente:**
+
+**Backend:**
+```bash
+cd backend
 npm run dev
 ```
+O backend estará disponível em `http://localhost:5000`
 
-Este comando iniciará a aplicação em modo de desenvolvimento. Você poderá acessá-la em `http://localhost:5173` (ou a porta indicada no seu terminal).
+**Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+O frontend estará disponível em `http://localhost:3000`
 
 ---
 
@@ -48,7 +79,7 @@ Este comando iniciará a aplicação em modo de desenvolvimento. Você poderá a
 
 ### Conexão com Banco de Dados
 
-Atualmente, o projeto utiliza dados estáticos (mock data) para facilitar o desenvolvimento do frontend. Estes dados estão localizados no diretório `/data`.
+Atualmente, o projeto utiliza dados estáticos (mock data) para facilitar o desenvolvimento do frontend. Estes dados estão localizados no diretório `frontend/data`.
 
 O planejamento futuro inclui a integração com um banco de dados real (como PostgreSQL, MySQL, ou um serviço de BaaS como Firebase). Quando essa integração for realizada, as credenciais de conexão do banco de dados deverão ser adicionadas ao arquivo `.env` para garantir a segurança.
 

@@ -8,7 +8,7 @@
 2. Duas janelas serão abertas (Backend e Frontend)
 3. **IMPORTANTE:** Observe as mensagens nas janelas
 4. Aguarde 10-15 segundos
-5. Acesse: http://localhost:5173
+5. Acesse: http://localhost:3000
 
 ---
 
@@ -33,6 +33,7 @@ npm run dev
 
 #### **Terminal 2 - Frontend:**
 ```bash
+cd frontend
 npm run dev
 ```
 
@@ -40,7 +41,7 @@ npm run dev
 ```
 VITE v5.x.x  ready in XXX ms
 
-➜  Local:   http://localhost:5173/
+➜  Local:   http://localhost:3000/
 ➜  Network: use --host to expose
 ```
 
@@ -64,7 +65,7 @@ Deve mostrar:
 
 ### 2. **Portas estão ocupadas?**
 ```bash
-netstat -ano | findstr ":5000 :5173"
+netstat -ano | findstr ":5000 :3000"
 ```
 
 Se aparecer algo, outra aplicação está usando as portas.
@@ -84,6 +85,7 @@ npm install
 
 **Frontend:**
 ```bash
+cd frontend
 npm install
 ```
 
@@ -91,7 +93,7 @@ npm install
 
 ## 🎯 **URLs Esperadas:**
 
-- **Frontend:** http://localhost:5173
+- **Frontend:** http://localhost:3000
 - **Backend API:** http://localhost:5000
 - **Health Check:** http://localhost:5000/health
 

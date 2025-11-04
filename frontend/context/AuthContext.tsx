@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type { AuthUser, Page } from '../types';
 import { ROLES, PERMISSIONS } from '../roles';
-import { api } from '../utils/api';
+import { api, validateToken } from '../utils/api';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
@@ -30,17 +30,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (token && storedUser) {
         try {
-          // Validar token com o backend - usar fetch direto para evitar redirecionamento
-          const response = await fetch('http://localhost:5000/api/auth/me', {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
+          // Validar token com o backend usando função especial que não redireciona
+          const result = await validateToken();
           
-          const result = await response.json();
-          
-          if (response.ok && result.success) {
+          if (result.success && result.data) {
             const user: AuthUser = {
               id: result.data.user.id,
               name: result.data.user.name,

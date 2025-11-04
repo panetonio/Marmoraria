@@ -44,15 +44,15 @@ npm run dev     # Iniciar servidor (porta 5000)
 
 ### 2️⃣ Iniciar Frontend
 ```bash
-# Na raiz do projeto
+cd frontend
 npm install
-npm run dev     # Iniciar frontend (porta 5173)
+npm run dev     # Iniciar frontend (porta 3000)
 ```
 
 ### 3️⃣ Testar
 
 1. **Login**
-   - Acesse http://localhost:5173
+   - Acesse http://localhost:3000
    - Use: `admin@marmoraria.com` / `admin123`
    - ✅ Login agora usa backend!
 
@@ -193,7 +193,7 @@ const API_URL = 'https://sua-api.com/api';
 ```
 
 ### CORS
-Backend configurado para aceitar `http://localhost:5173`
+Backend configurado para aceitar `http://localhost:3000`
 
 Para produção, altere no backend `.env`:
 ```env
@@ -233,7 +233,7 @@ location.reload();
 
 **Solução**:
 1. Verifique `CORS_ORIGIN` no backend `.env`
-2. Deve ser exatamente `http://localhost:5173`
+2. Deve ser exatamente `http://localhost:3000`
 3. Reinicie o backend após alterar
 
 ### Token inválido

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Marmoraria ERP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.12.8/dist/reset.css">
+    <style>
+      /* Barra de rolagem customizada para o container do menu */
+      .ant-layout-sider .overflow-y-auto {
+        scrollbar-width: thin; /* Firefox */
+        scrollbar-color: rgba(156, 163, 175, 0.4) transparent; /* Firefox */
+      }
+      
+      /* Webkit browsers (Chrome, Safari, Edge) */
+      .ant-layout-sider .overflow-y-auto::-webkit-scrollbar {
+        width: 8px;
+      }
+      
+      .ant-layout-sider .overflow-y-auto::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 4px;
+        margin: 4px 0;
+      }
+      
+      .ant-layout-sider .overflow-y-auto::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(156, 163, 175, 0.4) 0%, rgba(156, 163, 175, 0.6) 100%);
+        border-radius: 4px;
+        transition: all 0.3s ease;
+        border: 1px solid transparent;
+        background-clip: content-box;
+      }
+      
+      .ant-layout-sider .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, rgba(156, 163, 175, 0.6) 0%, rgba(156, 163, 175, 0.8) 100%);
+        border: 1px solid rgba(156, 163, 175, 0.2);
+      }
+      
+      .ant-layout-sider .overflow-y-auto::-webkit-scrollbar-thumb:active {
+        background: linear-gradient(180deg, rgba(156, 163, 175, 0.8) 0%, rgba(156, 163, 175, 1) 100%);
+      }
+      
+      /* Tema escuro */
+      .dark .ant-layout-sider .overflow-y-auto {
+        scrollbar-color: rgba(75, 85, 99, 0.4) transparent; /* Firefox */
+      }
+      
+      .dark .ant-layout-sider .overflow-y-auto::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(75, 85, 99, 0.4) 0%, rgba(75, 85, 99, 0.6) 100%);
+      }
+      
+      .dark .ant-layout-sider .overflow-y-auto::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, rgba(75, 85, 99, 0.6) 0%, rgba(75, 85, 99, 0.8) 100%);
+        border: 1px solid rgba(75, 85, 99, 0.2);
+      }
+      
+      .dark .ant-layout-sider .overflow-y-auto::-webkit-scrollbar-thumb:active {
+        background: linear-gradient(180deg, rgba(75, 85, 99, 0.8) 0%, rgba(75, 85, 99, 1) 100%);
+      }
+      
+      /* Melhorar aparência do menu */
+      .ant-menu {
+        border-right: none !important;
+      }
+      
+      .ant-menu-item {
+        margin: 4px 8px !important;
+        border-radius: 6px !important;
+      }
+      
+      .ant-menu-item-selected {
+        background-color: rgba(59, 130, 246, 0.1) !important;
+      }
+      
+      /* Ajustar cores do tema escuro */
+      .ant-menu-dark .ant-menu-item {
+        color: rgba(255, 255, 255, 0.85) !important;
+      }
+      
+      .ant-menu-dark .ant-menu-item:hover {
+        color: #fff !important;
+        background-color: rgba(255, 255, 255, 0.08) !important;
+      }
+      
+      .ant-menu-dark .ant-menu-item-selected {
+        color: #fff !important;
+        background-color: rgba(59, 130, 246, 0.2) !important;
+      }
+      
+      /* Ajustar cores do tema claro */
+      .ant-menu-light .ant-menu-item {
+        color: rgba(0, 0, 0, 0.85) !important;
+      }
+      
+      .ant-menu-light .ant-menu-item:hover {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.06) !important;
+      }
+      
+      .ant-menu-light .ant-menu-item-selected {
+        color: #1890ff !important;
+        background-color: rgba(24, 144, 255, 0.1) !important;
+      }
+      
+      /* Estilo do botão de toggle */
+      .ant-layout-sider .ant-btn {
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        color: rgba(0, 0, 0, 0.65) !important;
+        transition: all 0.3s ease !important;
+      }
+      
+      .ant-layout-sider .ant-btn:hover {
+        background: rgba(0, 0, 0, 0.06) !important;
+        color: rgba(0, 0, 0, 0.85) !important;
+      }
+      
+      /* Tema escuro para o botão */
+      .dark .ant-layout-sider .ant-btn {
+        color: rgba(255, 255, 255, 0.65) !important;
+      }
+      
+      .dark .ant-layout-sider .ant-btn:hover {
+        background: rgba(255, 255, 255, 0.08) !important;
+        color: rgba(255, 255, 255, 0.85) !important;
+      }
+      
+      /* Estilo do drawer mobile para tema escuro */
+      .mobile-drawer .ant-drawer-content {
+        background-color: var(--drawer-bg, #ffffff) !important;
+      }
+      
+      .mobile-drawer .ant-drawer-header {
+        background-color: var(--drawer-bg, #ffffff) !important;
+        border-bottom: var(--drawer-border, 1px solid #e5e7eb) !important;
+      }
+      
+      .mobile-drawer .ant-drawer-title {
+        color: var(--drawer-text, #000000) !important;
+      }
+      
+      .mobile-drawer .ant-drawer-close {
+        color: var(--drawer-text, #000000) !important;
+      }
+      
+      .mobile-drawer .ant-drawer-close:hover {
+        color: var(--drawer-text-hover, #1890ff) !important;
+      }
+    </style>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              'primary': '#1e40af', // blue-800
+              'primary-hover': '#1d4ed8', // blue-700
+              'secondary': '#9a3412', // orange-800
+              'secondary-hover': '#7c2d12', // orange-900
+              'accent': '#eab308', // yellow-500
+              'accent-hover': '#ca8a04', // yellow-600
+              
+              'light': '#f1f5f9',     // slate-100
+              'dark': '#1e293b',      // slate-800
+              'text-primary': '#1e293b', // slate-800
+              'text-secondary': '#64748b', // slate-500
+              
+              'background': '#f1f5f9', // slate-100
+              'surface': '#ffffff',
+
+              'success': '#16a34a', // green-600
+              'warning': '#f59e0b', // amber-500
+              'error': '#dc2626', // red-600
+              
+              'border': '#cbd5e1', // slate-300
+            }
+          }
+        }
+      }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@testing-library/react": "https://aistudiocdn.com/@testing-library/react@^16.3.0",
+    "@testing-library/user-event": "https://aistudiocdn.com/@testing-library/user-event@^14.6.1",
+    "@jest/globals": "https://aistudiocdn.com/@jest/globals@^30.2.0",
+    "@testing-library/jest-dom": "https://aistudiocdn.com/@testing-library/jest-dom@^6.9.1"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index-BVAjFfuv.js"></script>
+</head>
+  <body class="bg-background dark:bg-slate-900 text-text-primary dark:text-slate-100">
+    <div id="root"></div>
+  </body>
+</html>

@@ -66,7 +66,7 @@ JWT_SECRET=marmoraria_super_secret_key_change_in_production_2024
 JWT_EXPIRES_IN=7d
 PORT=5000
 NODE_ENV=development
-CORS_ORIGIN=http://localhost:5173
+CORS_ORIGIN=http://localhost:3000
 ```
 
 ### 3. Popular banco (opcional)
