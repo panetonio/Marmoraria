@@ -10,9 +10,11 @@ import StatusBadge from '../components/ui/StatusBadge';
 import { transactionStatusMap } from '../config/statusMaps';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
+import DateInput from '../components/ui/DateInput';
 import Select from '../components/ui/Select';
 import Textarea from '../components/ui/Textarea';
 import { exportTransactionsToCSV } from '../utils/helpers';
+import { formatDate } from '../utils/dateFormat';
 
 type FinanceView = 'contas' | 'fluxo_caixa' | 'relatorios';
 type ReportPeriod = 'day' | 'week' | 'month';
@@ -44,7 +46,7 @@ const ReportTable: FC<{ title: React.ReactNode, transactions: FinancialTransacti
                         <tbody>
                             {transactions.map(t => (
                                 <tr key={t.id} className="border-b border-border dark:border-slate-700 last:border-b-0">
-                                    <td className="p-2 whitespace-nowrap">{t.paymentDate ? new Date(t.paymentDate).toLocaleDateString() : '-'}</td>
+                                    <td className="p-2 whitespace-nowrap">{t.paymentDate ? formatDate(t.paymentDate) : '-'}</td>
                                     <td className="p-2">{t.description}</td>
                                     <td className="p-2 text-right font-mono">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                 </tr>
@@ -148,12 +150,14 @@ const AddTransactionModal: FC<{
                     onChange={e => handleChange('amount', parseFloat(e.target.value) || 0)}
                     error={errors.amount}
                 />
-                <Input
+                <DateInput
                     label="Data de Vencimento"
                     id="new-dueDate"
-                    type="date"
                     value={formData.dueDate?.split('T')[0] || ''}
-                    onChange={e => handleChange('dueDate', e.target.value)}
+                    onChange={(value) => {
+                        const newIsoString = value ? `${value}T${formData.dueDate?.split('T')[1] || '00:00:00'}` : '';
+                        handleChange('dueDate', newIsoString);
+                    }}
                     error={errors.dueDate}
                 />
                 <Select
@@ -235,12 +239,11 @@ const TransactionEditModal: FC<{
                     value={formData.amount}
                     onChange={e => handleChange('amount', parseFloat(e.target.value) || 0)}
                 />
-                <Input
+                <DateInput
                     label="Data de Vencimento"
                     id="edit-dueDate"
-                    type="date"
                     value={dateInputValue}
-                    onChange={e => handleDateChange(e.target.value)}
+                    onChange={(value) => handleDateChange(value)}
                 />
                 {formData.type === 'receita' && (
                     <Select
@@ -613,7 +616,7 @@ const FinancePage: FC = () => {
                                             ) : (
                                                 filteredTransactions.map(t => (
                                                     <tr key={t.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                                        <td className="p-3">{new Date(t.dueDate).toLocaleDateString()}</td>
+                                                        <td className="p-3">{formatDate(t.dueDate)}</td>
                                                         <td className="p-3">{t.description}</td>
                                                         {transactionTab === 'entradas' && (
                                                             <td className="p-3 text-sm capitalize text-text-secondary dark:text-slate-400">

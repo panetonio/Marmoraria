@@ -8,6 +8,7 @@ import Badge from '../components/ui/Badge';
 import { ROLES } from '../roles';
 import type { AuthUser, Role, Page } from '../types';
 import { api } from '../utils/api';
+import { formatDate } from '../utils/dateFormat';
 
 const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<AuthUser[]>([]);
@@ -323,7 +324,7 @@ const UsersPage: React.FC = () => {
                     {ROLES[user.role].displayName}
                   </Badge>
                   <span className="text-xs text-slate-500 dark:text-slate-500">
-                    Criado em {new Date(user.createdAt).toLocaleDateString('pt-BR')}
+                    Criado em {formatDate(user.createdAt)}
                   </span>
                 </div>
 

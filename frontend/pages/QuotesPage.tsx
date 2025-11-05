@@ -11,11 +11,13 @@ import { useData } from '../context/DataContext';
 import StatusBadge from '../components/ui/StatusBadge';
 import { quoteStatusMap } from '../config/statusMaps';
 import Input from '../components/ui/Input';
+import DateInput from '../components/ui/DateInput';
 import Textarea from '../components/ui/Textarea';
 import FreightCalculator from '../components/FreightCalculator';
 import { calculateQuoteItem, validateQuoteItem, validateAddress } from '../utils/helpers';
 import AddressForm from '../components/AddressForm';
 import Select from '../components/ui/Select';
+import { formatDate } from '../utils/dateFormat';
 
 
 const QuoteList: React.FC<{
@@ -92,23 +94,19 @@ const QuoteList: React.FC<{
                         />
                     </div>
                     <div>
-                        <Input
+                        <DateInput
                             id="start-date-filter-quotes"
                             label="Data Início"
-                            type="date"
                             value={startDateFilter}
-                            onChange={(e) => onStartDateFilterChange(e.target.value)}
-                            className="text-text-secondary dark:text-slate-300"
+                            onChange={(value) => onStartDateFilterChange(value)}
                         />
                     </div>
                     <div>
-                        <Input
+                        <DateInput
                             id="end-date-filter-quotes"
                             label="Data Final"
-                            type="date"
                             value={endDateFilter}
-                            onChange={(e) => onEndDateFilterChange(e.target.value)}
-                            className="text-text-secondary dark:text-slate-300"
+                            onChange={(value) => onEndDateFilterChange(value)}
                         />
                     </div>
                     <div>
@@ -163,7 +161,7 @@ const QuoteList: React.FC<{
                                 <tr key={quote.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                     <td className="p-3 font-mono text-sm">{quote.id}</td>
                                     <td className="p-3">{quote.clientName}</td>
-                                    <td className="p-3">{new Date(quote.createdAt).toLocaleDateString()}</td>
+                                    <td className="p-3">{formatDate(quote.createdAt)}</td>
                                     <td className="p-3">{quote.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                     <td className="p-3"><StatusBadge status={quote.status} statusMap={quoteStatusMap} /></td>
                                     <td className="p-3 space-x-2">

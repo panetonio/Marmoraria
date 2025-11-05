@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../utils/api';
 import Card, { CardContent } from './ui/Card';
 import Input from './ui/Input';
+import DateInput from './ui/DateInput';
 
 const ProductivityDashboard: React.FC = () => {
   const [startDate, setStartDate] = useState<string>('');
@@ -40,17 +41,15 @@ const ProductivityDashboard: React.FC = () => {
         <CardContent>
           <h2 className="text-xl font-semibold">Relatório de Produtividade</h2>
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
+            <DateInput
               label="Data Inicial"
-              type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={(value) => setStartDate(value)}
             />
-            <Input
+            <DateInput
               label="Data Final"
-              type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={(value) => setEndDate(value)}
             />
           </div>
         </CardContent>

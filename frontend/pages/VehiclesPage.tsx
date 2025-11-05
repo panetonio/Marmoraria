@@ -1,12 +1,16 @@
-import React, { FC, useMemo, useState } from 'react';
-import type { Vehicle, VehicleStatus, VehicleType, DeliveryRoute } from '../types';
+import React, { FC, useMemo, useState, useEffect } from 'react';
+import type { Vehicle, VehicleStatus, VehicleType, DeliveryRoute, MaintenanceLog } from '../types';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
+import DateInput from '../components/ui/DateInput';
 import Select from '../components/ui/Select';
 import Badge from '../components/ui/Badge';
+import Textarea from '../components/ui/Textarea';
+import { mockUsers } from '../data/mockData';
 
 const STATUS_LABELS: Record<VehicleStatus, string> = {
     disponivel: 'Disponível',
@@ -146,10 +150,86 @@ const VehicleScheduleList: FC<{ routes: DeliveryRoute[] }> = ({ routes }) => {
     );
 };
 
+const MaintenanceFormModal: FC<{
+    vehicleId: string;
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (log: Omit<MaintenanceLog, 'id'>) => void;
+}> = ({ vehicleId, isOpen, onClose, onSave }) => {
+    const { currentUser } = useAuth();
+    const [log, setLog] = useState<Partial<MaintenanceLog>>({
+        maintenanceDate: new Date().toISOString().split('T')[0],
+        performedBy: currentUser?.id || '',
+    });
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    
+    // Atualizar performedBy quando currentUser mudar
+    useEffect(() => {
+        if (currentUser?.id && !log.performedBy) {
+            setLog(prev => ({ ...prev, performedBy: currentUser.id }));
+        }
+    }, [currentUser]);
+    
+    const handleChange = (field: keyof MaintenanceLog, value: any) => {
+        setLog(prev => ({...prev, [field]: value }));
+    };
+
+    const validate = () => {
+        const newErrors: Record<string, string> = {};
+        if (!log.description?.trim()) newErrors.description = "Descrição é obrigatória.";
+        if (!log.maintenanceDate) newErrors.maintenanceDate = "Data é obrigatória.";
+        if ((log.cost || 0) < 0) newErrors.cost = "Custo não pode ser negativo.";
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+    
+    const handleSave = () => {
+        if (validate()) {
+            onSave({
+                equipmentId: vehicleId, // Usar vehicleId como equipmentId (o campo é genérico)
+                maintenanceDate: log.maintenanceDate!,
+                description: log.description!,
+                cost: log.cost || 0,
+                performedBy: log.performedBy!,
+                nextMaintenanceDate: log.nextMaintenanceDate
+            });
+        }
+    };
+    
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Registrar Manutenção">
+            <div className="space-y-4">
+                <Textarea label="Descrição do Serviço" value={log.description || ''} onChange={e => handleChange('description', e.target.value)} error={errors.description} />
+                <Input label="Custo (R$)" type="number" value={log.cost || ''} onChange={e => handleChange('cost', parseFloat(e.target.value) || 0)} error={errors.cost} />
+                <DateInput 
+                    label="Data da Manutenção" 
+                    value={log.maintenanceDate?.split('T')[0] || ''} 
+                    onChange={(value) => handleChange('maintenanceDate', value)} 
+                    error={errors.maintenanceDate} 
+                />
+                <DateInput 
+                    label="Próxima Manutenção (Opcional)" 
+                    value={log.nextMaintenanceDate?.split('T')[0] || ''} 
+                    onChange={(value) => handleChange('nextMaintenanceDate', value)} 
+                />
+                <Select label="Executado Por" value={log.performedBy || ''} onChange={e => handleChange('performedBy', e.target.value)}>
+                    {mockUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </Select>
+            </div>
+             <div className="flex justify-end mt-6 space-x-3">
+                <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+                <Button onClick={handleSave}>Salvar</Button>
+            </div>
+        </Modal>
+    );
+};
+
 const VehiclesPage: FC = () => {
-    const { vehicles, deliveryRoutes, addVehicle, updateVehicle, deleteVehicle } = useData();
+    const { vehicles, deliveryRoutes, addVehicle, updateVehicle, deleteVehicle, maintenanceLogs, addMaintenanceLog } = useData();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+    const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
+    const [selectedVehicleForMaintenance, setSelectedVehicleForMaintenance] = useState<Vehicle | null>(null);
 
     const sortedVehicles = useMemo(
         () => [...vehicles].sort((a, b) => a.name.localeCompare(b.name)),
@@ -199,6 +279,17 @@ const VehiclesPage: FC = () => {
         }
     };
 
+    const handleAddMaintenance = (vehicle: Vehicle) => {
+        setSelectedVehicleForMaintenance(vehicle);
+        setIsMaintenanceModalOpen(true);
+    };
+
+    const handleSaveMaintenance = (log: Omit<MaintenanceLog, 'id'>) => {
+        addMaintenanceLog(log);
+        setIsMaintenanceModalOpen(false);
+        setSelectedVehicleForMaintenance(null);
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -216,6 +307,11 @@ const VehiclesPage: FC = () => {
                     const vehicleRoutes = deliveryRoutes
                         .filter(route => route.vehicleId === vehicle.id)
                         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+                    
+                    const vehicleMaintenanceLogs = maintenanceLogs
+                        .filter(log => log.equipmentId === vehicle.id)
+                        .sort((a, b) => new Date(b.maintenanceDate).getTime() - new Date(a.maintenanceDate).getTime());
+                    const nextMaintenance = vehicleMaintenanceLogs[0]?.nextMaintenanceDate;
 
                     return (
                         <Card key={vehicle.id} className="shadow-sm border border-border dark:border-slate-700">
@@ -246,11 +342,19 @@ const VehiclesPage: FC = () => {
                                 )}
 
                                 <div>
+                                    <h3 className="text-sm font-semibold text-text-primary dark:text-slate-200 mb-2">Próxima Manutenção</h3>
+                                    <p className="text-sm text-text-secondary dark:text-slate-400">
+                                        {nextMaintenance ? formatDate(nextMaintenance) : 'Não agendada'}
+                                    </p>
+                                </div>
+
+                                <div>
                                     <h3 className="text-sm font-semibold text-text-primary dark:text-slate-200 mb-2">Agendamentos</h3>
                                     <VehicleScheduleList routes={vehicleRoutes} />
                                 </div>
 
                                 <div className="flex justify-end gap-3 pt-2">
+                                    <Button size="sm" variant="secondary" onClick={() => handleAddMaintenance(vehicle)}>+ Manutenção</Button>
                                     <Button variant="ghost" onClick={() => handleEditVehicle(vehicle)}>Editar</Button>
                                     <Button variant="destructive" onClick={() => handleDeleteVehicle(vehicle)}>Remover</Button>
                                 </div>
@@ -266,6 +370,14 @@ const VehiclesPage: FC = () => {
                     vehicle={selectedVehicle}
                     onClose={() => { setIsModalOpen(false); setSelectedVehicle(null); }}
                     onSave={handleSaveVehicle}
+                />
+            )}
+            {selectedVehicleForMaintenance && (
+                <MaintenanceFormModal
+                    isOpen={isMaintenanceModalOpen}
+                    vehicleId={selectedVehicleForMaintenance.id}
+                    onClose={() => { setIsMaintenanceModalOpen(false); setSelectedVehicleForMaintenance(null); }}
+                    onSave={handleSaveMaintenance}
                 />
             )}
         </div>

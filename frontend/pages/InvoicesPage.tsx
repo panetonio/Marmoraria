@@ -10,6 +10,7 @@ import Modal from '../components/ui/Modal';
 import InvoicePreview from '../components/InvoicePreview';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { formatDate, formatDateTime } from '../utils/dateFormat';
 
 const InvoiceList: React.FC<{
     invoices: Invoice[];
@@ -44,7 +45,7 @@ const InvoiceList: React.FC<{
                                     <td className="p-3 font-mono text-sm">{invoice.id}</td>
                                     <td className="p-3 font-mono text-sm">{invoice.orderId}</td>
                                     <td className="p-3">{invoice.clientName}</td>
-                                    <td className="p-3">{invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString() : '—'}</td>
+                                    <td className="p-3">{invoice.issueDate ? formatDate(invoice.issueDate) : '—'}</td>
                                     <td className="p-3">{invoice.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                     <td className="p-3"><StatusBadge status={invoice.status} statusMap={invoiceStatusMap} /></td>
                                     <td className="p-3">
@@ -125,8 +126,8 @@ const InvoiceForm: React.FC<{
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-sm">
                             <div><strong>Status:</strong><p><StatusBadge status={invoice.status} statusMap={invoiceStatusMap} /></p></div>
-                            <div><strong>Data de Criação:</strong><p>{new Date(invoice.createdAt).toLocaleString()}</p></div>
-                            <div><strong>Data de Emissão:</strong><p>{invoice.issueDate ? new Date(invoice.issueDate).toLocaleString() : 'Não emitida'}</p></div>
+                            <div><strong>Data de Criação:</strong><p>{formatDateTime(invoice.createdAt)}</p></div>
+                            <div><strong>Data de Emissão:</strong><p>{invoice.issueDate ? formatDateTime(invoice.issueDate) : 'Não emitida'}</p></div>
                         </div>
                     </div>
                 )}

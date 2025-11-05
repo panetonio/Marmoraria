@@ -8,9 +8,11 @@ import Tabs from '../components/ui/Tabs';
 import { useData } from '../context/DataContext';
 import { generateWhatsAppLink, validateAddress } from '../utils/helpers';
 import Input from '../components/ui/Input';
+import DateInput from '../components/ui/DateInput';
 import Textarea from '../components/ui/Textarea';
 import AddressForm from '../components/AddressForm';
 import Select from '../components/ui/Select';
+import { formatDate, formatDateTime } from '../utils/dateFormat';
 
 type CrmView = 'clientes' | 'pipeline' | 'agenda';
 
@@ -95,7 +97,7 @@ const ClientDetailModal: FC<{
                        <p><strong>Endereço:</strong> {formattedAddress}</p>
                        <p><strong>CEP:</strong> {client.address.cep}</p>
                        {client.cpfCnpj && <p><strong>CPF/CNPJ:</strong> {client.cpfCnpj}</p>}
-                       <p><strong>Cliente desde:</strong> {new Date(client.createdAt).toLocaleDateString()}</p>
+                       <p><strong>Cliente desde:</strong> {formatDate(client.createdAt)}</p>
                     </div>
                 </div>
                  <div className="md:w-2/3">
@@ -106,7 +108,7 @@ const ClientDetailModal: FC<{
                                 <li key={item.id} className="flex items-start space-x-3">
                                     <div className="p-2 bg-slate-100 dark:bg-dark rounded-full mt-1">{getIconForHistory(item.type)}</div>
                                     <div>
-                                        <p className="font-semibold">{item.type} <span className="text-xs text-text-secondary dark:text-slate-400 font-normal">- {new Date(item.createdAt).toLocaleString()}</span></p>
+                                        <p className="font-semibold">{item.type} <span className="text-xs text-text-secondary dark:text-slate-400 font-normal">- {formatDateTime(item.createdAt)}</span></p>
                                         <p className="text-sm text-text-secondary dark:text-slate-400">
                                             {'content' in item ? item.content : `ID: ${item.id} - Total: ${'total' in item ? item.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}`}
                                         </p>
@@ -299,12 +301,11 @@ const EventFormModal: FC<{
                     error={errors.title}
                 />
                 <div className="grid grid-cols-2 gap-4">
-                     <Input
+                     <DateInput
                         label="Data"
                         id="event-date"
-                        type="date"
                         value={date}
-                        onChange={e => setDate(e.target.value)}
+                        onChange={(value) => setDate(value)}
                         error={errors.date}
                     />
                     <Input

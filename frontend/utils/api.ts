@@ -802,12 +802,33 @@ export const api = {
     return response.json();
   },
   async createServiceOrder(serviceOrderData: any) {
-    const response = await apiFetch(`${API_URL}/serviceorders`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(serviceOrderData),
-    });
-    return response.json();
+    try {
+      const response = await apiFetch(`${API_URL}/serviceorders`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(serviceOrderData),
+      });
+      
+      // Se não for sucesso, tentar extrair mensagem de erro
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Erro na resposta do servidor:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: errorData,
+        });
+        
+        // Criar um erro com a mensagem do servidor
+        const error = new Error(errorData.message || errorData.error || `Erro ${response.status}: ${response.statusText}`);
+        (error as any).response = { data: errorData, status: response.status };
+        throw error;
+      }
+      
+      return response.json();
+    } catch (error: any) {
+      console.error('❌ Erro na requisição createServiceOrder:', error);
+      throw error;
+    }
   },
 
   async updateServiceOrderStatus(id: string, status: string, allocatedSlabId?: string) {

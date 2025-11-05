@@ -135,7 +135,7 @@ const StockDetailModal: FC<{ item: StockItem, isOpen: boolean, onClose: () => vo
                         <p><strong>Espessura:</strong> {item.thickness}cm</p>
                         <p><strong>Área:</strong> {(item.width * item.height).toFixed(2)}m²</p>
                         <p><strong>Localização:</strong> {item.location}</p>
-                        <p><strong>Data de Entrada:</strong> {new Date(item.createdAt).toLocaleDateString()}</p>
+                        <p><strong>Data de Entrada:</strong> {formatDate(item.createdAt)}</p>
                         {item.parentSlabId && <p><strong>Origem (Retalho):</strong> <span className="font-mono">{item.parentSlabId}</span></p>}
                     </div>
                 </div>

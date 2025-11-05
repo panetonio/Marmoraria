@@ -1,995 +1,891 @@
-const mongoose = require('mongoose');
 const ServiceOrder = require('../models/ServiceOrder');
+const Order = require('../models/Order');
+const { createCutPiecesForServiceOrder } = require('../utils/cutPieceHelper');
 const ActivityLog = require('../models/ActivityLog');
-const { createCutPiecesForServiceOrder, shouldCreateCutPieces } = require('../utils/cutPieceHelper');
+const mongoose = require('mongoose');
 
-const buildUserSnapshot = (user) => {
-  if (!user) {
-    return undefined;
+/**
+ * Gera um ID único para a Service Order
+ * Formato: OS-YYYYMMDD-HHMMSS-XXX
+ */
+const generateServiceOrderId = async () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  
+  // Gerar número aleatório de 3 dígitos
+  const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  
+  const id = `OS-${year}${month}${day}-${hours}${minutes}${seconds}-${random}`;
+  
+  // Verificar se o ID já existe
+  const existing = await ServiceOrder.findOne({ id });
+  if (existing) {
+    // Se existir, tentar novamente (recursivamente até 10 tentativas)
+    const maxRetries = 10;
+    for (let i = 0; i < maxRetries; i++) {
+      const newRandom = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+      const newId = `OS-${year}${month}${day}-${hours}${minutes}${seconds}-${newRandom}`;
+      const existingNew = await ServiceOrder.findOne({ id: newId });
+      if (!existingNew) {
+        return newId;
+      }
+    }
+    // Se ainda não conseguiu, usar timestamp completo
+    return `OS-${year}${month}${day}-${hours}${minutes}${seconds}-${Date.now() % 1000}`;
   }
-
-  return {
-    id: user._id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-  };
+  
+  return id;
 };
 
-const ensureChecklistItemId = (item) => ({
-  id: typeof item.id === 'string' && item.id.trim().length > 0
-    ? item.id
-    : new mongoose.Types.ObjectId().toString(),
-  text: item.text,
-  checked: Boolean(item.checked),
-});
-
-// Mapeamento de status de exceção para próximos status padrão
-const EXCEPTION_STATUS_RESOLUTION_MAP = {
-  'rework_needed': 'finishing',
-  'delivery_issue': 'ready_for_logistics',
-  'installation_issue': 'awaiting_installation',
-  'installation_pending_review': 'completed',
-  'quality_issue': 'quality_check',
-  'material_shortage': 'pending_production',
-  'equipment_failure': 'pending_production',
-  'customer_not_available': 'scheduled',
-  'weather_delay': 'scheduled',
-  'permit_issue': 'awaiting_installation',
-  'measurement_error': 'pending_production',
-  'design_change': 'pending_production',
-};
-
-// Status válidos para resolução
-const VALID_RESOLUTION_STATUSES = [
-  'pending_production',
-  'cutting',
-  'finishing',
-  'quality_check',
-  'ready_for_logistics',
-  'scheduled',
-  'in_transit',
-  'delivered',
-  'awaiting_installation',
-  'completed',
-];
-
-// Status de exceção que podem ser resolvidos
-const EXCEPTION_STATUSES = Object.keys(EXCEPTION_STATUS_RESOLUTION_MAP);
-
-// Função genérica para resolver status de exceção
-exports.resolveServiceOrderIssue = async (req, res) => {
+/**
+ * Obter todas as Service Orders
+ */
+exports.getAllServiceOrders = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { resolutionDetails, nextStatus } = req.body;
-
-    // Buscar a ServiceOrder pelo campo id personalizado
-    const serviceOrder = await ServiceOrder.findOne({ id });
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ordem de serviço não encontrada',
-      });
-    }
-
-    // Verificar se o status atual é um status de exceção
-    if (!EXCEPTION_STATUSES.includes(serviceOrder.status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Status atual '${serviceOrder.status}' não é um status de exceção que pode ser resolvido`,
-        validExceptionStatuses: EXCEPTION_STATUSES,
-      });
-    }
-
-    // Registrar status anterior
-    const previousStatus = serviceOrder.status;
-
-    // Determinar próximo status
-    let resolvedStatus;
-    if (nextStatus && VALID_RESOLUTION_STATUSES.includes(nextStatus)) {
-      resolvedStatus = nextStatus;
-    } else {
-      // Usar lógica padrão baseada no mapeamento
-      resolvedStatus = EXCEPTION_STATUS_RESOLUTION_MAP[previousStatus];
-    }
-
-    // Atualizar status
-    serviceOrder.status = resolvedStatus;
-
-    // Adicionar entrada ao history
-    serviceOrder.history.push({
-      status: resolvedStatus,
-      reason: resolutionDetails || `Status de exceção '${previousStatus}' resolvido`,
-      user: req.user ? req.user._id : null,
-      timestamp: new Date(),
-    });
-
-    // Salvar a OS
-    await serviceOrder.save();
-
-    // Registrar no ActivityLog
-    const activityType = `service_order_${previousStatus}_resolved`;
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: activityType,
-      description: `Status de exceção '${previousStatus}' resolvido para '${resolvedStatus}'${resolutionDetails ? ` - ${resolutionDetails}` : ''}`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        previousStatus,
-        resolvedStatus,
-        resolutionDetails,
-        serviceOrderId: serviceOrder._id,
-      },
-    });
-
-    return res.json({
+    const serviceOrders = await ServiceOrder.find()
+      .populate('orderId', 'id clientName')
+      .sort({ createdAt: -1 });
+    
+    res.json({
       success: true,
-      message: `Status de exceção '${previousStatus}' resolvido com sucesso`,
-      data: {
-        serviceOrder,
-        previousStatus,
-        resolvedStatus,
-        resolutionDetails,
-      },
+      data: serviceOrders,
     });
-
   } catch (error) {
-    console.error('Erro ao resolver status de exceção:', error);
-    return res.status(500).json({
+    console.error('Erro ao buscar ServiceOrders:', error);
+    res.status(500).json({
       success: false,
-      message: 'Erro interno ao resolver status de exceção',
+      message: 'Erro ao buscar ServiceOrders',
       error: error.message,
     });
   }
 };
 
-// Função específica para resolver rework
-exports.resolveRework = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { resolutionDetails, nextStatus } = req.body;
-
-    // Buscar a ServiceOrder pelo campo id personalizado
-    const serviceOrder = await ServiceOrder.findOne({ id });
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ordem de serviço não encontrada',
-      });
-    }
-
-    // Verificar se o status atual é 'rework_needed'
-    if (serviceOrder.status !== 'rework_needed') {
-      return res.status(400).json({
-        success: false,
-        message: `Status atual '${serviceOrder.status}' não é 'rework_needed'`,
-      });
-    }
-
-    // Registrar status anterior
-    const previousStatus = serviceOrder.status;
-
-    // Determinar próximo status (padrão: finishing)
-    const resolvedStatus = nextStatus && VALID_RESOLUTION_STATUSES.includes(nextStatus) 
-      ? nextStatus 
-      : 'finishing';
-
-    // Atualizar status
-    serviceOrder.status = resolvedStatus;
-
-    // Adicionar entrada ao history
-    serviceOrder.history.push({
-      status: resolvedStatus,
-      reason: resolutionDetails || 'Rework concluído e aprovado',
-      user: req.user ? req.user._id : null,
-      timestamp: new Date(),
-    });
-
-    // Salvar a OS
-    await serviceOrder.save();
-
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'service_order_rework_resolved',
-      description: `Rework resolvido - OS movida para '${resolvedStatus}'${resolutionDetails ? ` - ${resolutionDetails}` : ''}`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        previousStatus,
-        resolvedStatus,
-        resolutionDetails,
-        serviceOrderId: serviceOrder._id,
-      },
-    });
-
-    return res.json({
-      success: true,
-      message: 'Rework resolvido com sucesso',
-      data: {
-        serviceOrder,
-        previousStatus,
-        resolvedStatus,
-        resolutionDetails,
-      },
-    });
-
-  } catch (error) {
-    console.error('Erro ao resolver rework:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao resolver rework',
-      error: error.message,
-    });
-  }
-};
-
-// Função específica para resolver problemas de entrega
-exports.resolveDeliveryIssue = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { resolutionDetails, nextStatus } = req.body;
-
-    // Buscar a ServiceOrder pelo campo id personalizado
-    const serviceOrder = await ServiceOrder.findOne({ id });
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ordem de serviço não encontrada',
-      });
-    }
-
-    // Verificar se o status atual é 'delivery_issue'
-    if (serviceOrder.status !== 'delivery_issue') {
-      return res.status(400).json({
-        success: false,
-        message: `Status atual '${serviceOrder.status}' não é 'delivery_issue'`,
-      });
-    }
-
-    // Registrar status anterior
-    const previousStatus = serviceOrder.status;
-
-    // Determinar próximo status (padrão: ready_for_logistics)
-    const resolvedStatus = nextStatus && VALID_RESOLUTION_STATUSES.includes(nextStatus) 
-      ? nextStatus 
-      : 'ready_for_logistics';
-
-    // Atualizar status
-    serviceOrder.status = resolvedStatus;
-
-    // Adicionar entrada ao history
-    serviceOrder.history.push({
-      status: resolvedStatus,
-      reason: resolutionDetails || 'Problema de entrega resolvido',
-      user: req.user ? req.user._id : null,
-      timestamp: new Date(),
-    });
-
-    // Salvar a OS
-    await serviceOrder.save();
-
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'service_order_delivery_issue_resolved',
-      description: `Problema de entrega resolvido - OS movida para '${resolvedStatus}'${resolutionDetails ? ` - ${resolutionDetails}` : ''}`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        previousStatus,
-        resolvedStatus,
-        resolutionDetails,
-        serviceOrderId: serviceOrder._id,
-      },
-    });
-
-    return res.json({
-      success: true,
-      message: 'Problema de entrega resolvido com sucesso',
-      data: {
-        serviceOrder,
-        previousStatus,
-        resolvedStatus,
-        resolutionDetails,
-      },
-    });
-
-  } catch (error) {
-    console.error('Erro ao resolver problema de entrega:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao resolver problema de entrega',
-      error: error.message,
-    });
-  }
-};
-
-// Função específica para completar revisão de qualidade
-exports.completeReview = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { resolutionDetails, nextStatus } = req.body;
-
-    // Buscar a ServiceOrder pelo campo id personalizado
-    const serviceOrder = await ServiceOrder.findOne({ id });
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ordem de serviço não encontrada',
-      });
-    }
-
-    // Verificar se o status atual é 'quality_issue'
-    if (serviceOrder.status !== 'quality_issue') {
-      return res.status(400).json({
-        success: false,
-        message: `Status atual '${serviceOrder.status}' não é 'quality_issue'`,
-      });
-    }
-
-    // Registrar status anterior
-    const previousStatus = serviceOrder.status;
-
-    // Determinar próximo status (padrão: ready_for_logistics)
-    const resolvedStatus = nextStatus && VALID_RESOLUTION_STATUSES.includes(nextStatus) 
-      ? nextStatus 
-      : 'ready_for_logistics';
-
-    // Atualizar status
-    serviceOrder.status = resolvedStatus;
-
-    // Adicionar entrada ao history
-    serviceOrder.history.push({
-      status: resolvedStatus,
-      reason: resolutionDetails || 'Revisão de qualidade concluída e aprovada',
-      user: req.user ? req.user._id : null,
-      timestamp: new Date(),
-    });
-
-    // Salvar a OS
-    await serviceOrder.save();
-
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'service_order_quality_review_completed',
-      description: `Revisão de qualidade concluída - OS movida para '${resolvedStatus}'${resolutionDetails ? ` - ${resolutionDetails}` : ''}`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        previousStatus,
-        resolvedStatus,
-        resolutionDetails,
-        serviceOrderId: serviceOrder._id,
-      },
-    });
-
-    return res.json({
-      success: true,
-      message: 'Revisão de qualidade concluída com sucesso',
-      data: {
-        serviceOrder,
-        previousStatus,
-        resolvedStatus,
-        resolutionDetails,
-      },
-    });
-
-  } catch (error) {
-    console.error('Erro ao completar revisão de qualidade:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao completar revisão de qualidade',
-      error: error.message,
-    });
-  }
-};
-
-// Função para marcar OS para rework
-exports.markForRework = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { reason } = req.body;
-
-    // Buscar a ServiceOrder pelo campo id personalizado
-    const serviceOrder = await ServiceOrder.findOne({ id });
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ordem de serviço não encontrada',
-      });
-    }
-
-    // Verificar se a OS já está 'completed' ou 'cancelled'
-    if (serviceOrder.status === 'completed' || serviceOrder.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        message: `Status atual '${serviceOrder.status}' não pode ser alterado`,
-      });
-    }
-
-    // Registrar status anterior
-    const previousStatus = serviceOrder.status;
-
-    // Definir novo status
-    serviceOrder.status = 'rework_needed';
-
-    // Adicionar entrada ao history
-    serviceOrder.history.push({
-      status: 'rework_needed',
-      reason: reason || 'OS marcada para rework',
-      user: req.user ? req.user._id : null,
-      timestamp: new Date(),
-    });
-
-    // Salvar a OS
-    await serviceOrder.save();
-
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'service_order_rework_needed',
-      description: `OS marcada para rework - Status alterado de '${previousStatus}' para 'rework_needed'${reason ? ` - ${reason}` : ''}`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        previousStatus,
-        newStatus: 'rework_needed',
-        reason,
-        serviceOrderId: serviceOrder._id,
-      },
-    });
-
-    return res.json({
-      success: true,
-      message: 'OS marcada para rework com sucesso',
-      data: serviceOrder,
-    });
-
-  } catch (error) {
-    console.error('Erro ao marcar OS para rework:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao marcar OS para rework',
-      error: error.message,
-    });
-  }
-};
-
-// Função para reportar problema de entrega
-exports.reportDeliveryIssue = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { reason } = req.body;
-
-    // Buscar a ServiceOrder pelo campo id personalizado
-    const serviceOrder = await ServiceOrder.findOne({ id });
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ordem de serviço não encontrada',
-      });
-    }
-
-    // Verificar se a OS já está 'completed' ou 'cancelled'
-    if (serviceOrder.status === 'completed' || serviceOrder.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        message: `Status atual '${serviceOrder.status}' não pode ser alterado`,
-      });
-    }
-
-    // Registrar status anterior
-    const previousStatus = serviceOrder.status;
-
-    // Definir novo status
-    serviceOrder.status = 'delivery_issue';
-
-    // Adicionar entrada ao history
-    serviceOrder.history.push({
-      status: 'delivery_issue',
-      reason: reason || 'Problema de entrega reportado',
-      user: req.user ? req.user._id : null,
-      timestamp: new Date(),
-    });
-
-    // Salvar a OS
-    await serviceOrder.save();
-
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'service_order_delivery_issue',
-      description: `Problema de entrega reportado - Status alterado de '${previousStatus}' para 'delivery_issue'${reason ? ` - ${reason}` : ''}`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        previousStatus,
-        newStatus: 'delivery_issue',
-        reason,
-        serviceOrderId: serviceOrder._id,
-      },
-    });
-
-    return res.json({
-      success: true,
-      message: 'Problema de entrega reportado com sucesso',
-      data: serviceOrder,
-    });
-
-  } catch (error) {
-    console.error('Erro ao reportar problema de entrega:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao reportar problema de entrega',
-      error: error.message,
-    });
-  }
-};
-
-// Função para solicitar revisão de instalação
-exports.requestInstallationReview = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { reason } = req.body;
-
-    // Buscar a ServiceOrder pelo campo id personalizado
-    const serviceOrder = await ServiceOrder.findOne({ id });
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ordem de serviço não encontrada',
-      });
-    }
-
-    // Verificar se a OS já está 'completed' ou 'cancelled'
-    if (serviceOrder.status === 'completed' || serviceOrder.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        message: `Status atual '${serviceOrder.status}' não pode ser alterado`,
-      });
-    }
-
-    // Registrar status anterior
-    const previousStatus = serviceOrder.status;
-
-    // Definir novo status
-    serviceOrder.status = 'installation_pending_review';
-
-    // Adicionar entrada ao history
-    serviceOrder.history.push({
-      status: 'installation_pending_review',
-      reason: reason || 'Revisão de instalação solicitada',
-      user: req.user ? req.user._id : null,
-      timestamp: new Date(),
-    });
-
-    // Salvar a OS
-    await serviceOrder.save();
-
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'service_order_issue_resolved',
-      description: `Revisão de instalação solicitada - Status alterado de '${previousStatus}' para 'installation_pending_review'${reason ? ` - ${reason}` : ''}`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        previousStatus,
-        newStatus: 'installation_pending_review',
-        reason,
-        serviceOrderId: serviceOrder._id,
-      },
-    });
-
-    return res.json({
-      success: true,
-      message: 'Revisão de instalação solicitada com sucesso',
-      data: serviceOrder,
-    });
-
-  } catch (error) {
-    console.error('Erro ao solicitar revisão de instalação:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao solicitar revisão de instalação',
-      error: error.message,
-    });
-  }
-};
-
-exports.updateDepartureChecklist = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { checklist } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: 'ID inválido para ordem de serviço',
-      });
-    }
-
-    const serviceOrder = await ServiceOrder.findById(id);
-
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'Ordem de serviço não encontrada',
-      });
-    }
-
-    const previousChecklist = Array.isArray(serviceOrder.departureChecklist)
-      ? serviceOrder.departureChecklist.map(item => ({ ...item }))
-      : [];
-
-    const normalizedChecklist = Array.isArray(checklist)
-      ? checklist.map(ensureChecklistItemId)
-      : [];
-
-    serviceOrder.departureChecklist = normalizedChecklist;
-    await serviceOrder.save();
-
-    const previousCheckedMap = new Map(previousChecklist.map(item => [item.id, Boolean(item.checked)]));
-    const newlyCompleted = normalizedChecklist.filter(item => item.checked && !previousCheckedMap.get(item.id));
-    const totalCompleted = normalizedChecklist.filter(item => item.checked).length;
-
-    const descriptionParts = [
-      `Checklist atualizado (${totalCompleted}/${normalizedChecklist.length} itens concluídos)`,
-    ];
-
-    if (newlyCompleted.length > 0) {
-      descriptionParts.push(`Itens concluídos: ${newlyCompleted.map(item => item.text).join(', ')}`);
-    }
-
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: newlyCompleted.length > 0
-        ? 'service_order_checklist_item_checked'
-        : 'service_order_checklist_update',
-      description: descriptionParts.join(' | '),
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        totalItems: normalizedChecklist.length,
-        totalCompleted,
-        newlyCompleted: newlyCompleted.map(item => ({ id: item.id, text: item.text })),
-      },
-    });
-
-    return res.json({
-      success: true,
-      message: 'Checklist atualizado com sucesso',
-      data: serviceOrder,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Erro ao atualizar checklist da ordem de serviço',
-      error: error.message,
-    });
-  }
-};
-
-// Criar ServiceOrder
+/**
+ * Criar uma nova Service Order
+ */
 exports.createServiceOrder = async (req, res) => {
   try {
     const serviceOrderData = req.body;
     
-    // Criar a ServiceOrder
-    const serviceOrder = await ServiceOrder.create(serviceOrderData);
+    console.log('📋 Dados recebidos para criar ServiceOrder:', JSON.stringify(serviceOrderData, null, 2));
     
-    console.log(`✅ ServiceOrder criada: ${serviceOrder.id} com status: ${serviceOrder.status}`);
+    // Validação de campos obrigatórios
+    const requiredFields = ['orderId', 'clientName', 'deliveryAddress', 'items', 'total', 'deliveryDate'];
+    const missingFields = requiredFields.filter(field => !serviceOrderData[field]);
     
-    // Verificar se deve criar CutPieces
-    if (shouldCreateCutPieces(serviceOrder, serviceOrder.status)) {
+    if (missingFields.length > 0) {
+      console.error('❌ Campos obrigatórios faltando:', missingFields);
+      return res.status(400).json({
+        success: false,
+        message: `Campos obrigatórios faltando: ${missingFields.join(', ')}`,
+      });
+    }
+    
+    // Validar que items é um array não vazio
+    if (!Array.isArray(serviceOrderData.items) || serviceOrderData.items.length === 0) {
+      console.error('❌ Items deve ser um array não vazio');
+      return res.status(400).json({
+        success: false,
+        message: 'Items deve ser um array não vazio',
+      });
+    }
+    
+    // Converter orderId para ObjectId se for string (fazer antes de gerar IDs dos itens)
+    let orderIdString = serviceOrderData.orderId;
+    if (typeof serviceOrderData.orderId === 'string') {
       try {
-        const cutPieces = await createCutPiecesForServiceOrder(serviceOrder.id, serviceOrder.allocatedSlabId);
-        console.log(`🎯 ${cutPieces.length} CutPieces criadas automaticamente para ${serviceOrder.id}`);
-      } catch (cutPieceError) {
-        console.error(`⚠️ Erro ao criar CutPieces para ${serviceOrder.id}:`, cutPieceError.message);
-        // Não falha a criação da ServiceOrder se CutPieces falharem
+        serviceOrderData.orderId = new mongoose.Types.ObjectId(serviceOrderData.orderId);
+        orderIdString = serviceOrderData.orderId.toString();
+        console.log('🔄 orderId convertido para ObjectId:', serviceOrderData.orderId);
+      } catch (error) {
+        console.error('❌ Erro ao converter orderId para ObjectId:', error);
+        return res.status(400).json({
+          success: false,
+          message: 'orderId inválido',
+        });
+      }
+    } else {
+      orderIdString = serviceOrderData.orderId?.toString() || 'temp';
+    }
+    
+    // Garantir que todos os itens tenham IDs válidos e campos numéricos tenham valores padrão
+    serviceOrderData.items = serviceOrderData.items.map((item, index) => {
+      // Gerar ID se necessário
+      if (!item.id || item.id === undefined || item.id === null || item.id === '') {
+        const generatedId = `item-${orderIdString}-${Date.now()}-${index}`;
+        console.warn(`⚠️ Item sem ID encontrado! Gerando ID no backend: ${generatedId}`, item);
+        item.id = generatedId;
+      }
+      
+      // Garantir valores padrão para campos numéricos que podem ser undefined
+      const normalizedItem = {
+        ...item,
+        discount: item.discount ?? 0,
+        quantity: item.quantity ?? 0,
+        unitPrice: item.unitPrice ?? 0,
+        totalPrice: item.totalPrice ?? 0,
+      };
+      
+      return normalizedItem;
+    });
+    
+    console.log('✅ Todos os itens têm IDs válidos:', serviceOrderData.items.map(item => ({ id: item.id, description: item.description })));
+    
+    // Gerar ID único se não fornecido (verificação robusta)
+    if (!serviceOrderData.id || serviceOrderData.id === '' || serviceOrderData.id === null || serviceOrderData.id === undefined) {
+      try {
+        serviceOrderData.id = await generateServiceOrderId();
+        console.log('🆔 ID gerado automaticamente:', serviceOrderData.id);
+      } catch (error) {
+        console.error('❌ Erro ao gerar ID:', error);
+        // Fallback: ID usando timestamp
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}${Date.now() % 10000}`;
+        serviceOrderData.id = `OS-${timestamp}`;
+        console.log('🆔 ID de fallback gerado:', serviceOrderData.id);
       }
     }
     
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'service_order_created',
-      description: `ServiceOrder ${serviceOrder.id} criada com status '${serviceOrder.status}'`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        serviceOrderId: serviceOrder.id,
-        status: serviceOrder.status,
-        clientName: serviceOrder.clientName
-      }
+    // Garantir que cada item do departureChecklist tenha um ID único
+    if (serviceOrderData.departureChecklist && Array.isArray(serviceOrderData.departureChecklist)) {
+      serviceOrderData.departureChecklist = serviceOrderData.departureChecklist.map((item, index) => ({
+        ...item,
+        id: item.id || `checklist-${Date.now()}-${index}`,
+      }));
+    }
+    
+    console.log('✅ Dados validados, criando ServiceOrder...');
+    console.log('📋 Estrutura final dos dados:', {
+      id: serviceOrderData.id,
+      orderId: serviceOrderData.orderId,
+      clientName: serviceOrderData.clientName,
+      itemsCount: serviceOrderData.items?.length,
+      items: serviceOrderData.items?.map(item => ({
+        id: item.id,
+        type: item.type,
+        description: item.description,
+        hasCategory: !!item.category,
+        hasQuantity: typeof item.quantity !== 'undefined',
+        hasTotalPrice: typeof item.totalPrice !== 'undefined',
+      })),
+      total: serviceOrderData.total,
+      deliveryDate: serviceOrderData.deliveryDate,
     });
     
-    return res.status(201).json({
+    // VALIDAÇÃO FINAL: Garantir que o ID existe antes de criar
+    if (!serviceOrderData.id || serviceOrderData.id === '' || serviceOrderData.id === null || serviceOrderData.id === undefined) {
+      console.error('❌ ERRO CRÍTICO: ID não encontrado após todas as validações! Gerando ID de emergência...');
+      try {
+        serviceOrderData.id = await generateServiceOrderId();
+        console.log('🆔 ID de emergência gerado:', serviceOrderData.id);
+      } catch (error) {
+        console.error('❌ Erro ao gerar ID de emergência:', error);
+        // Fallback final: ID usando timestamp
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}${Date.now() % 10000}`;
+        serviceOrderData.id = `OS-${timestamp}`;
+        console.log('🆔 ID de fallback final gerado:', serviceOrderData.id);
+      }
+    }
+    
+    // VALIDAÇÃO EXPLÍCITA: Lançar erro se ID ainda não existir
+    if (!serviceOrderData.id || serviceOrderData.id === '' || serviceOrderData.id === null || serviceOrderData.id === undefined) {
+      const errorMsg = 'Não foi possível gerar ID para a ServiceOrder após todas as tentativas';
+      console.error('❌', errorMsg);
+      return res.status(500).json({
+        success: false,
+        message: errorMsg,
+        error: errorMsg,
+      });
+    }
+    
+    console.log('🔍 ID final antes de criar:', serviceOrderData.id);
+    
+    // GARANTIR que o ID seja sempre uma string válida não vazia
+    let finalId = serviceOrderData.id;
+    if (typeof finalId !== 'string' || finalId.trim() === '') {
+      console.error('❌ ID inválido detectado, convertendo para string:', finalId);
+      finalId = String(finalId || '').trim();
+      if (finalId === '') {
+        // Último fallback: gerar ID usando timestamp
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}${Date.now() % 10000}`;
+        finalId = `OS-${timestamp}`;
+        console.error('🆔 ID de fallback crítico gerado:', finalId);
+      }
+    }
+    
+    // Validar que o ID tem pelo menos 3 caracteres
+    if (finalId.length < 3) {
+      console.error('❌ ID muito curto, gerando novo:', finalId);
+      const now = new Date();
+      const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}${Date.now() % 10000}`;
+      finalId = `OS-${timestamp}`;
+    }
+    
+    console.log('🔍 ID final validado:', {
+      id: finalId,
+      length: finalId.length,
+      type: typeof finalId,
+      isString: typeof finalId === 'string',
+      isEmpty: finalId.trim() === '',
+    });
+    
+    // Criar objeto novo com todos os campos garantidos, incluindo id explícito
+    // Remover campos undefined antes de criar
+    const serviceOrderToCreate = {
+      id: finalId, // ID garantido como string válida
+      orderId: serviceOrderData.orderId,
+      clientName: serviceOrderData.clientName,
+      deliveryAddress: serviceOrderData.deliveryAddress,
+      items: serviceOrderData.items,
+      total: serviceOrderData.total,
+      deliveryDate: serviceOrderData.deliveryDate,
+    };
+    
+    // Adicionar campos opcionais apenas se não forem undefined
+    if (serviceOrderData.assignedToIds !== undefined) {
+      serviceOrderToCreate.assignedToIds = serviceOrderData.assignedToIds;
+    }
+    if (serviceOrderData.productionStatus !== undefined) {
+      serviceOrderToCreate.productionStatus = serviceOrderData.productionStatus;
+    }
+    if (serviceOrderData.logisticsStatus !== undefined) {
+      serviceOrderToCreate.logisticsStatus = serviceOrderData.logisticsStatus;
+    }
+    if (serviceOrderData.isFinalized !== undefined) {
+      serviceOrderToCreate.isFinalized = serviceOrderData.isFinalized;
+    }
+    if (serviceOrderData.departureChecklist !== undefined) {
+      serviceOrderToCreate.departureChecklist = serviceOrderData.departureChecklist;
+    }
+    if (serviceOrderData.allocatedSlabId !== undefined) {
+      serviceOrderToCreate.allocatedSlabId = serviceOrderData.allocatedSlabId;
+    }
+    if (serviceOrderData.priority !== undefined) {
+      serviceOrderToCreate.priority = serviceOrderData.priority;
+    }
+    if (serviceOrderData.requiresInstallation !== undefined) {
+      serviceOrderToCreate.requiresInstallation = serviceOrderData.requiresInstallation;
+    }
+    if (serviceOrderData.finalizationType !== undefined) {
+      serviceOrderToCreate.finalizationType = serviceOrderData.finalizationType;
+    }
+    if (serviceOrderData.observations !== undefined) {
+      serviceOrderToCreate.observations = serviceOrderData.observations;
+    }
+    
+    // LOG DETALHADO: Objeto completo que será enviado ao Mongoose
+    console.log('📋 OBJETO COMPLETO QUE SERÁ ENVIADO AO MONGOOSE:');
+    console.log(JSON.stringify(serviceOrderToCreate, null, 2));
+    console.log('🔍 Verificação do campo ID no objeto:');
+    console.log('  - id existe?', 'id' in serviceOrderToCreate);
+    console.log('  - id valor:', serviceOrderToCreate.id);
+    console.log('  - id tipo:', typeof serviceOrderToCreate.id);
+    console.log('  - id é string?', typeof serviceOrderToCreate.id === 'string');
+    console.log('  - id não vazio?', serviceOrderToCreate.id && serviceOrderToCreate.id.trim() !== '');
+    
+    // Criar a Service Order usando o novo objeto
+    const serviceOrder = await ServiceOrder.create(serviceOrderToCreate);
+    
+    console.log('✅ ServiceOrder criada com sucesso:', serviceOrder.id);
+    
+    // Atualizar o Order com o ID da Service Order
+    // Usar _id (ObjectId) em vez de id (string) para a referência
+    try {
+      await Order.findByIdAndUpdate(
+        serviceOrderData.orderId,
+        {
+          $push: { serviceOrderIds: serviceOrder._id },
+        }
+      );
+      console.log('✅ Order atualizada com ServiceOrder ID');
+    } catch (error) {
+      console.error('⚠️  Erro ao atualizar Order:', error.message);
+      // Não falhar a criação da OS se não conseguir atualizar o Order
+    }
+    
+    // Criar CutPieces automaticamente se houver items
+    if (serviceOrder.items && serviceOrder.items.length > 0) {
+      try {
+        await createCutPiecesForServiceOrder(serviceOrder.id);
+        console.log('✅ CutPieces criadas automaticamente');
+      } catch (error) {
+        console.error('⚠️  Erro ao criar CutPieces:', error.message);
+        // Não falhar a criação da OS se não conseguir criar CutPieces
+      }
+    }
+    
+    // Registrar no log de atividades
+    try {
+      await ActivityLog.create({
+        userId: req.user?._id || null,
+        userName: req.user?.name || 'Sistema',
+        action: 'create',
+        entityType: 'ServiceOrder',
+        entityId: serviceOrder._id,
+        description: `Criou a OS ${serviceOrder.id} para o cliente ${serviceOrder.clientName}`,
+      });
+    } catch (error) {
+      console.error('⚠️  Erro ao registrar log de atividade:', error.message);
+    }
+    
+    res.status(201).json({
       success: true,
       message: 'ServiceOrder criada com sucesso',
-      data: serviceOrder
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('❌ Erro ao criar ServiceOrder:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      keyPattern: error.keyPattern,
     });
     
-  } catch (error) {
-    console.error('Erro ao criar ServiceOrder:', error);
-    return res.status(500).json({
+    // Tratamento específico de erros
+    if (error.name === 'ValidationError') {
+      const errors = {};
+      const missingFields = [];
+      
+      Object.keys(error.errors || {}).forEach(key => {
+        const errorObj = error.errors[key];
+        errors[key] = errorObj.message;
+        
+        // Detectar campos obrigatórios faltando
+        if (errorObj.kind === 'required' || errorObj.message.includes('required')) {
+          missingFields.push(key);
+        }
+      });
+      
+      console.error('❌ Erro de validação do Mongoose:', errors);
+      console.error('❌ Campos obrigatórios faltando:', missingFields);
+      
+      // Mensagem mais específica se houver campos obrigatórios faltando
+      let errorMessage = 'Erro de validação';
+      if (missingFields.length > 0) {
+        errorMessage = `Campos obrigatórios faltando: ${missingFields.join(', ')}`;
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: errorMessage,
+        errors: Object.values(errors),
+        details: errors,
+        missingFields: missingFields.length > 0 ? missingFields : undefined,
+      });
+    }
+    
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        message: `${field} já existe`,
+      });
+    }
+    
+    // Erro de cast (ID inválido)
+    if (error.name === 'CastError') {
+      console.error('❌ Erro de cast:', error.path, error.value);
+      return res.status(400).json({
+        success: false,
+        message: `Campo ${error.path} inválido: ${error.value}`,
+        error: error.message,
+      });
+    }
+    
+    // Log detalhado do erro antes de retornar
+    console.error('❌ Erro genérico ao criar ServiceOrder:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n'), // Primeiras 5 linhas do stack
+    });
+    
+    res.status(500).json({
       success: false,
-      message: 'Erro interno ao criar ServiceOrder',
-      error: error.message
+      message: error.message || 'Erro interno ao criar ServiceOrder',
+      error: error.message,
+      errorType: error.name,
     });
   }
 };
 
-// Atualizar status da ServiceOrder
+/**
+ * Atualizar status da Service Order
+ */
 exports.updateServiceOrderStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, allocatedSlabId } = req.body;
     
-    const serviceOrder = await ServiceOrder.findOne({ id });
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'ServiceOrder não encontrada'
-      });
-    }
-    
-    const previousStatus = serviceOrder.status;
-    
-    // Atualizar status e allocatedSlabId se fornecido
     const updateData = { status };
     if (allocatedSlabId) {
       updateData.allocatedSlabId = allocatedSlabId;
     }
     
-    const updatedServiceOrder = await ServiceOrder.findByIdAndUpdate(
-      serviceOrder._id,
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
       updateData,
       { new: true, runValidators: true }
     );
     
-    console.log(`📝 ServiceOrder ${id} status atualizado: ${previousStatus} → ${status}`);
-    
-    // Verificar se deve criar CutPieces após mudança de status
-    if (shouldCreateCutPieces(updatedServiceOrder, status)) {
-      try {
-        const cutPieces = await createCutPiecesForServiceOrder(id, updatedServiceOrder.allocatedSlabId);
-        console.log(`🎯 ${cutPieces.length} CutPieces criadas após mudança de status para ${id}`);
-      } catch (cutPieceError) {
-        console.error(`⚠️ Erro ao criar CutPieces para ${id}:`, cutPieceError.message);
-        // Não falha a atualização se CutPieces falharem
-      }
-    }
-    
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'service_order_status_updated',
-      description: `Status da ServiceOrder ${id} alterado de '${previousStatus}' para '${status}'`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        serviceOrderId: id,
-        previousStatus,
-        newStatus: status,
-        allocatedSlabId: updatedServiceOrder.allocatedSlabId
-      }
-    });
-    
-    return res.json({
-      success: true,
-      message: 'Status da ServiceOrder atualizado com sucesso',
-      data: updatedServiceOrder
-    });
-    
-  } catch (error) {
-    console.error('Erro ao atualizar status da ServiceOrder:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao atualizar status da ServiceOrder',
-      error: error.message
-    });
-  }
-};
-
-// Confirmar dados de entrega/instalação
-exports.confirmDeliveryData = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { 
-      checklistItems, 
-      photoUrls, 
-      signatureUrl, 
-      signatoryName, 
-      signatoryDocument 
-    } = req.body;
-
-    console.log(`📋 Confirmando dados de entrega para ServiceOrder ${id}`);
-
-    // Buscar a ServiceOrder pelo campo id personalizado
-    const serviceOrder = await ServiceOrder.findOne({ id });
     if (!serviceOrder) {
       return res.status(404).json({
         success: false,
-        message: 'Ordem de serviço não encontrada',
+        message: 'ServiceOrder não encontrada',
       });
     }
-
-    // Verificar se a ServiceOrder está em status adequado para confirmação
-    const validStatuses = ['in_transit', 'delivered', 'in_installation'];
-    const isValidStatus = validStatuses.includes(serviceOrder.logisticsStatus);
-    const isValidGeneralStatus = serviceOrder.status === 'in_transit' || serviceOrder.status === 'delivered' || serviceOrder.status === 'awaiting_installation';
     
-    if (!isValidStatus && !isValidGeneralStatus) {
-      return res.status(400).json({
-        success: false,
-        message: `ServiceOrder não está em status adequado para confirmação. Status atual: ${serviceOrder.status}, Logistics Status: ${serviceOrder.logisticsStatus}`,
-        validStatuses: validStatuses
+    // Registrar no log de atividades
+    try {
+      await ActivityLog.create({
+        userId: req.user?._id || null,
+        userName: req.user?.name || 'Sistema',
+        action: 'update',
+        entityType: 'ServiceOrder',
+        entityId: serviceOrder._id,
+        description: `Atualizou o status da OS ${serviceOrder.id} para ${status}`,
       });
+    } catch (error) {
+      console.error('Erro ao registrar log:', error);
     }
-
-    // Registrar dados anteriores para o ActivityLog
-    const previousData = {
-      delivery_confirmed: serviceOrder.delivery_confirmed,
-      confirmationPhotos: serviceOrder.confirmationPhotos?.length || 0,
-      customerSignature: serviceOrder.customerSignature ? 'existe' : 'não existe'
-    };
-
-    // Atualizar checklist de saída se fornecido
-    if (checklistItems && Array.isArray(checklistItems)) {
-      console.log(`📝 Atualizando checklist de saída com ${checklistItems.length} itens`);
-      serviceOrder.departureChecklist = checklistItems.map(item => ensureChecklistItemId(item));
-    }
-
-    // Atualizar fotos de confirmação se fornecidas
-    if (photoUrls && Array.isArray(photoUrls)) {
-      console.log(`📸 Adicionando ${photoUrls.length} fotos de confirmação`);
-      serviceOrder.confirmationPhotos = photoUrls.map(photo => ({
-        url: photo.url,
-        description: photo.description || ''
-      }));
-    }
-
-    // Atualizar assinatura do cliente se fornecida
-    if (signatureUrl) {
-      console.log(`✍️ Adicionando assinatura do cliente`);
-      serviceOrder.customerSignature = {
-        url: signatureUrl,
-        timestamp: new Date(),
-        name: signatoryName || '',
-        documentNumber: signatoryDocument || ''
-      };
-    }
-
-    // Marcar entrega como confirmada
-    serviceOrder.delivery_confirmed = true;
-    console.log(`✅ Entrega marcada como confirmada`);
-
-    // Determinar próximo status baseado no finalizationType
-    let nextStatus;
-    if (serviceOrder.finalizationType === 'pickup') {
-      nextStatus = 'completed';
-      serviceOrder.logisticsStatus = 'picked_up';
-      console.log(`📦 Finalização por retirada - marcando como concluído`);
-    } else if (serviceOrder.finalizationType === 'delivery_only') {
-      nextStatus = 'completed';
-      serviceOrder.logisticsStatus = 'delivered';
-      console.log(`🚚 Finalização apenas entrega - marcando como concluído`);
-    } else if (serviceOrder.finalizationType === 'delivery_installation') {
-      nextStatus = 'awaiting_installation';
-      serviceOrder.logisticsStatus = 'in_installation';
-      console.log(`🔧 Finalização com instalação - aguardando instalação`);
-    } else {
-      // Fallback baseado no requiresInstallation
-      if (serviceOrder.requiresInstallation) {
-        nextStatus = 'awaiting_installation';
-        serviceOrder.logisticsStatus = 'in_installation';
-        console.log(`🔧 Instalação necessária - aguardando instalação`);
-      } else {
-        nextStatus = 'completed';
-        serviceOrder.logisticsStatus = 'delivered';
-        console.log(`✅ Sem instalação - marcando como concluído`);
-      }
-    }
-
-    // Atualizar status geral
-    serviceOrder.status = nextStatus;
-
-    // Adicionar entrada ao history
-    serviceOrder.history.push({
-      status: nextStatus,
-      reason: 'Confirmação de entrega realizada',
-      user: req.user._id,
-      timestamp: new Date()
-    });
-
-    // Salvar a ServiceOrder
-    const updatedServiceOrder = await serviceOrder.save();
-    console.log(`💾 ServiceOrder ${id} atualizada com sucesso`);
-
-    // Registrar no ActivityLog
-    await ActivityLog.create({
-      serviceOrder: serviceOrder._id,
-      action: 'delivery_confirmation_completed',
-      description: `Confirmação de entrega realizada para ServiceOrder ${id}`,
-      user: buildUserSnapshot(req.user),
-      metadata: {
-        serviceOrderId: id,
-        previousData,
-        newData: {
-          delivery_confirmed: updatedServiceOrder.delivery_confirmed,
-          confirmationPhotos: updatedServiceOrder.confirmationPhotos?.length || 0,
-          customerSignature: updatedServiceOrder.customerSignature ? 'existe' : 'não existe',
-          newStatus: nextStatus,
-          finalizationType: serviceOrder.finalizationType,
-          requiresInstallation: serviceOrder.requiresInstallation
-        }
-      }
-    });
-
-    console.log(`📊 ActivityLog registrado para ServiceOrder ${id}`);
-
-    return res.json({
+    
+    res.json({
       success: true,
-      message: 'Dados de confirmação de entrega salvos com sucesso',
-      data: {
-        id: updatedServiceOrder.id,
-        status: updatedServiceOrder.status,
-        logisticsStatus: updatedServiceOrder.logisticsStatus,
-        delivery_confirmed: updatedServiceOrder.delivery_confirmed,
-        confirmationPhotos: updatedServiceOrder.confirmationPhotos,
-        customerSignature: updatedServiceOrder.customerSignature,
-        departureChecklist: updatedServiceOrder.departureChecklist,
-        finalizationType: updatedServiceOrder.finalizationType,
-        requiresInstallation: updatedServiceOrder.requiresInstallation
-      }
-    });
-
-  } catch (error) {
-    console.error('Erro ao confirmar dados de entrega:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Erro interno ao confirmar dados de entrega',
-      error: error.message
-    });
-  }
-};
-
-// Listar todas as ServiceOrders
-exports.getAllServiceOrders = async (req, res) => {
-  try {
-    const serviceOrders = await ServiceOrder.find({}).lean();
-    return res.json({
-      success: true,
-      count: serviceOrders.length,
-      data: serviceOrders,
+      message: 'Status atualizado com sucesso',
+      data: serviceOrder,
     });
   } catch (error) {
-    console.error('Erro ao listar ServiceOrders:', error);
-    return res.status(500).json({
+    console.error('Erro ao atualizar status:', error);
+    res.status(500).json({
       success: false,
-      message: 'Erro interno ao listar ServiceOrders',
+      message: 'Erro ao atualizar status',
       error: error.message,
     });
   }
 };
 
-// Atualização genérica de ServiceOrder (PUT/PATCH)
+/**
+ * Atualizar Service Order completa
+ */
 exports.updateServiceOrder = async (req, res) => {
   try {
-    const { id } = req.params; // id lógico (string) da OS
-    const update = req.body || {};
-
-    // Não permitir a mudança do id lógico
-    if (update.id) delete update.id;
-
-    const updated = await ServiceOrder.findOneAndUpdate(
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    // Remover campos que não devem ser atualizados
+    delete updateData._id;
+    delete updateData.id;
+    delete updateData.createdAt;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
       { id },
-      { $set: update },
-      { new: true }
+      updateData,
+      { new: true, runValidators: true }
     );
-
-    if (!updated) {
-      return res.status(404).json({ success: false, message: 'ServiceOrder não encontrada' });
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
     }
-
-    return res.json({ success: true, message: 'ServiceOrder atualizada com sucesso', data: updated });
+    
+    res.json({
+      success: true,
+      message: 'ServiceOrder atualizada com sucesso',
+      data: serviceOrder,
+    });
   } catch (error) {
     console.error('Erro ao atualizar ServiceOrder:', error);
-    return res.status(500).json({ success: false, message: 'Erro interno ao atualizar ServiceOrder', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao atualizar ServiceOrder',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Atualizar checklist de partida
+ */
+exports.updateDepartureChecklist = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { departureChecklist } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
+      { departureChecklist },
+      { new: true, runValidators: true }
+    );
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Checklist atualizado com sucesso',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao atualizar checklist:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao atualizar checklist',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Marcar para retrabalho
+ */
+exports.markForRework = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reworkReason } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
+      {
+        status: 'retrabalho',
+        reworkReason,
+      },
+      { new: true }
+    );
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'ServiceOrder marcada para retrabalho',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao marcar para retrabalho:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao marcar para retrabalho',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Reportar problema na entrega
+ */
+exports.reportDeliveryIssue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { issueType, issueDescription, reportedBy, reportedAt } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
+      {
+        status: 'problema_entrega',
+        deliveryIssue: {
+          type: issueType,
+          description: issueDescription,
+          reportedBy,
+          reportedAt: reportedAt || new Date(),
+        },
+      },
+      { new: true }
+    );
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Problema reportado com sucesso',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao reportar problema:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao reportar problema',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Solicitar vistoria de instalação
+ */
+exports.requestInstallationReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reviewNotes } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
+      {
+        status: 'aguardando_vistoria',
+        installationReview: {
+          requestedAt: new Date(),
+          notes: reviewNotes,
+        },
+      },
+      { new: true }
+    );
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Vistoria solicitada com sucesso',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao solicitar vistoria:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao solicitar vistoria',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Resolver problema geral da OS
+ */
+exports.resolveServiceOrderIssue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { resolution, resolvedBy } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOne({ id });
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    // Determinar o próximo status baseado no status atual
+    let nextStatus = 'em_producao';
+    if (serviceOrder.status === 'aguardando_vistoria') {
+      nextStatus = 'pronto_entrega';
+    } else if (serviceOrder.status === 'problema_entrega') {
+      nextStatus = 'entregue';
+    }
+    
+    serviceOrder.status = nextStatus;
+    serviceOrder.issueResolution = {
+      resolution,
+      resolvedBy,
+      resolvedAt: new Date(),
+    };
+    
+    await serviceOrder.save();
+    
+    res.json({
+      success: true,
+      message: 'Problema resolvido com sucesso',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao resolver problema:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao resolver problema',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Resolver retrabalho
+ */
+exports.resolveRework = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { resolution, resolvedBy } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
+      {
+        status: 'em_producao',
+        reworkResolution: {
+          resolution,
+          resolvedBy,
+          resolvedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Retrabalho resolvido com sucesso',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao resolver retrabalho:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao resolver retrabalho',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Resolver problema de entrega
+ */
+exports.resolveDeliveryIssue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { resolution, resolvedBy } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
+      {
+        status: 'entregue',
+        'deliveryIssue.resolution': resolution,
+        'deliveryIssue.resolvedBy': resolvedBy,
+        'deliveryIssue.resolvedAt': new Date(),
+      },
+      { new: true }
+    );
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Problema de entrega resolvido com sucesso',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao resolver problema de entrega:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao resolver problema de entrega',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Completar vistoria
+ */
+exports.completeReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reviewResult, reviewNotes, reviewedBy } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
+      {
+        status: reviewResult === 'approved' ? 'pronto_entrega' : 'retrabalho',
+        'installationReview.completedAt': new Date(),
+        'installationReview.result': reviewResult,
+        'installationReview.notes': reviewNotes,
+        'installationReview.reviewedBy': reviewedBy,
+      },
+      { new: true }
+    );
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Vistoria completada com sucesso',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao completar vistoria:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao completar vistoria',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Confirmar dados de entrega
+ */
+exports.confirmDeliveryData = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { deliveryDate, deliveryTime, vehicle, driver, installers } = req.body;
+    
+    const serviceOrder = await ServiceOrder.findOneAndUpdate(
+      { id },
+      {
+        deliveryDate,
+        deliveryTime,
+        vehicle,
+        driver,
+        installers,
+      },
+      { new: true }
+    );
+    
+    if (!serviceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Dados de entrega confirmados com sucesso',
+      data: serviceOrder,
+    });
+  } catch (error) {
+    console.error('Erro ao confirmar dados de entrega:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erro ao confirmar dados de entrega',
+      error: error.message,
+    });
   }
 };

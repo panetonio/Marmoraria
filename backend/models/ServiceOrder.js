@@ -17,12 +17,17 @@ const pointSchema = new mongoose.Schema({
 }, { _id: false });
 
 const itemSchema = new mongoose.Schema({
+  id: {
+    type: String,
+    required: true,
+  },
   type: String,
   description: String,
   quantity: Number,
   unitPrice: Number,
   discount: Number,
   totalPrice: Number,
+  category: String,
   width: Number,
   height: Number,
   perimeter: Number,

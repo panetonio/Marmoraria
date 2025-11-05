@@ -12,8 +12,10 @@ import OrderAddendumForm from '../components/OrderAddendumForm';
 import { useData } from '../context/DataContext';
 import Select from '../components/ui/Select';
 import Input from '../components/ui/Input';
+import DateInput from '../components/ui/DateInput';
 import StatusBadge from '../components/ui/StatusBadge';
 import type { StatusMap } from '../components/ui/StatusBadge';
+import { formatDate } from '../utils/dateFormat';
 
 type OrderStatus = 'approved' | 'in_production' | 'in_logistics' | 'completed' | 'cancelled';
 
@@ -62,17 +64,10 @@ const ServiceOrderItem: FC<{
 }> = ({ item, index, isSelected, onToggle }) => {
     const checkboxId = `os-item-${item.id}-${index}`;
     
-    // Handler isolado para evitar problemas de propagação
+    // Handler para o checkbox - único handler necessário
     const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         e.stopPropagation(); // Prevenir propagação de eventos
         console.log(`🖱️ Checkbox clicked for item ${item.id}:`, e.target.checked);
-        onToggle(item.id);
-    };
-    
-    // Handler isolado para o label
-    const handleLabelClick = (e: React.MouseEvent<HTMLLabelElement>) => {
-        e.preventDefault(); // Prevenir comportamento padrão
-        console.log(`🏷️ Label clicked for item ${item.id}`);
         onToggle(item.id);
     };
 
@@ -101,7 +96,6 @@ const ServiceOrderItem: FC<{
             <label 
                 htmlFor={checkboxId}
                 className="ml-3 text-sm text-text-primary dark:text-slate-200 cursor-pointer flex-1"
-                onClick={handleLabelClick}
             >
                 <div className="flex items-center justify-between">
                     <div>
@@ -228,14 +222,52 @@ const CreateServiceOrderModal: FC<{
         console.log('🔄 Changed items:', changedItems.map(item => ({ id: item.id, description: item.description })));
         console.log('✅ Total available items:', allAvailableItems.map(item => ({ id: item.id, description: item.description })));
         
-        // Debug: Verificar se há IDs duplicados
-        const itemIds = allAvailableItems.map(item => item.id);
+        // PASSO 1: Garantir que TODOS os itens tenham IDs válidos
+        // Se um item não tiver ID, gerar um ID único baseado no índice e timestamp
+        const itemsWithIds = allAvailableItems.map((item, index) => {
+            if (!item.id || item.id === undefined || item.id === null || item.id === '') {
+                const generatedId = `item-${order.id}-${Date.now()}-${index}`;
+                console.warn(`⚠️ Item sem ID encontrado! Gerando ID: ${generatedId}`, item);
+                return {
+                    ...item,
+                    id: generatedId
+                };
+            }
+            return item;
+        });
+        
+        // PASSO 2: Garantir IDs únicos: se houver duplicatas, gerar IDs únicos temporários
+        const itemIds = itemsWithIds.map(item => item.id);
         const uniqueIds = new Set(itemIds);
         if (itemIds.length !== uniqueIds.size) {
-            console.warn('⚠️ Aviso: IDs duplicados encontrados nos itens disponíveis!', itemIds);
+            console.warn('⚠️ Aviso: IDs duplicados encontrados nos itens disponíveis! Corrigindo...', itemIds);
+            
+            // Mapa para rastrear quantas vezes cada ID aparece
+            const idCountMap = new Map<string, number>();
+            const itemsWithUniqueIds = itemsWithIds.map((item, index) => {
+                const itemId = item.id || `item-${order.id}-${Date.now()}-${index}`;
+                const count = idCountMap.get(itemId) || 0;
+                idCountMap.set(itemId, count + 1);
+                
+                // Se é a primeira ocorrência, manter ID original
+                if (count === 0) {
+                    return item;
+                }
+                
+                // Para duplicatas, gerar um ID único temporário
+                const uniqueId = `${itemId}-dup-${count}-${index}`;
+                console.warn(`🔧 Corrigindo ID duplicado: ${itemId} -> ${uniqueId}`);
+                
+                return {
+                    ...item,
+                    id: uniqueId
+                };
+            });
+            
+            return itemsWithUniqueIds;
         }
         
-        return allAvailableItems;
+        return itemsWithIds;
     }, [order, serviceOrders, orderAddendums]);
 
     const uniqueCategories = useMemo(() => {
@@ -291,8 +323,6 @@ const CreateServiceOrderModal: FC<{
 
     const handleToggleItem = useCallback((itemId: string) => {
         console.log('🔄 handleToggleItem called with itemId:', itemId);
-        console.log('📋 Current selectedItemIds:', selectedItemIds);
-        console.log('📦 Available items:', availableItems.map(item => ({ id: item.id, description: item.description })));
         
         // Verificar se o itemId é válido
         const isValidItem = availableItems.some(item => item.id === itemId);
@@ -311,7 +341,7 @@ const CreateServiceOrderModal: FC<{
             
             return newSelection;
         });
-    }, [selectedItemIds, availableItems]);
+    }, [availableItems]);
 
     const handleSelectAllVisible = useCallback(() => {
         const visibleItemIds = filteredAvailableItems.map(item => item.id);
@@ -483,13 +513,12 @@ const CreateServiceOrderModal: FC<{
                 </div>
             )}
             <div className="mb-6">
-                <label htmlFor="delivery-date" className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Data de Entrega para esta OS</label>
-                <input
+                <DateInput
                     id="delivery-date"
-                    type="date"
+                    label="Data de Entrega para esta OS"
                     value={deliveryDate}
-                    onChange={e => setDeliveryDate(e.target.value)}
-                    className={`p-2 border rounded w-full text-text-primary bg-slate-50 dark:bg-slate-700 dark:text-slate-200 ${error && !deliveryDate ? 'border-error' : 'border-border dark:border-slate-700'} h-[42px]`}
+                    onChange={(value) => setDeliveryDate(value)}
+                    error={error && !deliveryDate ? 'Data de entrega é obrigatória' : undefined}
                 />
             </div>
             <div className="mb-6">
@@ -758,23 +787,19 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                         />
                     </div>
                     <div>
-                        <Input
+                        <DateInput
                             id="start-date-filter-orders"
                             label="Data Início"
-                            type="date"
                             value={startDateFilter}
-                            onChange={(e) => setStartDateFilter(e.target.value)}
-                            className="text-text-secondary dark:text-slate-300"
+                            onChange={(value) => setStartDateFilter(value)}
                         />
                     </div>
                     <div>
-                        <Input
+                        <DateInput
                             id="end-date-filter-orders"
                             label="Data Final"
-                            type="date"
                             value={endDateFilter}
-                            onChange={(e) => setEndDateFilter(e.target.value)}
-                            className="text-text-secondary dark:text-slate-300"
+                            onChange={(value) => setEndDateFilter(value)}
                         />
                     </div>
                     <div>
@@ -839,7 +864,7 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
                                         >
                                             <td className="p-3 font-mono text-sm">{order.id}</td>
                                             <td className="p-3">{order.clientName}</td>
-                                            <td className="p-3">{new Date(order.approvalDate).toLocaleDateString()}</td>
+                                            <td className="p-3">{formatDate(order.approvalDate)}</td>
                                             <td className="p-3">{order.salespersonId ? salespeopleMap[order.salespersonId] : 'N/A'}</td>
                                             <td className="p-3"><StatusBadge status={order.status} statusMap={orderStatusMap} /></td>
                                             <td className="p-3 text-right font-semibold">{order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>

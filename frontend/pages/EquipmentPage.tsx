@@ -1,11 +1,13 @@
 import React, { useState, useMemo, FC, useEffect, useRef } from 'react';
 import { useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import type { Equipment, MaintenanceLog, EquipmentStatus, EquipmentCategory, Page } from '../types';
 import { mockProductionProfessionals, mockUsers } from '../data/mockData';
 import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
+import DateInput from '../components/ui/DateInput';
 import Select from '../components/ui/Select';
 import StatusBadge from '../components/ui/StatusBadge';
 import type { StatusMap } from '../components/ui/StatusBadge';
@@ -70,8 +72,18 @@ const EquipmentForm: FC<{
                     <Input label="Número de Série" value={equipment.serialNumber} onChange={e => handleChange('serialNumber', e.target.value)} error={errors.serialNumber} />
                     <Input label="Localização Atual" value={equipment.currentLocation} onChange={e => handleChange('currentLocation', e.target.value)} error={errors.currentLocation} />
                     
-                    <Input label="Data da Compra" type="date" value={equipment.purchaseDate.split('T')[0]} onChange={e => handleChange('purchaseDate', e.target.value)} error={errors.purchaseDate} />
-                    <Input label="Data Fim da Garantia" type="date" value={equipment.warrantyEndDate.split('T')[0]} onChange={e => handleChange('warrantyEndDate', e.target.value)} error={errors.warrantyEndDate} />
+                    <DateInput 
+                        label="Data da Compra" 
+                        value={equipment.purchaseDate.split('T')[0]} 
+                        onChange={(value) => handleChange('purchaseDate', value)} 
+                        error={errors.purchaseDate} 
+                    />
+                    <DateInput 
+                        label="Data Fim da Garantia" 
+                        value={equipment.warrantyEndDate.split('T')[0]} 
+                        onChange={(value) => handleChange('warrantyEndDate', value)} 
+                        error={errors.warrantyEndDate} 
+                    />
                     
                     <Input label="Nº da NF de Compra" value={equipment.purchaseInvoiceNumber} onChange={e => handleChange('purchaseInvoiceNumber', e.target.value)} error={errors.purchaseInvoiceNumber} />
                     <Input label="CNPJ do Fornecedor" value={equipment.supplierCnpj} onChange={e => handleChange('supplierCnpj', e.target.value)} error={errors.supplierCnpj} />
@@ -95,17 +107,24 @@ const EquipmentForm: FC<{
 };
 
 const MaintenanceFormModal: FC<{
-    equipmentId: string;
+    equipmentId: string; // Pode ser ID de equipamento ou veículo
     isOpen: boolean;
     onClose: () => void;
     onSave: (log: Omit<MaintenanceLog, 'id'>) => void;
 }> = ({ equipmentId, isOpen, onClose, onSave }) => {
-    const { currentUser } = useData();
+    const { currentUser } = useAuth();
     const [log, setLog] = useState<Partial<MaintenanceLog>>({
         maintenanceDate: new Date().toISOString().split('T')[0],
-        performedBy: currentUser.id,
+        performedBy: currentUser?.id || '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    
+    // Atualizar performedBy quando currentUser mudar
+    useEffect(() => {
+        if (currentUser?.id && !log.performedBy) {
+            setLog(prev => ({ ...prev, performedBy: currentUser.id }));
+        }
+    }, [currentUser]);
     
     const handleChange = (field: keyof MaintenanceLog, value: any) => {
         setLog(prev => ({...prev, [field]: value }));
@@ -138,8 +157,17 @@ const MaintenanceFormModal: FC<{
             <div className="space-y-4">
                 <Textarea label="Descrição do Serviço" value={log.description || ''} onChange={e => handleChange('description', e.target.value)} error={errors.description} />
                 <Input label="Custo (R$)" type="number" value={log.cost || ''} onChange={e => handleChange('cost', parseFloat(e.target.value) || 0)} error={errors.cost} />
-                <Input label="Data da Manutenção" type="date" value={log.maintenanceDate?.split('T')[0] || ''} onChange={e => handleChange('maintenanceDate', e.target.value)} error={errors.maintenanceDate} />
-                <Input label="Próxima Manutenção (Opcional)" type="date" value={log.nextMaintenanceDate?.split('T')[0] || ''} onChange={e => handleChange('nextMaintenanceDate', e.target.value)} />
+                <DateInput 
+                    label="Data da Manutenção" 
+                    value={log.maintenanceDate?.split('T')[0] || ''} 
+                    onChange={(value) => handleChange('maintenanceDate', value)} 
+                    error={errors.maintenanceDate} 
+                />
+                <DateInput 
+                    label="Próxima Manutenção (Opcional)" 
+                    value={log.nextMaintenanceDate?.split('T')[0] || ''} 
+                    onChange={(value) => handleChange('nextMaintenanceDate', value)} 
+                />
                 <Select label="Executado Por" value={log.performedBy || ''} onChange={e => handleChange('performedBy', e.target.value)}>
                     {mockUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </Select>
@@ -235,8 +263,8 @@ const EquipmentDetailModal: FC<{ equipment: Equipment; isOpen: boolean; onClose:
                         <p><strong>Categoria:</strong> {equipmentCategoryMap[equipment.category]}</p>
                         <p><strong>Localização:</strong> {equipment.currentLocation}</p>
                         <p><strong>Responsável:</strong> {mockProductionProfessionals.find(p => p.id === equipment.assignedTo)?.name || 'Não atribuído'}</p>
-                        <p><strong>Data de Compra:</strong> {new Date(equipment.purchaseDate).toLocaleDateString()}</p>
-                        <p><strong>Fim da Garantia:</strong> {new Date(equipment.warrantyEndDate).toLocaleDateString()}</p>
+                        <p><strong>Data de Compra:</strong> {formatDate(equipment.purchaseDate)}</p>
+                        <p><strong>Fim da Garantia:</strong> {formatDate(equipment.warrantyEndDate)}</p>
                         <p><strong>NF de Compra:</strong> {equipment.purchaseInvoiceNumber}</p>
                         <p><strong>CNPJ Fornecedor:</strong> {equipment.supplierCnpj}</p>
                         {equipment.notes && <p><strong>Observações:</strong> {equipment.notes}</p>}
@@ -392,7 +420,7 @@ const EquipmentPage: FC<EquipmentPageProps> = ({ searchTarget, clearSearchTarget
                                         <td className="p-3">{eq.currentLocation}</td>
                                         <td className="p-3">{mockProductionProfessionals.find(p => p.id === eq.assignedTo)?.name || '-'}</td>
                                         <td className="p-3"><StatusBadge status={eq.status} statusMap={equipmentStatusMap} /></td>
-                                        <td className="p-3">{nextMaint ? new Date(nextMaint).toLocaleDateString() : '-'}</td>
+                                        <td className="p-3">{nextMaint ? formatDate(nextMaint) : '-'}</td>
                                         <td className="p-3 text-center space-x-2">
                                             <Button size="sm" variant="secondary" onClick={() => setViewingEquipment(eq)}>Detalhes/QR</Button>
                                             <Button size="sm" variant="secondary" onClick={() => handleAddMaintenance(eq)}>+ Manutenção</Button>

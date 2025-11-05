@@ -2,6 +2,7 @@ import React from 'react';
 import type { Vehicle, ProductionEmployee } from '../types';
 import Card, { CardHeader, CardContent } from './ui/Card';
 import Input from './ui/Input';
+import DateInput from './ui/DateInput';
 import Select from './ui/Select';
 import Button from './ui/Button';
 
@@ -78,24 +79,22 @@ const OperationsFilters: React.FC<OperationsFiltersProps> = ({
               📅 Período
             </label>
             <div className="space-y-2">
-              <Input
-                type="date"
+              <DateInput
                 value={filters.dateRange.start}
-                onChange={(e) => handleFilterChange('dateRange', {
+                onChange={(value) => handleFilterChange('dateRange', {
                   ...filters.dateRange,
-                  start: e.target.value
+                  start: value
                 })}
-                label=""
+                label="Data Início"
                 className="text-sm"
               />
-              <Input
-                type="date"
+              <DateInput
                 value={filters.dateRange.end}
-                onChange={(e) => handleFilterChange('dateRange', {
+                onChange={(value) => handleFilterChange('dateRange', {
                   ...filters.dateRange,
-                  end: e.target.value
+                  end: value
                 })}
-                label=""
+                label="Data Final"
                 className="text-sm"
               />
             </div>

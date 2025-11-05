@@ -18,6 +18,7 @@ import PostDeliverySchedulingModal from '../components/PostDeliverySchedulingMod
 import ReceiptTermModal from '../components/ReceiptTermModal';
 import InstallationTermModal from '../components/InstallationTermModal';
 import Modal from '../components/ui/Modal';
+import { formatDate } from '../utils/dateFormat';
 
 interface FilterState {
   dateRange: { start: string; end: string };
@@ -272,7 +273,7 @@ const ShopfloorDashboard: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-text-secondary dark:text-slate-400 mb-1">Data de Entrega</label>
-                <p className="text-sm text-text-primary dark:text-slate-100">{new Date(viewingOrder.deliveryDate).toLocaleDateString()}</p>
+                <p className="text-sm text-text-primary dark:text-slate-100">{formatDate(viewingOrder.deliveryDate)}</p>
               </div>
             </div>
             {viewingOrder.observations && (

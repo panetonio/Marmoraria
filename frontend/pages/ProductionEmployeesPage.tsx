@@ -5,9 +5,11 @@ import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import DateInput from '../components/ui/DateInput';
 import Select from '../components/ui/Select';
 import StatusBadge from '../components/ui/StatusBadge';
 import { api } from '../utils/api';
+import { formatDate } from '../utils/dateFormat';
 
 // Modal para visualizar disponibilidade de recursos
 const ResourceAvailabilityModal: FC<{
@@ -90,11 +92,10 @@ const ResourceAvailabilityModal: FC<{
                 {/* Filtros de data/hora */}
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <Input
+                        <DateInput
                             label="Data de Início"
-                            type="date"
                             value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
+                            onChange={(value) => setStartDate(value)}
                             min={new Date().toISOString().split('T')[0]}
                         />
                         <Input
@@ -106,11 +107,10 @@ const ResourceAvailabilityModal: FC<{
                         />
                     </div>
                     <div>
-                        <Input
+                        <DateInput
                             label="Data de Término"
-                            type="date"
                             value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
+                            onChange={(value) => setEndDate(value)}
                             min={startDate || new Date().toISOString().split('T')[0]}
                         />
                         <Input
@@ -273,7 +273,7 @@ const EmployeeCard: FC<{
                 )}
                 <div className="flex items-center">
                     <span className="font-semibold mr-2">📅</span>
-                    <span>Admitido em {new Date(employee.hireDate).toLocaleDateString()}</span>
+                    <span>Admitido em {formatDate(employee.hireDate)}</span>
                 </div>
                 <div className="flex items-center">
                     <span className="font-semibold mr-2">Status:</span>
@@ -364,11 +364,10 @@ const EmployeeForm: FC<{
                             <option value="entregador">Entregador</option>
                             <option value="auxiliar">Auxiliar</option>
                         </Select>
-                        <Input
+                        <DateInput
                             label="Data de Admissão"
-                            type="date"
                             value={employee.hireDate}
-                            onChange={(e) => setEmployee({...employee, hireDate: e.target.value})}
+                            onChange={(value) => setEmployee({...employee, hireDate: value})}
                             error={errors.hireDate}
                         />
                         <div className="flex items-center space-x-4">

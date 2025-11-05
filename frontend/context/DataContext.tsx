@@ -548,14 +548,33 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     const createServiceOrder = async (newOsData: Omit<ServiceOrder, 'id'>) => {
         try {
+            console.log('📤 Enviando dados para criar ServiceOrder:', {
+                orderId: newOsData.orderId,
+                clientName: newOsData.clientName,
+                itemsCount: newOsData.items?.length,
+                items: newOsData.items?.map(item => ({
+                    id: item.id,
+                    type: item.type,
+                    description: item.description,
+                    quantity: item.quantity,
+                    totalPrice: item.totalPrice,
+                })),
+                total: newOsData.total,
+                deliveryDate: newOsData.deliveryDate,
+            });
+            
             const result = await toast.promise(
                 api.createServiceOrder(newOsData),
                 {
                     loading: 'Criando OS...',
                     success: (r: any) => r?.message || 'OS criada com sucesso!',
-                    error: (e: Error) => e?.message || 'Erro ao criar OS.',
+                    error: (e: Error) => {
+                        console.error('❌ Erro detalhado ao criar OS:', e);
+                        return e?.message || 'Erro ao criar OS.';
+                    },
                 }
             );
+            
             if (result?.success && result?.data) {
                 setServiceOrders(prev => [...prev, result.data]);
                 setOrders(prev => prev.map(order => 
@@ -565,10 +584,25 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ));
                 return { success: true, message: result.message };
             }
+            
+            // Se não teve sucesso, logar o resultado completo
+            console.error('❌ Resultado da criação da OS:', result);
             return { success: false, message: result?.message || 'Erro ao criar ServiceOrder' };
         } catch (error: any) {
-            console.error('Erro ao criar ServiceOrder:', error);
-            return { success: false, message: error?.message || 'Erro inesperado ao criar ServiceOrder' };
+            console.error('❌ Erro ao criar ServiceOrder (catch):', error);
+            console.error('❌ Stack trace:', error?.stack);
+            
+            // Tentar extrair mensagem de erro mais detalhada
+            let errorMessage = 'Erro inesperado ao criar ServiceOrder';
+            if (error?.message) {
+                errorMessage = error.message;
+            } else if (error?.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error?.response?.data?.error) {
+                errorMessage = error.response.data.error;
+            }
+            
+            return { success: false, message: errorMessage };
         }
     };
 

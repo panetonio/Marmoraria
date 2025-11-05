@@ -3,6 +3,7 @@ import type { ServiceOrder, ProductionEmployee, Vehicle, ChecklistTemplate } fro
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
+import DateInput from './ui/DateInput';
 import Select from './ui/Select';
 import Card, { CardHeader, CardContent } from './ui/Card';
 import Badge from './ui/Badge';
@@ -364,11 +365,10 @@ const PostDeliverySchedulingModal: React.FC<PostDeliverySchedulingModalProps> = 
                 <div className="space-y-4">
                   {/* Date and Time */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Input
-                      type="date"
+                    <DateInput
                       label="Data da Instalação"
                       value={schedulingData.date}
-                      onChange={(e) => setSchedulingData(prev => ({ ...prev, date: e.target.value }))}
+                      onChange={(value) => setSchedulingData(prev => ({ ...prev, date: value }))}
                       required
                     />
                     <Input

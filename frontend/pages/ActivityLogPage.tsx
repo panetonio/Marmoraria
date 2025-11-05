@@ -3,6 +3,7 @@ import type { ActivityLog, ActivityType } from '../types';
 import { useData } from '../context/DataContext';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Input from '../components/ui/Input';
+import DateInput from '../components/ui/DateInput';
 import Select from '../components/ui/Select';
 import { getActivityTypeIcon, getActivityTypeColor } from '../config/activityLabels';
 
@@ -212,18 +213,16 @@ const ActivityLogPage: React.FC = () => {
                         ))}
                     </Select>
                     
-                    <Input
+                    <DateInput
                         label="Data Inicial"
-                        type="date"
                         value={dateFromFilter}
-                        onChange={(e) => setDateFromFilter(e.target.value)}
+                        onChange={(value) => setDateFromFilter(value)}
                     />
                     
-                    <Input
+                    <DateInput
                         label="Data Final"
-                        type="date"
                         value={dateToFilter}
-                        onChange={(e) => setDateToFilter(e.target.value)}
+                        onChange={(value) => setDateToFilter(value)}
                     />
                 </div>
             </Card>

@@ -4,6 +4,8 @@ import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import { useData } from '../context/DataContext';
 import ViewReceiptModal from '../components/ViewReceiptModal';
 import Select from '../components/ui/Select';
+import DateInput from '../components/ui/DateInput';
+import { formatDate } from '../utils/dateFormat';
 
 const ReceiptsPage: FC = () => {
     const { receipts, suppliers } = useData();
@@ -43,12 +45,10 @@ const ReceiptsPage: FC = () => {
                             <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                     </Select>
-                    <input
-                        type="date"
+                    <DateInput
+                        label="Filtrar por Data"
                         value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
-                        className="p-2 border border-border dark:border-slate-600 rounded w-full text-text-secondary dark:text-slate-300 bg-slate-50 dark:bg-slate-700 h-[42px]"
-                        aria-label="Filtrar por data"
+                        onChange={(value) => setDateFilter(value)}
                     />
                 </div>
             </Card>
@@ -71,7 +71,7 @@ const ReceiptsPage: FC = () => {
                                 {filteredReceipts.map(receipt => (
                                     <tr key={receipt.id} className="border-b border-border dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                         <td className="p-3 font-mono text-sm">{receipt.id}</td>
-                                        <td className="p-3">{new Date(receipt.createdAt).toLocaleDateString()}</td>
+                                        <td className="p-3">{formatDate(receipt.createdAt)}</td>
                                         <td className="p-3">{receipt.supplierName}</td>
                                         <td className="p-3 text-sm text-text-secondary dark:text-slate-400">{receipt.description}</td>
                                         <td className="p-3 text-right font-semibold">{receipt.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
