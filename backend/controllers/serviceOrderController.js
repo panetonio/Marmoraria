@@ -310,26 +310,31 @@ exports.createServiceOrder = async (req, res) => {
       // Não falhar a criação da OS se não conseguir atualizar o Order
     }
     
-    // Criar CutPieces automaticamente se houver items
-    if (serviceOrder.items && serviceOrder.items.length > 0) {
+    // Criar CutPieces automaticamente se houver items E allocatedSlabId
+    if (serviceOrder.items && serviceOrder.items.length > 0 && serviceOrderData.allocatedSlabId) {
       try {
-        await createCutPiecesForServiceOrder(serviceOrder.id);
+        await createCutPiecesForServiceOrder(serviceOrder.id, serviceOrderData.allocatedSlabId);
         console.log('✅ CutPieces criadas automaticamente');
       } catch (error) {
         console.error('⚠️  Erro ao criar CutPieces:', error.message);
         // Não falhar a criação da OS se não conseguir criar CutPieces
       }
+    } else if (serviceOrder.items && serviceOrder.items.length > 0 && !serviceOrderData.allocatedSlabId) {
+      console.log('ℹ️  CutPieces não serão criadas: allocatedSlabId não fornecido');
     }
     
     // Registrar no log de atividades
     try {
       await ActivityLog.create({
-        userId: req.user?._id || null,
-        userName: req.user?.name || 'Sistema',
-        action: 'create',
-        entityType: 'ServiceOrder',
-        entityId: serviceOrder._id,
+        serviceOrder: serviceOrder._id,
+        action: 'service_order_created',
         description: `Criou a OS ${serviceOrder.id} para o cliente ${serviceOrder.clientName}`,
+        user: req.user ? {
+          id: req.user._id,
+          name: req.user.name,
+          email: req.user.email,
+          role: req.user.role,
+        } : undefined,
       });
     } catch (error) {
       console.error('⚠️  Erro ao registrar log de atividade:', error.message);
@@ -424,6 +429,17 @@ exports.updateServiceOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status, allocatedSlabId } = req.body;
     
+    // Buscar ServiceOrder atual para obter o status anterior
+    const previousServiceOrder = await ServiceOrder.findOne({ id });
+    if (!previousServiceOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'ServiceOrder não encontrada',
+      });
+    }
+    
+    const previousStatus = previousServiceOrder.status;
+    
     const updateData = { status };
     if (allocatedSlabId) {
       updateData.allocatedSlabId = allocatedSlabId;
@@ -435,22 +451,20 @@ exports.updateServiceOrderStatus = async (req, res) => {
       { new: true, runValidators: true }
     );
     
-    if (!serviceOrder) {
-      return res.status(404).json({
-        success: false,
-        message: 'ServiceOrder não encontrada',
-      });
-    }
-    
     // Registrar no log de atividades
     try {
       await ActivityLog.create({
-        userId: req.user?._id || null,
-        userName: req.user?.name || 'Sistema',
-        action: 'update',
-        entityType: 'ServiceOrder',
-        entityId: serviceOrder._id,
-        description: `Atualizou o status da OS ${serviceOrder.id} para ${status}`,
+        serviceOrder: serviceOrder._id,
+        action: 'service_order_status_updated',
+        description: `Atualizou o status da OS ${serviceOrder.id} de ${previousStatus || 'indefinido'} para ${status}`,
+        previousStatus: previousStatus,
+        newStatus: status,
+        user: req.user ? {
+          id: req.user._id,
+          name: req.user.name,
+          email: req.user.email,
+          role: req.user.role,
+        } : undefined,
       });
     } catch (error) {
       console.error('Erro ao registrar log:', error);
