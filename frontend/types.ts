@@ -138,7 +138,7 @@ export interface Product {
 }
 
 export type QuoteItemType = 'material' | 'service' | 'product';
-export type ItemCategory = 'pia' | 'bancada' | 'soleira' | 'revestimento' | 'outro';
+export type ItemCategory = 'pia' | 'bancada' | 'soleira' | 'revestimento' | 'peitoril' | 'outro';
 
 export interface Point {
     x: number;
@@ -368,6 +368,8 @@ export interface StockItem {
   id: string; // Unique ID, could be what the QR code holds
   materialId: string;
   photoUrl: string;
+  internalId?: string;
+  qrCodeValue?: string;
   width: number; // in meters
   height: number; // in meters
   thickness: number; // in cm
@@ -375,6 +377,10 @@ export interface StockItem {
   status: StockItemStatus;
   createdAt: string;
   parentSlabId?: string; // If it's a remnant
+  width_cm?: number;
+  height_cm?: number;
+  shape?: string;
+  shapePoints?: Point[];
 }
 
 export type TransactionType = 'receita' | 'despesa';

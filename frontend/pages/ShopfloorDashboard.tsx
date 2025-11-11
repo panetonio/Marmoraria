@@ -66,7 +66,7 @@ const ShopfloorDashboard: React.FC = () => {
 
   // Filtrar OSs de produção
   const productionOrders = useMemo(() => {
-    const productionStatuses: ProductionStatus[] = ['cutting', 'finishing'];
+    const productionStatuses: ProductionStatus[] = ['pending_production', 'cutting', 'finishing', 'awaiting_logistics'];
     return serviceOrders.filter(order => {
       const statusMatch = productionStatuses.includes(order.productionStatus);
       const dateMatch = new Date(order.deliveryDate) >= new Date(filters.dateRange.start) && 

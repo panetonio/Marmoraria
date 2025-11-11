@@ -117,11 +117,13 @@ const ServiceOrderItem: FC<{
     );
 };
 
+import Badge from '../components/ui/Badge';
+
 const CreateServiceOrderModal: FC<{
     isOpen: boolean;
     order: Order;
     onClose: () => void;
-    onCreate: (newOs: Omit<ServiceOrder, 'id'>) => void;
+    onCreate: (newOs: Omit<ServiceOrder, 'id'>) => Promise<{ success: boolean; message?: string }>;
 }> = ({ isOpen, order, onClose, onCreate }) => {
     const { serviceOrders, checklistTemplates, orderAddendums } = useData();
     const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
@@ -129,6 +131,7 @@ const CreateServiceOrderModal: FC<{
     const [error, setError] = useState<string>('');
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<string>('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Resetar estado quando o modal abrir ou o pedido mudar
     useEffect(() => {
@@ -172,7 +175,7 @@ const CreateServiceOrderModal: FC<{
         // IDs de itens já atribuídos a OSs existentes
         const assignedItemIds = new Set(
             serviceOrders
-                .filter(os => os.orderId === order.id)
+                .filter(os => os.orderId === order.id && os.status !== 'cancelled')
                 .flatMap(os => os.items.map(item => item.id))
         );
         
@@ -368,7 +371,21 @@ const CreateServiceOrderModal: FC<{
         return `chk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     };
 
-    const handleCreate = () => {
+    const assignedItems = useMemo(() => {
+        const map = new Map<string, { item: QuoteItem; serviceOrderId: string }>();
+        serviceOrders
+            .filter(os => os.orderId === order.id && os.status !== 'cancelled')
+            .forEach(os => {
+                os.items.forEach(item => {
+                    if (!map.has(item.id)) {
+                        map.set(item.id, { item, serviceOrderId: os.id });
+                    }
+                });
+            });
+        return Array.from(map.values());
+    }, [serviceOrders, order.id]);
+
+    const handleCreate = async () => {
         setError('');
         
         // Validações básicas
@@ -421,8 +438,22 @@ const CreateServiceOrderModal: FC<{
                 : undefined,
         };
         
-        console.log('✅ OS criada com sucesso - Itens incluídos:', newOsData.items.length);
-        onCreate(newOsData);
+        console.log('✅ OS pronta para submissão - Itens incluídos:', newOsData.items.length);
+        setIsSubmitting(true);
+        try {
+            const result = await onCreate(newOsData);
+            if (!result?.success) {
+                setError(result?.message || 'Não foi possível criar a OS. Tente novamente.');
+                setIsSubmitting(false);
+                return;
+            }
+        } catch (submissionError: any) {
+            console.error('❌ Falha ao criar OS:', submissionError);
+            setError(submissionError?.message || 'Não foi possível criar a OS. Tente novamente.');
+            setIsSubmitting(false);
+            return;
+        }
+        setIsSubmitting(false);
     };
 
     return (
@@ -497,6 +528,22 @@ const CreateServiceOrderModal: FC<{
                         {categoryFilter ? 'Nenhum item encontrado para a categoria selecionada.' : 'Todos os itens deste pedido já foram alocados em Ordens de Serviço.'}
                     </p>}
                 </div>
+                {assignedItems.length > 0 && (
+                    <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800/40 border border-dashed border-border dark:border-slate-700 rounded-lg">
+                        <h4 className="text-sm font-semibold text-text-primary dark:text-slate-100 mb-2 flex items-center gap-2">
+                            Itens já alocados em OS
+                            <Badge variant="secondary">{assignedItems.length}</Badge>
+                        </h4>
+                        <ul className="space-y-1 text-xs text-text-secondary dark:text-slate-300">
+                            {assignedItems.map(({ item, serviceOrderId }) => (
+                                <li key={`${item.id}-${serviceOrderId}`} className="flex justify-between items-center gap-3">
+                                    <span className="truncate">{item.description}</span>
+                                    <Badge variant="primary">{serviceOrderId}</Badge>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
             </div>
              {selectedItems.length > 0 && (
                 <div className="my-4 p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg border border-border dark:border-slate-700">
@@ -556,7 +603,9 @@ const CreateServiceOrderModal: FC<{
             {error && <p className="text-error text-center text-sm mb-4">{error}</p>}
             <div className="flex justify-end space-x-3">
                 <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-                <Button onClick={handleCreate} disabled={availableItems.length === 0}>Gerar OS</Button>
+                <Button onClick={handleCreate} disabled={availableItems.length === 0 || isSubmitting}>
+                    {isSubmitting ? 'Gerando...' : 'Gerar OS'}
+                </Button>
             </div>
         </Modal>
     );
@@ -706,9 +755,12 @@ const OrdersPage: FC<OrdersPageProps> = ({ searchTarget, clearSearchTarget }) =>
         setIsOsModalOpen(false);
     };
 
-    const handleCreateOs = (newOsData: Omit<ServiceOrder, 'id'>) => {
-        createServiceOrder(newOsData);
-        handleCloseOsModal();
+    const handleCreateOs = async (newOsData: Omit<ServiceOrder, 'id'>) => {
+        const result = await createServiceOrder(newOsData);
+        if (result?.success) {
+            handleCloseOsModal();
+        }
+        return result;
     };
 
      const SortableTh: React.FC<{ children: React.ReactNode, columnKey: keyof Order }> = ({ children, columnKey }) => {

@@ -412,6 +412,11 @@ exports.createRetalhoFromSlab = async (req, res) => {
       : statusEnum.includes('disponivel')
       ? 'disponivel'
       : 'available';
+    const partialStatus = statusEnum.includes('partial')
+      ? 'partial'
+      : statusEnum.includes('retalho')
+      ? 'retalho'
+      : 'partial';
 
     const originalPreviousStatus = originalSlab.status || null;
     originalSlab.status = consumedStatus;
@@ -430,7 +435,7 @@ exports.createRetalhoFromSlab = async (req, res) => {
       height: typeof height_cm === 'number' ? height_cm / 100 : originalSlab.height,
       thickness: originalSlab.thickness,
       location: location || originalSlab.location,
-      status: availableStatus,
+      status: partialStatus,
       parentSlabId: originalSlab._id,
       internalId: newInternalId,
       qrCodeValue,

@@ -3,11 +3,42 @@ import type { QuoteItem, Material, StockItem } from '../types';
 import { useData } from '../context/DataContext';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import Badge from './ui/Badge';
+import { calculateArea } from '../utils/helpers';
 
 // External packer and mapper declarations (assumed to exist elsewhere)
 declare class Packer {
     constructor(width: number, height: number);
     fit(items: any[]): void;
+}
+
+const CM_PER_M = 100;
+
+const normalizeDimensionToCm = (value?: number | null): number => {
+    if (value === undefined || value === null) return 0;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+    return numeric > 10 ? numeric : numeric * CM_PER_M;
+};
+
+const getSlabDimensions = (slab: StockItem) => {
+    const rawWidth = (slab as any).width_cm;
+    const rawHeight = (slab as any).height_cm;
+    const widthCm = typeof rawWidth === 'number' && !Number.isNaN(rawWidth) && rawWidth > 0
+        ? rawWidth
+        : normalizeDimensionToCm(slab.width);
+    const heightCm = typeof rawHeight === 'number' && !Number.isNaN(rawHeight) && rawHeight > 0
+        ? rawHeight
+        : normalizeDimensionToCm(slab.height);
+    return { widthCm, heightCm };
+};
+
+interface PackingZone {
+    id: 'A' | 'B' | 'FULL';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
 }
 
 interface PackerItem {
@@ -22,25 +53,226 @@ interface PackerItem {
     x?: number;
     y?: number;
     quoteItem: QuoteItem;
+    origW: number;
+    origH: number;
+    renderW: number;
+    renderH: number;
+    rotated?: boolean;
+    zoneId?: 'A' | 'B' | 'FULL';
 }
 
 const mapQuoteItemToPackerItem = (item: QuoteItem, index: number): PackerItem => {
-    const width = item.width ?? 0;
-    const height = item.height ?? 0;
+    const widthCm = normalizeDimensionToCm(item.width);
+    const heightCm = normalizeDimensionToCm(item.height);
 
     return {
         id: `${item.id}-copy-${index}`, // ID único para cada cópia
         originalItemId: item.id,
         description: item.description,
-        w: width,
-        h: height,
-        area: width * height,
+        w: widthCm,
+        h: heightCm,
+        area: widthCm * heightCm,
         quantity: item.quantity ?? 1,
         fit: false,
         x: 0,
         y: 0,
         quoteItem: item,
+        origW: widthCm,
+        origH: heightCm,
+        renderW: widthCm,
+        renderH: heightCm,
+        rotated: false,
+        zoneId: undefined,
     };
+};
+
+interface Rect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+const rectArea = (rect: Rect) => Math.max(rect.width, 0) * Math.max(rect.height, 0);
+
+const rectIntersectionArea = (a: Rect, b: Rect) => {
+    const xOverlap = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+    const yOverlap = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+    return xOverlap * yOverlap;
+};
+
+const toNumericPoints = (shapePoints: any[]): { x: number; y: number }[] =>
+    shapePoints
+        .map(point => ({
+            x: Number((point || {}).x),
+            y: Number((point || {}).y),
+        }))
+        .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+
+const computeZonesForSlab = (slab: StockItem, slabDimensions: { widthCm: number; heightCm: number }): PackingZone[] | null => {
+    const rawPoints = (slab as any).shapePoints;
+    if (!Array.isArray(rawPoints) || rawPoints.length < 6) {
+        return null;
+    }
+
+    const points = toNumericPoints(rawPoints);
+    if (points.length < 6) {
+        return null;
+    }
+
+    const uniqueX = Array.from(new Set(points.map(p => p.x))).sort((a, b) => a - b);
+    const uniqueY = Array.from(new Set(points.map(p => p.y))).sort((a, b) => a - b);
+
+    if (uniqueX.length !== 3 || uniqueY.length !== 3) {
+        return null;
+    }
+
+    const [minX, midX, maxX] = uniqueX;
+    const [minY, midY, maxY] = uniqueY;
+
+    const combos: Array<{ rectA: Rect; rectB: Rect }> = [
+        {
+            rectA: { x: minX, y: minY, width: midX - minX, height: maxY - minY },
+            rectB: { x: midX, y: midY, width: maxX - midX, height: maxY - midY },
+        },
+        {
+            rectA: { x: midX, y: minY, width: maxX - midX, height: maxY - minY },
+            rectB: { x: minX, y: midY, width: midX - minX, height: maxY - midY },
+        },
+        {
+            rectA: { x: minX, y: minY, width: maxX - minX, height: midY - minY },
+            rectB: { x: midX, y: midY, width: maxX - midX, height: maxY - midY },
+        },
+        {
+            rectA: { x: minX, y: midY, width: maxX - minX, height: maxY - midY },
+            rectB: { x: minX, y: minY, width: midX - minX, height: midY - minY },
+        },
+    ];
+
+    const polygonArea = calculateArea(points);
+    const tolerance = Math.max(1, polygonArea * 0.05);
+
+    const isValidRect = (rect: Rect) =>
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.x >= 0 &&
+        rect.y >= 0 &&
+        rect.x + rect.width <= slabDimensions.widthCm + 0.01 &&
+        rect.y + rect.height <= slabDimensions.heightCm + 0.01;
+
+    let bestCombo: { rectA: Rect; rectB: Rect; diff: number } | null = null;
+
+    combos.forEach(combo => {
+        if (!isValidRect(combo.rectA) || !isValidRect(combo.rectB)) {
+            return;
+        }
+
+        const unionArea = rectArea(combo.rectA) + rectArea(combo.rectB) - rectIntersectionArea(combo.rectA, combo.rectB);
+        const diff = Math.abs(unionArea - polygonArea);
+
+        if (!bestCombo || diff < bestCombo.diff) {
+            bestCombo = { rectA: combo.rectA, rectB: combo.rectB, diff };
+        }
+    });
+
+    if (!bestCombo || bestCombo.diff > tolerance) {
+        return null;
+    }
+
+    return [
+        { id: 'A', ...bestCombo.rectA },
+        { id: 'B', ...bestCombo.rectB },
+    ];
+};
+
+const packZoneGreedy = (items: PackerItem[], zone: PackingZone, allowRotation = true) => {
+    let currentX = 0;
+    let currentY = 0;
+    let shelfHeight = 0;
+
+    const sortedItems = [...items].filter(item => !item.fit).sort((a, b) => {
+        const aMax = Math.max(a.origW, a.origH);
+        const bMax = Math.max(b.origW, b.origH);
+        return bMax - aMax;
+    });
+
+    const attemptPlacement = (
+        baseX: number,
+        baseY: number,
+        baseShelf: number,
+        zoneWidth: number,
+        zoneHeight: number,
+        itemWidth: number,
+        itemHeight: number
+    ) => {
+        let x = baseX;
+        let y = baseY;
+        let shelf = baseShelf;
+
+        if (itemWidth <= 0 || itemHeight <= 0) {
+            return null;
+        }
+
+        if (x > 0 && x + itemWidth > zoneWidth) {
+            y = baseY + baseShelf;
+            x = 0;
+            shelf = 0;
+        }
+
+        if (itemWidth > zoneWidth || itemHeight > zoneHeight || y + itemHeight > zoneHeight) {
+            return null;
+        }
+
+        return {
+            x,
+            y,
+            nextX: x + itemWidth,
+            nextY: y,
+            nextShelfHeight: Math.max(shelf, itemHeight),
+        };
+    };
+
+    sortedItems.forEach(item => {
+        const baseWidth = item.origW;
+        const baseHeight = item.origH;
+
+        const orientations = allowRotation && Math.abs(baseWidth - baseHeight) > 0.01
+            ? [
+                { width: baseWidth, height: baseHeight, rotated: false },
+                { width: baseHeight, height: baseWidth, rotated: true },
+            ]
+            : [
+                { width: baseWidth, height: baseHeight, rotated: false },
+            ];
+
+        let placed = false;
+
+        for (const orientation of orientations) {
+            const placement = attemptPlacement(currentX, currentY, shelfHeight, zone.width, zone.height, orientation.width, orientation.height);
+            if (placement) {
+                item.fit = true;
+                item.x = zone.x + placement.x;
+                item.y = zone.y + placement.y;
+                item.renderW = orientation.width;
+                item.renderH = orientation.height;
+                item.rotated = orientation.rotated;
+                item.zoneId = zone.id;
+
+                currentX = placement.nextX;
+                currentY = placement.nextY;
+                shelfHeight = placement.nextShelfHeight;
+                placed = true;
+                break;
+            }
+        }
+
+        if (!placed) {
+            item.fit = false;
+            item.rotated = false;
+            item.renderW = item.origW;
+            item.renderH = item.origH;
+        }
+    });
 };
 
 interface CuttingOptimizerProps {
@@ -110,45 +342,85 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ pieces, initialSlab
     const [currentSlabIndex, setCurrentSlabIndex] = useState(0);
     const [isSlabSelectorOpen, setIsSlabSelectorOpen] = useState(false);
 
-    // Multi-slab packing logic
+    /**
+     * Multi-slab packing routine
+     * --------------------------
+     * We no longer rely on the external `Packer` helper. Instead we use a simple
+     * greedy "shelf" heuristic that sorts pieces by their largest edge, fills rows
+     * from left-to-right, and opens a new shelf when the next piece would overflow.
+     * Pieces can be rotated 90° whenever that helps them fit in the current shelf.
+     *
+     * When a slab defines `shapePoints` that outline an orthogonal "L", we split
+     * the polygon into two axis-aligned rectangles (zones A and B) and pack them
+     * sequentially: first we try zone A (the largest leg), then we re-run the
+     * heuristic for the items that did not fit in zone B. Every placement keeps
+     * track of its zone, rotation state and final width/height so the viewer can
+     * render the real polygon rather than a bounding box.
+     */
     const packItems = () => {
-        // 1. Map all pieces to packer format
-        let itemsToPack: PackerItem[] = [];
+        // 1. Map all pieces to packer format, expanding by quantity
+        const expandedItems: PackerItem[] = [];
 
         pieces.forEach(item => {
-            // Garante que a quantidade seja pelo menos 1
             const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
-
-            // Adiciona o item 'quantity' vezes ao array de empacotamento
             for (let i = 0; i < quantity; i++) {
-                // Passa o item e o índice 'i' para gerar IDs únicos
-                itemsToPack.push(mapQuoteItemToPackerItem(item, i));
+                expandedItems.push(mapQuoteItemToPackerItem(item, i));
             }
         });
 
-        let layouts: any[][] = [];
-        let remainingItems = [...itemsToPack];
+        // Prepare initial state with original dimensions preserved
+        let remainingItems: PackerItem[] = expandedItems.map(item => ({
+            ...item,
+            fit: false,
+            rotated: false,
+            renderW: item.origW,
+            renderH: item.origH,
+            zoneId: undefined,
+        }));
+
+        const layouts: PackerItem[][] = [];
 
         // 2. Iterate over each available slab
         slabs.forEach((slab) => {
-            const itemsForThisSlab = remainingItems.filter(item => !item.fit);
-            if (itemsForThisSlab.length === 0) {
+            if (remainingItems.length === 0) {
                 layouts.push([]);
                 return;
             }
 
-            // 3. Run the packer for current slab
-            const packer = new Packer((slab as any).width_cm, (slab as any).height_cm);
-            packer.fit(itemsForThisSlab);
+            const slabDimensions = getSlabDimensions(slab);
+            const candidateZones = computeZonesForSlab(slab, slabDimensions) ?? [
+                { id: 'FULL', x: 0, y: 0, width: slabDimensions.widthCm, height: slabDimensions.heightCm },
+            ];
 
-            // 4. Save result for this slab
-            layouts.push(itemsForThisSlab);
+            // Clone remaining items for this slab to avoid mutating the queue for subsequent slabs
+            const itemsForThisSlab: PackerItem[] = remainingItems.map(item => ({
+                ...item,
+                fit: false,
+                rotated: false,
+                renderW: item.origW,
+                renderH: item.origH,
+                zoneId: undefined,
+            }));
 
-            // 5. Update remaining items
-            remainingItems = itemsForThisSlab.filter(item => !item.fit);
+            candidateZones.forEach(zone => {
+                packZoneGreedy(itemsForThisSlab, zone, true);
+            });
+
+            layouts.push(itemsForThisSlab.map(item => ({ ...item })));
+
+            // Items that did not fit move on to the next slab
+            remainingItems = itemsForThisSlab
+                .filter(item => !item.fit)
+                .map(item => ({
+                    ...item,
+                    fit: false,
+                    rotated: false,
+                    renderW: item.origW,
+                    renderH: item.origH,
+                    zoneId: undefined,
+                }));
         });
 
-        // 6. Update state
         setPackedLayouts(layouts);
         setUnpackedItems(remainingItems);
     };
@@ -209,30 +481,87 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ pieces, initialSlab
                     {slabs[currentSlabIndex] && (packedLayouts[currentSlabIndex]?.length ?? 0) >= 0 ? (
                         (() => {
                             const currentSlab = slabs[currentSlabIndex];
-                            const currentLayout = packedLayouts[currentSlabIndex] || [];
-                            const itemsToDraw = currentLayout.filter((it: any) => it.fit === true);
+                            const currentLayout = (packedLayouts[currentSlabIndex] || []) as PackerItem[];
+                            const { widthCm, heightCm } = getSlabDimensions(currentSlab);
+                            const renderWidthPx = widthCm * cmScale;
+                            const renderHeightPx = heightCm * cmScale;
+
+                            const polygonSource = Array.isArray((currentSlab as any).shapePoints) && (currentSlab as any).shapePoints.length >= 3
+                                ? toNumericPoints((currentSlab as any).shapePoints)
+                                : [
+                                    { x: 0, y: 0 },
+                                    { x: widthCm, y: 0 },
+                                    { x: widthCm, y: heightCm },
+                                    { x: 0, y: heightCm },
+                                ];
+
+                            const polygonPoints = polygonSource
+                                .map(point => `${point.x * cmScale},${point.y * cmScale}`)
+                                .join(' ');
+
+                            const itemsToDraw = currentLayout.filter((it: PackerItem) => it.fit);
+
                             return (
-                                <div
-                                    className="relative bg-slate-300 dark:bg-slate-600 border-2 border-slate-400 dark:border-slate-500"
-                                    style={{ width: (currentSlab as any).width_cm * cmScale, height: (currentSlab as any).height_cm * cmScale }}
-                                    title={`Chapa ${(currentSlab as any).width_cm}cm x ${(currentSlab as any).height_cm}cm`}
+                                <svg
+                                    width={renderWidthPx}
+                                    height={renderHeightPx}
+                                    className="bg-slate-200 dark:bg-slate-700 border-2 border-slate-400 dark:border-slate-500 rounded"
+                                    role="img"
+                                    aria-label="Disposição das peças na chapa selecionada"
                                 >
-                                    {itemsToDraw.map((it: any, idx: number) => (
-                                        <div
-                                            key={idx}
-                                            className="absolute bg-primary/80 border border-blue-800 text-white text-xs flex items-center justify-center p-1 overflow-hidden"
-                                            style={{
-                                                left: (it.x || 0) * cmScale,
-                                                top: (it.y || 0) * cmScale,
-                                                width: (it.w || 0) * cmScale,
-                                                height: (it.h || 0) * cmScale,
-                                            }}
-                                            title={`${it.description || it.id || 'Peça'} (${it.w}x${it.h} cm)`}
-                                        >
-                                            <span className="truncate">{(it.description || it.id || 'Peça').toString()}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                                    <polygon
+                                        points={polygonPoints}
+                                        fill="#e2e8f0"
+                                        stroke="#94a3b8"
+                                        strokeWidth={1.5}
+                                    />
+
+                                    {itemsToDraw.map((item) => {
+                                        const itemWidth = item.renderW ?? item.w ?? 0;
+                                        const itemHeight = item.renderH ?? item.h ?? 0;
+                                        if (itemWidth <= 0 || itemHeight <= 0) {
+                                            return null;
+                                        }
+
+                                        const xPx = (item.x ?? 0) * cmScale;
+                                        const yPx = (item.y ?? 0) * cmScale;
+                                        const widthPx = itemWidth * cmScale;
+                                        const heightPx = itemHeight * cmScale;
+                                        const fillColor = item.rotated ? 'rgba(34,197,94,0.75)' : 'rgba(59,130,246,0.75)';
+                                        const strokeDasharray = item.rotated ? '6 4' : undefined;
+                                        const zoneLabel = item.zoneId ? `Zona ${item.zoneId}` : 'Zona';
+
+                                        return (
+                                            <g key={item.id}>
+                                                <rect
+                                                    x={xPx}
+                                                    y={yPx}
+                                                    width={widthPx}
+                                                    height={heightPx}
+                                                    fill={fillColor}
+                                                    stroke="#1e3a8a"
+                                                    strokeWidth={1.5}
+                                                    strokeDasharray={strokeDasharray}
+                                                    rx={3}
+                                                    ry={3}
+                                                />
+                                                <title>{`${item.description ?? item.id} | ${zoneLabel}${item.rotated ? ' (rotacionada)' : ''}`}</title>
+                                                <text
+                                                    x={xPx + widthPx / 2}
+                                                    y={yPx + heightPx / 2}
+                                                    textAnchor="middle"
+                                                    dominantBaseline="middle"
+                                                    fill="#ffffff"
+                                                    fontSize={Math.max(10, Math.min(widthPx, heightPx) / 4)}
+                                                    pointerEvents="none"
+                                                >
+                                                    {(item.description || item.id || 'Peça').toString().slice(0, 20)}
+                                                    {item.rotated ? ' (R)' : ''}
+                                                </text>
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
                             );
                         })()
                     ) : (
@@ -317,6 +646,7 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ pieces, initialSlab
                     <SlabSelector
                         initialSlab={initialSlab}
                         selectedSlabs={slabs}
+                        items={pieces}
                         onSelect={(slab) => {
                             setSlabs(prev => [...prev, slab]);
                             setIsSlabSelectorOpen(false);
@@ -329,7 +659,7 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ pieces, initialSlab
     );
 };
 
-const SlabSelector: React.FC<{ initialSlab: StockItem; selectedSlabs: StockItem[]; onSelect: (slab: StockItem) => void; onClose: () => void; }> = ({ initialSlab, selectedSlabs, onSelect, onClose }) => {
+const SlabSelector: React.FC<{ initialSlab: StockItem; selectedSlabs: StockItem[]; items: QuoteItem[]; onSelect: (slab: StockItem) => void; onClose: () => void; }> = ({ initialSlab, selectedSlabs, items, onSelect, onClose }) => {
     const { stockItems } = useData();
     const alreadySelectedIds = new Set(selectedSlabs.map(s => s.id));
     const candidates = useMemo(() =>
@@ -337,12 +667,53 @@ const SlabSelector: React.FC<{ initialSlab: StockItem; selectedSlabs: StockItem[
         [stockItems, initialSlab.materialId, selectedSlabs]
     );
 
+    const materialItems = useMemo(
+        () => (Array.isArray(items) ? items.filter(item => item.type === 'material') : []),
+        [items]
+    );
+
+    const smallPieceCategories = useMemo(() => new Set(['soleira', 'peitoril']), []);
+
+    const isSmallPieceOrder = useMemo(() => {
+        if (materialItems.length === 0) return false;
+        const smallCount = materialItems.filter(item => smallPieceCategories.has(String(item.category ?? '').toLowerCase())).length;
+        if (smallCount === 0) return false;
+        return smallCount === materialItems.length || smallCount / materialItems.length >= 0.6;
+    }, [materialItems, smallPieceCategories]);
+
+    const retalhoScore = (slab: StockItem) => (slab.status === 'partial' || Boolean(slab.parentSlabId) ? 1 : 0);
+
+    const sortedCandidates = useMemo(() => {
+        if (!isSmallPieceOrder) return candidates;
+        return [...candidates].sort((a, b) => retalhoScore(b) - retalhoScore(a));
+    }, [candidates, isSmallPieceOrder]);
+
+    const formatDimensions = (slab: StockItem) => {
+        const rawWidthCm = (slab as any).width_cm;
+        const rawHeightCm = (slab as any).height_cm;
+        const widthCm = typeof rawWidthCm === 'number' && !Number.isNaN(rawWidthCm) && rawWidthCm > 0
+            ? rawWidthCm
+            : Math.round((slab.width ?? 0) * 100);
+        const heightCm = typeof rawHeightCm === 'number' && !Number.isNaN(rawHeightCm) && rawHeightCm > 0
+            ? rawHeightCm
+            : Math.round((slab.height ?? 0) * 100);
+        if (widthCm <= 0 || heightCm <= 0) {
+            return '—';
+        }
+        return `${widthCm} x ${heightCm} cm`;
+    };
+
     return (
         <div className="space-y-3">
-            {candidates.length === 0 ? (
+            {sortedCandidates.length === 0 ? (
                 <p className="text-text-secondary dark:text-slate-400">Nenhuma chapa adicional disponível para este material.</p>
             ) : (
                 <div className="max-h-80 overflow-auto border border-border dark:border-slate-700 rounded">
+                    {isSmallPieceOrder && (
+                        <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-border dark:border-slate-700 text-sm text-amber-800 dark:text-amber-200">
+                            Sugestão: Para Soleiras e Peitoris, verifique os retalhos disponíveis primeiro.
+                        </div>
+                    )}
                     <table className="w-full text-left text-sm">
                         <thead>
                             <tr className="border-b border-border dark:border-slate-700">
@@ -353,16 +724,24 @@ const SlabSelector: React.FC<{ initialSlab: StockItem; selectedSlabs: StockItem[
                             </tr>
                         </thead>
                         <tbody>
-                            {candidates.map(slab => (
+                            {sortedCandidates.map(slab => {
+                                const isRetalho = slab.status === 'partial' || Boolean(slab.parentSlabId);
+                                return (
                                 <tr key={slab.id} className="border-b border-border dark:border-slate-700 last:border-b-0">
-                                    <td className="p-2 font-mono">{slab.id}</td>
-                                    <td className="p-2">{(slab as any).width_cm} x {(slab as any).height_cm} cm</td>
+                                    <td className="p-2 font-mono">
+                                        <div className="flex items-center gap-2">
+                                            <span>{slab.id}</span>
+                                            {isRetalho && <Badge variant="warning">Retalho</Badge>}
+                                        </div>
+                                    </td>
+                                    <td className="p-2">{formatDimensions(slab)}</td>
                                     <td className="p-2">{(slab as any).location || '-'}</td>
                                     <td className="p-2 text-right">
                                         <Button size="sm" onClick={() => onSelect(slab)}>Selecionar</Button>
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

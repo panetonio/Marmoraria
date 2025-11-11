@@ -88,29 +88,93 @@ const cutPieceStatusOptions: { value: CutPieceStatus; label: string }[] = [
   { value: 'rework', label: cutPieceStatusMap.rework.label },
 ];
 
+const translateStockStatus = (value: unknown, fallback: StockItemStatus): StockItemStatus => {
+  if (!value && value !== 0) return fallback;
+  const rawString = String(value).trim();
+  const normalized = rawString.toLowerCase();
+  const translations: Record<string, StockItemStatus> = {
+    disponivel: 'disponivel',
+    available: 'disponivel',
+    reservada: 'reservada',
+    reserved: 'reservada',
+    'em_uso': 'em_uso',
+    in_use: 'em_uso',
+    consumida: 'consumida',
+    consumed: 'consumida',
+    parcial: 'partial',
+    partial: 'partial',
+    retalho: 'partial',
+    'em_corte': 'em_corte',
+    cutting: 'em_corte',
+    'em_acabamento': 'em_acabamento',
+    finishing: 'em_acabamento',
+    'pronto_para_expedicao': 'pronto_para_expedicao',
+    ready_for_dispatch: 'pronto_para_expedicao',
+  };
+  if (translations[normalized]) {
+    return translations[normalized];
+  }
+  if (stockStatusEntries.some(([status]) => status === rawString)) {
+    return rawString as StockItemStatus;
+  }
+  return fallback;
+};
+
 const normalizeStockItem = (data: RawStockItem): StockItem => {
   const fallbackStatus: StockItemStatus = 'disponivel';
   const rawData = data as Record<string, any>;
-  const parsedStatus = (data.status ?? rawData.currentStatus) as StockItemStatus | undefined;
-  const width = typeof data.width === 'number' ? data.width : Number(data.width ?? 0);
-  const height = typeof data.height === 'number' ? data.height : Number(data.height ?? 0);
-  const thickness = typeof data.thickness === 'number' ? data.thickness : Number(data.thickness ?? 0);
+  const statusCandidate = translateStockStatus(data.status ?? rawData.currentStatus, fallbackStatus);
 
-  const statusCandidate = parsedStatus && stockStatusOptions.some(option => option.value === parsedStatus)
-    ? parsedStatus
-    : fallbackStatus;
+  const parseNumber = (value: unknown): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const width = parseNumber(data.width ?? rawData.width);
+  const height = parseNumber(data.height ?? rawData.height);
+  const thickness = parseNumber(data.thickness ?? rawData.thickness);
+
+  const rawParent = data.parentSlabId ?? rawData.parentSlabId;
+  const parentSlabId =
+    typeof rawParent === 'string'
+      ? rawParent
+      : rawParent && typeof rawParent === 'object' && 'toString' in rawParent
+      ? (rawParent as any).toString()
+      : undefined;
+
+  const rawShapePoints = (data as any).shapePoints ?? rawData.shapePoints;
+  const shapePoints = Array.isArray(rawShapePoints)
+    ? rawShapePoints
+        .map(point => ({
+          x: parseNumber((point as any)?.x),
+          y: parseNumber((point as any)?.y),
+        }))
+        .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+    : undefined;
+
+  const normalizeOptionalString = (value: unknown): string | undefined => {
+    if (value === undefined || value === null) return undefined;
+    const str = String(value).trim();
+    return str.length > 0 ? str : undefined;
+  };
 
   return {
     id: data.id ?? (rawData._id as string) ?? '',
     materialId: data.materialId ?? rawData.material?.id ?? '',
     photoUrl: data.photoUrl ?? rawData.imageUrl ?? '',
+    internalId: normalizeOptionalString((data as any).internalId ?? rawData.internalId),
+    qrCodeValue: normalizeOptionalString((data as any).qrCodeValue ?? rawData.qrCodeValue),
     width,
     height,
     thickness,
+    width_cm: Number.isFinite((data as any)?.width_cm) ? Number((data as any).width_cm) : parseNumber(rawData.width_cm) || undefined,
+    height_cm: Number.isFinite((data as any)?.height_cm) ? Number((data as any).height_cm) : parseNumber(rawData.height_cm) || undefined,
+    shape: normalizeOptionalString((data as any).shape ?? rawData.shape),
+    shapePoints,
     location: data.location ?? rawData.storageLocation ?? '',
     status: statusCandidate,
-    createdAt: data.createdAt ?? new Date().toISOString(),
-    parentSlabId: data.parentSlabId,
+    createdAt: normalizeOptionalString(data.createdAt ?? rawData.createdAt) ?? new Date().toISOString(),
+    parentSlabId,
   };
 };
 
@@ -685,14 +749,38 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
 
   const handleSaveRetalho = useCallback((newSlab: StockItem) => {
     setIsRetalhoModalOpen(false);
-    setNewRetalhoResult(newSlab);
+    const normalizedRetalho = normalizeStockItem(newSlab as RawStockItem);
+    const originalAssetId = assetPayload?.type === 'stock_item' ? assetPayload.data.id : undefined;
+    const candidateParentIds = new Set(
+      [normalizedRetalho.parentSlabId, originalAssetId].filter((value): value is string => Boolean(value))
+    );
+
+    setStockItems(prev => {
+      const updatedList = prev.map(item => {
+        if (candidateParentIds.has(item.id)) {
+          return { ...item, status: 'consumida' as StockItemStatus };
+        }
+        return item;
+      });
+
+      const exists = updatedList.some(item => item.id === normalizedRetalho.id);
+      if (exists) {
+        return updatedList.map(item => (item.id === normalizedRetalho.id ? { ...item, ...normalizedRetalho } : item));
+      }
+      return [...updatedList, normalizedRetalho];
+    });
+
+    setNewRetalhoResult(normalizedRetalho);
     resetScanner();
     toast.success('Chapa original marcada como "Consumida". Imprima a nova etiqueta para o retalho.');
-  }, [resetScanner]);
+  }, [assetPayload, resetScanner, setStockItems]);
 
   return (
     <>
       {newRetalhoResult && (
+        (() => {
+          const statusLabel = stockStatusMap[newRetalhoResult.status]?.label ?? newRetalhoResult.status;
+          return (
         <Card className="mb-4 border border-green-500">
           <CardContent className="space-y-3">
             <h3 className="text-lg font-bold text-green-700">Novo Retalho Gerado com Sucesso!</h3>
@@ -700,8 +788,13 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
               ID do Retalho: <b>{newRetalhoResult.internalId}</b>
             </p>
             <p>
-              Status: <b>Disponível</b>
+              Status: <b>{statusLabel}</b>
             </p>
+            {newRetalhoResult.location && (
+              <p>
+                Localização: <b>{newRetalhoResult.location}</b>
+              </p>
+            )}
             <p className="font-semibold mt-2">Imprima e cole este novo QR Code na chapa restante:</p>
             <div className="text-center p-4">
               <QRCode value={newRetalhoResult.qrCodeValue} size={150} />
@@ -709,6 +802,8 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
             <Button onClick={() => setNewRetalhoResult(null)}>Fechar Aviso</Button>
           </CardContent>
         </Card>
+          );
+        })()
       )}
       <Card className={`p-0 ${className}`}>
       <CardHeader className="border-b border-border dark:border-slate-700">

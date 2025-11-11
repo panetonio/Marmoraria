@@ -136,6 +136,42 @@ exports.createServiceOrder = async (req, res) => {
     
     console.log('✅ Todos os itens têm IDs válidos:', serviceOrderData.items.map(item => ({ id: item.id, description: item.description })));
     
+    // Verificar se já existe OS ativa com os mesmos itens
+    const incomingItemIds = Array.from(new Set(serviceOrderData.items.map(item => item.id).filter(Boolean)));
+    if (incomingItemIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nenhum item válido informado para a Ordem de Serviço.',
+      });
+    }
+
+    const existingOrders = await ServiceOrder.find({
+      orderId: serviceOrderData.orderId,
+      status: { $ne: 'cancelled' },
+      'items.id': { $in: incomingItemIds },
+    }).lean();
+
+    if (existingOrders.length > 0) {
+      const conflicts = new Set<string>();
+      existingOrders.forEach(existing => {
+        existing.items?.forEach(existingItem => {
+          if (incomingItemIds.includes(existingItem.id)) {
+            conflicts.add(existingItem.description || existingItem.id);
+          }
+        });
+      });
+
+      const conflictList = Array.from(conflicts);
+      const conflictMessage = conflictList.length === 1
+        ? `O item "${conflictList[0]}" já possui uma OS em andamento.`
+        : `Os itens ${conflictList.slice(0, 3).map(name => `"${name}"`).join(', ')} já possuem OS em andamento.`;
+
+      return res.status(409).json({
+        success: false,
+        message: `${conflictMessage} Utilize a OS existente ou finalize-a antes de criar outra.`,
+      });
+    }
+    
     // Gerar ID único se não fornecido (verificação robusta)
     if (!serviceOrderData.id || serviceOrderData.id === '' || serviceOrderData.id === null || serviceOrderData.id === undefined) {
       try {

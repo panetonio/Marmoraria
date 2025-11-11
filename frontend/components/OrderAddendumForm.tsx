@@ -123,6 +123,7 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
                                 <option value="bancada">Bancada</option>
                                 <option value="soleira">Soleira</option>
                                 <option value="revestimento">Revestimento</option>
+                                <option value="peitoril">Peitoril</option>
                                 <option value="outro">Outro</option>
                             </Select>
                         </div>
@@ -596,6 +597,7 @@ const OrderAddendumForm: React.FC<OrderAddendumFormProps> = ({ order, onSave, on
                                             <option value="bancada">Bancada</option>
                                             <option value="soleira">Soleira</option>
                                             <option value="revestimento">Revestimento</option>
+                                            <option value="peitoril">Peitoril</option>
                                             <option value="outro">Outro</option>
                                         </Select>
                                     </div>

@@ -491,6 +491,7 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                             <option value="bancada">Bancada</option>
                             <option value="soleira">Soleira</option>
                             <option value="revestimento">Revestimento</option>
+                            <option value="peitoril">Peitoril</option>
                             <option value="outro">Outro</option>
                         </Select>
                     </div>

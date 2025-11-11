@@ -5,6 +5,7 @@ import Button from './ui/Button';
 import StatusBadge from './ui/StatusBadge';
 import Badge from './ui/Badge';
 import { productionStatusMap } from '../config/statusMaps';
+import { useData } from '../context/DataContext';
 
 interface OrderCardProps {
   order: ServiceOrder;
@@ -60,6 +61,8 @@ const OrderCard: FC<OrderCardProps> = ({
   onAssignEmployee,
   assignedProfessionals = [],
 }) => {
+  const { materials } = useData();
+  const materialNameById = new Map(materials.map(material => [material.id, material.name]));
   const priority = order.priority || 'normal';
   const resolvedClientName = (() => {
     if (!order.clientName && order.clientName !== 0) return 'Cliente não informado';
@@ -91,11 +94,40 @@ const OrderCard: FC<OrderCardProps> = ({
   const deliveryStart = order.deliveryStart || order.deliveryScheduledDate;
   const startDate = deliveryStart ? new Date(deliveryStart) : null;
   const endDate = order.deliveryEnd ? new Date(order.deliveryEnd) : null;
+  const deliveryDateFormatted = order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString('pt-BR') : null;
+
+  const materialItems = Array.isArray(order.items)
+    ? order.items.filter(item => item.type === 'material')
+    : [];
+  const uniqueCategories = Array.from(
+    new Set(
+      materialItems
+        .map(item => (item.category || '').toString().trim())
+        .filter(value => value.length > 0)
+    )
+  );
+  const uniqueMaterials = Array.from(
+    new Set(
+      materialItems
+        .map(item => {
+          const materialId = (item.materialId || '').toString().trim();
+          if (materialId && materialNameById.has(materialId)) {
+            return materialNameById.get(materialId)!;
+          }
+          const description = (item.description || '').toString().trim();
+          if (description.length > 0) {
+            return description;
+          }
+          return materialId;
+        })
+        .filter(value => value.length > 0)
+    )
+  );
 
   // Determinar quais botões mostrar baseado na view e status
   const shouldShowFinalizeProduction = view === 'production' && order.productionStatus === 'finishing' && onFinalizeProduction;
   const shouldShowAllocate = view === 'production' && order.productionStatus === 'cutting' && !order.allocatedSlabId && onAllocate;
-  const shouldShowAssign = view === 'production' && (order.productionStatus !== 'cutting' || order.allocatedSlabId) && onAssign;
+  const shouldShowAssign = view === 'production' && onAssign;
   const shouldShowSchedule = (view === 'logistics' && order.logisticsStatus === 'awaiting_scheduling' && onSchedule) ||
                              (view === 'assembly' && order.logisticsStatus === 'awaiting_scheduling' && onSchedule);
   const shouldShowStartRoute = view === 'logistics' && order.logisticsStatus === 'scheduled' && onStartRoute;
@@ -180,9 +212,35 @@ const OrderCard: FC<OrderCardProps> = ({
         </div>
       </div>
 
-      {/* Nome do cliente */}
-      <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{resolvedClientName}</p>
-      
+      <div className="mt-2 space-y-1 text-xs text-text-secondary dark:text-slate-300">
+        {deliveryDateFormatted && (
+          <div>
+            <span className="font-semibold text-text-primary dark:text-slate-100">Entrega:</span>{' '}
+            {deliveryDateFormatted}
+          </div>
+        )}
+        {uniqueCategories.length > 0 && (
+          <div className="flex items-center flex-wrap gap-1">
+            <span className="font-semibold text-text-primary dark:text-slate-100">Categorias:</span>
+            {uniqueCategories.map(category => (
+              <Badge key={category} variant="secondary">
+                {category}
+              </Badge>
+            ))}
+          </div>
+        )}
+        {uniqueMaterials.length > 0 && (
+          <div className="flex items-center flex-wrap gap-1">
+            <span className="font-semibold text-text-primary dark:text-slate-100">Materiais:</span>
+            {uniqueMaterials.map(material => (
+              <Badge key={material} variant="outline">
+                {material}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* StatusBadge para status de exceção */}
       {isExceptionStatus && (
         <div className="mt-2">
