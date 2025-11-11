@@ -73,7 +73,7 @@ const ShopfloorDashboard: React.FC = () => {
                        new Date(order.deliveryDate) <= new Date(filters.dateRange.end);
       const clientMatch = !filters.client || order.clientName.toLowerCase().includes(filters.client.toLowerCase());
       const statusFilterMatch = !filters.status || order.status === filters.status || order.productionStatus === filters.status;
-      const teamMatch = !filters.team || order.assignedToIds.includes(filters.team);
+      const teamMatch = !filters.team || (order.assignedToIds ?? []).includes(filters.team);
       const priorityMatch = !filters.priority || order.priority === filters.priority;
       
       return statusMatch && dateMatch && clientMatch && statusFilterMatch && teamMatch && priorityMatch;
@@ -89,7 +89,7 @@ const ShopfloorDashboard: React.FC = () => {
                        new Date(order.deliveryDate) <= new Date(filters.dateRange.end);
       const clientMatch = !filters.client || order.clientName.toLowerCase().includes(filters.client.toLowerCase());
       const statusFilterMatch = !filters.status || order.status === filters.status || order.logisticsStatus === filters.status;
-      const teamMatch = !filters.team || order.assignedToIds.includes(filters.team);
+      const teamMatch = !filters.team || (order.assignedToIds ?? []).includes(filters.team);
       const vehicleMatch = !filters.vehicle || order.vehicleId === filters.vehicle;
       const priorityMatch = !filters.priority || order.priority === filters.priority;
       
@@ -106,7 +106,7 @@ const ShopfloorDashboard: React.FC = () => {
                        new Date(order.deliveryDate) <= new Date(filters.dateRange.end);
       const clientMatch = !filters.client || order.clientName.toLowerCase().includes(filters.client.toLowerCase());
       const statusFilterMatch = !filters.status || order.status === filters.status || order.productionStatus === filters.status;
-      const teamMatch = !filters.team || order.assignedToIds.includes(filters.team);
+      const teamMatch = !filters.team || (order.assignedToIds ?? []).includes(filters.team);
       const priorityMatch = !filters.priority || order.priority === filters.priority;
       
       return statusMatch && dateMatch && clientMatch && statusFilterMatch && teamMatch && priorityMatch;

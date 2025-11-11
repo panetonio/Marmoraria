@@ -196,6 +196,57 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [orderAddendums, setOrderAddendums] = useState<OrderAddendum[]>([]);
     const [cutPieces, setCutPieces] = useState<CutPiece[]>([]);
 
+    const resolveString = (value: any): string => {
+        if (!value && value !== 0) return '';
+        if (typeof value === 'string') return value;
+        if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+        if (typeof value === 'object') {
+            if (typeof value.name === 'string') return value.name;
+            if (typeof value.clientName === 'string') return value.clientName;
+            if (typeof value.fullName === 'string') return value.fullName;
+            if (typeof value.title === 'string') return value.title;
+        }
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
+        }
+    };
+
+    const normalizeServiceOrder = (rawServiceOrder: any): ServiceOrder => {
+        const serviceOrderData = rawServiceOrder ?? {};
+
+        const normalized = {
+            ...serviceOrderData,
+            id: serviceOrderData.id || serviceOrderData._id,
+            clientName: resolveString(serviceOrderData.clientName),
+            orderId: resolveString(serviceOrderData.orderId),
+            status: serviceOrderData.status ?? serviceOrderData.productionStatus ?? serviceOrderData.logisticsStatus ?? 'pending_production',
+            productionStatus: serviceOrderData.productionStatus ?? serviceOrderData.status ?? 'pending_production',
+            logisticsStatus: serviceOrderData.logisticsStatus ?? serviceOrderData.status ?? 'awaiting_scheduling',
+            finalizationType: serviceOrderData.finalizationType ?? (serviceOrderData.requiresInstallation ? 'delivery_installation' : 'delivery_only'),
+            assignedToIds: Array.isArray(serviceOrderData.assignedToIds)
+                ? serviceOrderData.assignedToIds
+                : [],
+            deliveryTeamIds: Array.isArray(serviceOrderData.deliveryTeamIds)
+                ? serviceOrderData.deliveryTeamIds
+                : [],
+            deliveryScheduledDate: resolveString(serviceOrderData.deliveryScheduledDate),
+            deliveryStart: resolveString(serviceOrderData.deliveryStart),
+            deliveryEnd: resolveString(serviceOrderData.deliveryEnd),
+            vehicleId: resolveString(serviceOrderData.vehicleId),
+        } as ServiceOrder;
+
+        if (!normalized.id) {
+            console.warn('⚠️  ServiceOrder recebida sem ID válido durante normalização:', serviceOrderData);
+        }
+
+        return normalized;
+    };
+
+    const normalizeServiceOrders = (serviceOrdersData: any[]): ServiceOrder[] =>
+        (serviceOrdersData || []).map(normalizeServiceOrder);
+
     // Carregar dados do backend
     useEffect(() => {
         // Verificar se há token antes de carregar dados autenticados
@@ -218,7 +269,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setSuppliers(mockSuppliers);
             setQuotes(mockQuotes);
             setOrders(mockOrders);
-            setServiceOrders(mockServiceOrders);
+            setServiceOrders(normalizeServiceOrders(mockServiceOrders));
             setMaterials(mockMaterials);
         }
     }, []);
@@ -234,10 +285,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try {
             const result = await api.getAllServiceOrders();
             if (result.success && Array.isArray(result.data)) {
-                const mapped: ServiceOrder[] = result.data.map((so: any) => ({
-                    ...so,
-                    id: so.id || so._id,
-                }));
+                const mapped: ServiceOrder[] = normalizeServiceOrders(result.data);
                 setServiceOrders(mapped);
             }
         } catch (error) {
@@ -576,7 +624,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             );
             
             if (result?.success && result?.data) {
-                setServiceOrders(prev => [...prev, result.data]);
+                setServiceOrders(prev => [...prev, normalizeServiceOrder(result.data)]);
                 setOrders(prev => prev.map(order => 
                     order.id === newOsData.orderId 
                         ? { ...order, serviceOrderIds: [...(order.serviceOrderIds || []), result.data.id] }
@@ -611,7 +659,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await toast.promise(
                 api.updateServiceOrder(serviceOrderId, { priority }).then((result: any) => {
                     if (!result?.success || !result?.data) throw new Error(result?.message || 'Falha ao atualizar prioridade');
-                    setServiceOrders(prev => prev.map(so => so.id === serviceOrderId ? result.data : so));
+                    setServiceOrders(prev => prev.map(so => so.id === serviceOrderId ? normalizeServiceOrder(result.data) : so));
                     return result;
                 }),
                 {
@@ -630,7 +678,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await toast.promise(
                 api.updateServiceOrder(serviceOrderId, { observations }).then((result: any) => {
                     if (!result?.success || !result?.data) throw new Error(result?.message || 'Falha ao atualizar observações');
-                    setServiceOrders(prev => prev.map(so => so.id === serviceOrderId ? result.data : so));
+                    setServiceOrders(prev => prev.map(so => so.id === serviceOrderId ? normalizeServiceOrder(result.data) : so));
                     return result;
                 }),
                 {
@@ -976,7 +1024,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (result.success && result.data) {
                 // Atualizar a ServiceOrder no estado local
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === serviceOrderId ? result.data : so
+                    so.id === serviceOrderId ? normalizeServiceOrder(result.data) : so
                 ));
                 
                 return { success: true, message: result.message };
@@ -1029,7 +1077,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
             if (result.success && result.data) {
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === orderId ? result.data : so
+                    so.id === orderId ? normalizeServiceOrder(result.data) : so
                 ));
                 return { success: true, message: result.message };
             }
@@ -1328,7 +1376,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (response.ok) {
                 const updatedServiceOrder = await response.json();
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === serviceOrderId ? updatedServiceOrder : so
+                    so.id === serviceOrderId ? normalizeServiceOrder(updatedServiceOrder) : so
                 ));
                 console.log(`✅ ServiceOrder ${serviceOrderId} refreshed with updated logistics status`);
             } else {
@@ -1346,7 +1394,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (result.success && result.data) {
                 // Atualizar o estado local com a OS retornada pela API
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === id ? result.data : so
+                    so.id === id ? normalizeServiceOrder(result.data) : so
                 ));
                 return { success: true, message: result.message };
             }
@@ -1363,7 +1411,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (result.success && result.data) {
                 // Atualizar o estado local com a OS retornada pela API
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === id ? result.data : so
+                    so.id === id ? normalizeServiceOrder(result.data) : so
                 ));
                 return { success: true, message: result.message };
             }
@@ -1380,7 +1428,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (result.success && result.data) {
                 // Atualizar o estado local com a OS retornada pela API
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === id ? result.data : so
+                    so.id === id ? normalizeServiceOrder(result.data) : so
                 ));
                 return { success: true, message: result.message };
             }
@@ -1397,7 +1445,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (result.success && result.data) {
                 // Atualizar o estado local com a OS retornada pela API
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === id ? result.data : so
+                    so.id === id ? normalizeServiceOrder(result.data) : so
                 ));
                 return { success: true, message: result.message };
             }
@@ -1414,7 +1462,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (result.success && result.data) {
                 // Atualizar o estado local com a OS retornada pela API
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === id ? result.data : so
+                    so.id === id ? normalizeServiceOrder(result.data) : so
                 ));
                 return { success: true, message: result.message };
             }
@@ -1431,7 +1479,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (result.success && result.data) {
                 // Atualizar o estado local com a OS retornada pela API
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === id ? result.data : so
+                    so.id === id ? normalizeServiceOrder(result.data) : so
                 ));
                 return { success: true, message: result.message };
             }
@@ -1448,7 +1496,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (result.success && result.data) {
                 // Atualizar o estado local com a OS retornada pela API
                 setServiceOrders(prev => prev.map(so => 
-                    so.id === id ? result.data : so
+                    so.id === id ? normalizeServiceOrder(result.data) : so
                 ));
                 return { success: true, message: result.message };
             }

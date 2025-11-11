@@ -386,3 +386,88 @@ exports.updateAssetLocation = async (req, res) => {
     });
   }
 };
+
+exports.createRetalhoFromSlab = async (req, res) => {
+  try {
+    const originalSlabId = req.params.id;
+    const { shape, width_cm, height_cm, shapePoints, location } = req.body || {};
+
+    const originalSlab = await StockItem.findById(originalSlabId);
+
+    if (!originalSlab) {
+      return res.status(404).json({
+        success: false,
+        message: 'Chapa original não encontrada',
+      });
+    }
+
+    const statusEnum = (StockItem.schema && StockItem.schema.path('status') && StockItem.schema.path('status').enumValues) || [];
+    const consumedStatus = statusEnum.includes('consumed')
+      ? 'consumed'
+      : statusEnum.includes('consumida')
+      ? 'consumida'
+      : 'consumed';
+    const availableStatus = statusEnum.includes('available')
+      ? 'available'
+      : statusEnum.includes('disponivel')
+      ? 'disponivel'
+      : 'available';
+
+    const originalPreviousStatus = originalSlab.status || null;
+    originalSlab.status = consumedStatus;
+    await originalSlab.save();
+
+    const baseInternalId = originalSlab.internalId || originalSlab._id.toString();
+    const existingRetalhosCount = await StockItem.countDocuments({ parentSlabId: originalSlab._id });
+    const newRetalhoIndex = existingRetalhosCount + 1;
+    const newInternalId = `${baseInternalId}-R${newRetalhoIndex}`;
+    const qrCodeValue = `marmoraria://asset/stock_item/${newInternalId}`;
+
+    const newRetalho = new StockItem({
+      materialId: originalSlab.materialId,
+      photoUrl: originalSlab.photoUrl,
+      width: typeof width_cm === 'number' ? width_cm / 100 : originalSlab.width,
+      height: typeof height_cm === 'number' ? height_cm / 100 : originalSlab.height,
+      thickness: originalSlab.thickness,
+      location: location || originalSlab.location,
+      status: availableStatus,
+      parentSlabId: originalSlab._id,
+      internalId: newInternalId,
+      qrCodeValue,
+      shape,
+      width_cm,
+      height_cm,
+      shapePoints,
+    });
+
+    await newRetalho.save();
+
+    await ActivityLog.create({
+      action: 'stock_status_updated',
+      description: `Retalho ${newInternalId} criado a partir da chapa ${baseInternalId}`,
+      relatedEntityType: 'stock_item',
+      relatedEntityId: newRetalho._id.toString(),
+      previousStatus: null,
+      newStatus: availableStatus,
+      metadata: {
+        originalSlabId: originalSlab._id.toString(),
+        newRetalhoId: newRetalho._id.toString(),
+        internalId: newInternalId,
+        originalPreviousStatus,
+        consumedStatus,
+      },
+      user: buildUserSnapshot(req.user),
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: newRetalho,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao criar retalho a partir da chapa',
+      error: error.message,
+    });
+  }
+};

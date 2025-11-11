@@ -816,7 +816,14 @@ const QuoteForm: React.FC<{ quote: Quote; onSave: (quote: Quote) => void; onCanc
                                     <tbody>
                                         {quote.items.map(item => (
                                             <tr key={item.id} className={`border-b border-border dark:border-slate-700 ${editingItemId === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
-                                                <td className="p-2">{item.description}</td>
+                                                <td className="p-2">
+                                                    <p className="font-semibold">
+                                                        {item.description}
+                                                        {item.type === 'material' && item.quantity && item.quantity > 1 && (
+                                                            <span className="text-sm font-normal text-gray-500 ml-2">(x{item.quantity})</span>
+                                                        )}
+                                                    </p>
+                                                </td>
                                                 <td className="p-2">{item.quantity.toFixed(2)}</td>
                                                 <td className="p-2">{item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                                 <td className="p-2 text-red-600 dark:text-red-400">{item.discount ? `- ${item.discount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : '-'}</td>

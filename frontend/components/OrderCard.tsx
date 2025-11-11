@@ -61,6 +61,18 @@ const OrderCard: FC<OrderCardProps> = ({
   assignedProfessionals = [],
 }) => {
   const priority = order.priority || 'normal';
+  const resolvedClientName = (() => {
+    if (!order.clientName && order.clientName !== 0) return 'Cliente não informado';
+    if (typeof order.clientName === 'string') return order.clientName;
+    if (typeof (order.clientName as any)?.name === 'string') return (order.clientName as any).name;
+    if (typeof (order.clientName as any)?.clientName === 'string') return (order.clientName as any).clientName;
+    if (typeof (order.clientName as any)?.fullName === 'string') return (order.clientName as any).fullName;
+    try {
+      return JSON.stringify(order.clientName);
+    } catch {
+      return String(order.clientName);
+    }
+  })();
   
   // Detectar status de exceção
   const isExceptionStatus = [
@@ -169,7 +181,7 @@ const OrderCard: FC<OrderCardProps> = ({
       </div>
 
       {/* Nome do cliente */}
-      <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{order.clientName}</p>
+      <p className="text-text-secondary dark:text-slate-400 text-sm mt-1">{resolvedClientName}</p>
       
       {/* StatusBadge para status de exceção */}
       {isExceptionStatus && (

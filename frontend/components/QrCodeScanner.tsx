@@ -11,6 +11,9 @@ import Button from './ui/Button';
 import Select from './ui/Select';
 import StatusBadge from './ui/StatusBadge';
 import { equipmentStatusMap, stockStatusMap, cutPieceStatusMap } from '../config/statusMaps';
+import CreateRetalhoModal from './CreateRetalhoModal';
+import QRCode from '../lib/qrcode-react';
+import toast from 'react-hot-toast';
 import type {
   ActivityType,
   Equipment,
@@ -59,15 +62,12 @@ const assetTypeLabels: Record<AssetType, string> = {
   cut_piece: 'Peça Cortada',
 };
 
-const stockStatusOptions: { value: StockItemStatus; label: string }[] = [
-  { value: 'disponivel', label: stockStatusMap.disponivel.label },
-  { value: 'reservada', label: stockStatusMap.reservada.label },
-  { value: 'em_uso', label: stockStatusMap.em_uso.label },
-  { value: 'consumida', label: stockStatusMap.consumida.label },
-  { value: 'em_corte', label: stockStatusMap.em_corte.label },
-  { value: 'em_acabamento', label: stockStatusMap.em_acabamento.label },
-  { value: 'pronto_para_expedicao', label: stockStatusMap.pronto_para_expedicao.label },
-];
+const stockStatusEntries = Object.entries(stockStatusMap) as Array<[StockItemStatus, { label: string; variant: string }]>;
+
+const stockStatusOptions: { value: StockItemStatus; label: string }[] = stockStatusEntries.map(([value, config]) => ({
+  value,
+  label: config.label,
+}));
 
 const equipmentStatusOptions: { value: EquipmentStatus; label: string }[] = [
   { value: 'operacional', label: equipmentStatusMap.operacional.label },
@@ -330,6 +330,8 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
   const [statusValue, setStatusValue] = useState('');
   const [locationValue, setLocationValue] = useState('');
   const [lastScan, setLastScan] = useState<{ data: string; timestamp: number } | null>(null);
+  const [isRetalhoModalOpen, setIsRetalhoModalOpen] = useState(false);
+  const [newRetalhoResult, setNewRetalhoResult] = useState<StockItem | null>(null);
 
   const updateLocalStock = useCallback((item: StockItem) => {
     setStockItems(prev => {
@@ -359,6 +361,7 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
     setAssetPayload(null);
     setStatusValue('');
     setLocationValue('');
+    setIsRetalhoModalOpen(false);
   }, []);
 
   const applyAssetPayload = useCallback((payload: AssetPayload) => {
@@ -377,6 +380,19 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
       setLocationValue('');
     }
   }, [updateLocalEquipment, updateLocalStock]);
+
+  const resetScanner = useCallback(() => {
+    clearAssetData();
+    setMode('manual');
+    setManualType('stock_item');
+    setManualInput('');
+    setStatusValue('');
+    setLocationValue('');
+    setSuccessMessage('');
+    setError('');
+    setCameraError('');
+    setLastScan(null);
+  }, [clearAssetData]);
 
   const requestCameraPermission = useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -575,6 +591,11 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
     const statusChanged = supportsStatus && statusValue && statusValue !== currentStatus;
     const locationChanged = supportsLocation && trimmedLocation !== currentLocation;
 
+    if (assetPayload.type === 'stock_item' && statusChanged && statusValue === 'partial') {
+      setIsRetalhoModalOpen(true);
+      return;
+    }
+
     if (!statusChanged && !locationChanged) {
       setSuccessMessage('Nenhuma alteração detectada para atualizar.');
       return;
@@ -662,8 +683,34 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
     { value: 'cut_piece', label: 'Peça Cortada' },
   ]), []);
 
+  const handleSaveRetalho = useCallback((newSlab: StockItem) => {
+    setIsRetalhoModalOpen(false);
+    setNewRetalhoResult(newSlab);
+    resetScanner();
+    toast.success('Chapa original marcada como "Consumida". Imprima a nova etiqueta para o retalho.');
+  }, [resetScanner]);
+
   return (
-    <Card className={`p-0 ${className}`}>
+    <>
+      {newRetalhoResult && (
+        <Card className="mb-4 border border-green-500">
+          <CardContent className="space-y-3">
+            <h3 className="text-lg font-bold text-green-700">Novo Retalho Gerado com Sucesso!</h3>
+            <p>
+              ID do Retalho: <b>{newRetalhoResult.internalId}</b>
+            </p>
+            <p>
+              Status: <b>Disponível</b>
+            </p>
+            <p className="font-semibold mt-2">Imprima e cole este novo QR Code na chapa restante:</p>
+            <div className="text-center p-4">
+              <QRCode value={newRetalhoResult.qrCodeValue} size={150} />
+            </div>
+            <Button onClick={() => setNewRetalhoResult(null)}>Fechar Aviso</Button>
+          </CardContent>
+        </Card>
+      )}
+      <Card className={`p-0 ${className}`}>
       <CardHeader className="border-b border-border dark:border-slate-700">
         <div>
           <h2 className="text-xl font-semibold text-text-primary dark:text-slate-100">Scanner de QR Code</h2>
@@ -926,11 +973,17 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
                     onChange={event => setStatusValue(event.target.value)}
                     label="Atualizar Status"
                   >
-                    {statusOptions.map(option => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
+                    {assetPayload?.type === 'stock_item'
+                      ? stockStatusEntries.map(([value, config]) => (
+                          <option key={value} value={value}>
+                            {config.label}
+                          </option>
+                        ))
+                      : statusOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
                   </Select>
                 )}
                 {supportsLocation && (
@@ -953,7 +1006,16 @@ const QrCodeScanner: React.FC<QrCodeScannerProps> = ({ className = '' }) => {
           </div>
         )}
       </CardContent>
-    </Card>
+      </Card>
+      {isRetalhoModalOpen && assetPayload?.type === 'stock_item' && (
+        <CreateRetalhoModal
+          isOpen={isRetalhoModalOpen}
+          onClose={() => setIsRetalhoModalOpen(false)}
+          originalSlab={assetPayload.data}
+          onSave={handleSaveRetalho}
+        />
+      )}
+    </>
   );
 };
 

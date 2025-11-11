@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const assetController = require('../controllers/assetController');
+const { createRetalhoFromSlab } = assetController;
 const { authenticate, authorize } = require('../middleware/auth');
 
 const router = express.Router();
@@ -20,7 +21,7 @@ const validateRequest = (req, res, next) => {
 };
 
 router.use(authenticate);
-router.use(authorize('stock', 'production', 'catalog'));
+router.use(authorize('stock', 'production', 'catalog', 'admin'));
 
 router.get(
   '/qrcode-scan',
@@ -107,6 +108,13 @@ router.put(
   ],
   validateRequest,
   assetController.updateAssetLocation,
+);
+
+router.post(
+  '/stock_item/:id/create-retalho',
+  authenticate,
+  authorize('production', 'stock', 'admin'),
+  createRetalhoFromSlab,
 );
 
 module.exports = router;

@@ -46,6 +46,7 @@ export const stockStatusMap: StatusMap<StockItemStatus> = {
     reservada: { label: "Reservada", variant: "primary" },
     em_uso: { label: "Em Uso", variant: "warning" },
     consumida: { label: "Consumida", variant: "default" },
+    partial: { label: 'Sobrou Retalho (Gerar Novo)', variant: 'warning' },
     em_corte: { label: "Em Corte", variant: "warning" },
     em_acabamento: { label: "Em Acabamento", variant: "primary" },
     pronto_para_expedicao: { label: "Pronto para Expedição", variant: "success" },

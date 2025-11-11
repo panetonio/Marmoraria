@@ -639,6 +639,15 @@ export const api = {
     return response.json();
   },
 
+  async createRetalhoFromSlab(originalSlabId: string, retalhoData: any) {
+    const response = await apiFetch(`${API_URL}/assets/stock_item/${encodeURIComponent(originalSlabId)}/create-retalho`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(retalhoData),
+    });
+    return response.json();
+  },
+
   // Relatórios de produtividade
   async getEmployeeProductivity(params: {
     startDate: string;

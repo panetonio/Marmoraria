@@ -9,7 +9,39 @@ declare class Packer {
     constructor(width: number, height: number);
     fit(items: any[]): void;
 }
-declare function mapQuoteItemToPackerItem(item: QuoteItem): any;
+
+interface PackerItem {
+    id: string;
+    originalItemId: string;
+    description: string;
+    w: number;
+    h: number;
+    area: number;
+    quantity: number;
+    fit?: boolean;
+    x?: number;
+    y?: number;
+    quoteItem: QuoteItem;
+}
+
+const mapQuoteItemToPackerItem = (item: QuoteItem, index: number): PackerItem => {
+    const width = item.width ?? 0;
+    const height = item.height ?? 0;
+
+    return {
+        id: `${item.id}-copy-${index}`, // ID único para cada cópia
+        originalItemId: item.id,
+        description: item.description,
+        w: width,
+        h: height,
+        area: width * height,
+        quantity: item.quantity ?? 1,
+        fit: false,
+        x: 0,
+        y: 0,
+        quoteItem: item,
+    };
+};
 
 interface CuttingOptimizerProps {
     pieces: QuoteItem[];
@@ -81,7 +113,19 @@ const CuttingOptimizer: React.FC<CuttingOptimizerProps> = ({ pieces, initialSlab
     // Multi-slab packing logic
     const packItems = () => {
         // 1. Map all pieces to packer format
-        let itemsToPack = pieces.map(mapQuoteItemToPackerItem);
+        let itemsToPack: PackerItem[] = [];
+
+        pieces.forEach(item => {
+            // Garante que a quantidade seja pelo menos 1
+            const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+
+            // Adiciona o item 'quantity' vezes ao array de empacotamento
+            for (let i = 0; i < quantity; i++) {
+                // Passa o item e o índice 'i' para gerar IDs únicos
+                itemsToPack.push(mapQuoteItemToPackerItem(item, i));
+            }
+        });
+
         let layouts: any[][] = [];
         let remainingItems = [...itemsToPack];
 

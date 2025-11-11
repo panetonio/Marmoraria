@@ -359,6 +359,7 @@ export type StockItemStatus =
   | 'reservada'
   | 'em_uso'
   | 'consumida'
+  | 'partial'
   | 'em_corte'
   | 'em_acabamento'
   | 'pronto_para_expedicao';

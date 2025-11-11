@@ -6,6 +6,7 @@ import KanbanColumn from './KanbanColumn';
 import OrderCard from './OrderCard';
 
 const KANBAN_COLUMNS: { id: ProductionStatus; title: string; color: string }[] = [
+  { id: 'pending_production', title: 'Pré-Corte', color: 'bg-slate-600' },
   { id: 'cutting', title: 'Em Corte', color: 'bg-orange-800' },
   { id: 'finishing', title: 'Em Acabamento', color: 'bg-blue-700' },
   { id: 'awaiting_pickup', title: 'Aguardando Retirada', color: 'bg-yellow-600' },
@@ -48,7 +49,7 @@ const ProductionKanban: FC<ProductionKanbanProps> = ({
     return serviceOrders.filter(order => {
       const professionalMatch = professionalFilter ? order.assignedToIds.includes(professionalFilter) : true;
       const orderIdMatch = orderIdFilter ? order.orderId.toLowerCase().includes(orderIdFilter.toLowerCase()) : true;
-      const productionStatuses: ProductionStatus[] = ['cutting', 'finishing', 'awaiting_pickup'];
+      const productionStatuses: ProductionStatus[] = ['pending_production', 'cutting', 'finishing', 'awaiting_pickup'];
       return professionalMatch && orderIdMatch && productionStatuses.includes(order.productionStatus);
     });
   }, [serviceOrders, professionalFilter, orderIdFilter]);
@@ -111,7 +112,7 @@ const ProductionKanban: FC<ProductionKanbanProps> = ({
       </div>
 
       {/* Kanban */}
-      <div className="grid grid-cols-3 gap-5 h-[75vh]">
+      <div className="grid grid-cols-4 gap-5 h-[75vh]">
         {KANBAN_COLUMNS.map(column => {
           const columnOrders = filteredServiceOrders.filter(order => order.productionStatus === column.id);
           return (
