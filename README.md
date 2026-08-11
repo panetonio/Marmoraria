@@ -1,62 +1,99 @@
-# Marmoraria ERP - Gestão Integrada
+# Marmoraria ERP/CRM/SCM
 
-Bem-vindo ao Marmoraria ERP, um sistema de gestão interno (ERP) robusto e centralizado, projetado para otimizar todas as operações de uma marmoraria.
+> Status: 🚧 Em desenvolvimento — MVP (Fase 1)
 
-Este documento fornece as instruções necessárias para configurar e executar o projeto em um ambiente de desenvolvimento.
+Sistema de gestão completo para uma marmoraria (fabricação e instalação de mármore/granito): ERP + CRM + SCM cobrindo o ciclo operacional inteiro, da medição em campo até a montagem final, com controle de acesso por perfil, comissionamento e integrações fiscais/WhatsApp planejadas. Aplicação **single-tenant**, uso exclusivo desta empresa.
 
-## 🚀 Começando
+## Fase atual: MVP
 
-Siga os passos abaixo para colocar a aplicação em funcionamento.
+Esta fase entrega o ciclo operacional completo — **orçamento → pedido → produção → entrega → montagem** — e o financeiro vinculado a pedido (contas a receber). O módulo de despesas gerais da empresa está fora desta fase, aguardando decisão do stakeholder sobre modelo de aprovação. Escopo completo em [`docs/Regras_MVP_Addendum.md`](docs/Regras_MVP_Addendum.md).
 
-### 1. Pré-requisitos
+## Stack
 
-Certifique-se de ter o [Node.js](https://nodejs.org/) (versão 18 ou superior) instalado em sua máquina. A instalação do Node.js também inclui o `npm`, o gerenciador de pacotes que usaremos.
+| Camada | Tecnologia |
+|---|---|
+| Frontend | Next.js (App Router) + React 18 + TypeScript + Tailwind CSS + shadcn/ui |
+| Backend | Next.js Route Handlers + Prisma ORM |
+| Banco de dados | PostgreSQL |
+| Autenticação | Login/senha (perfis administrativos) + PIN numérico (perfis de campo) |
+| Testes | Vitest (unidade) + Playwright (E2E) |
 
-### 2. Instalação
+## Estrutura do repositório
 
-Primeiro, instale todas as dependências do projeto. No diretório raiz do projeto, execute o seguinte comando:
+```
+marmoraria-mvp/
+├── CLAUDE.md                                   # instruções de projeto para o Claude Code
+├── README.md
+├── docs/
+│   ├── Regras_de_Negocio_Consolidado.md        # fonte de verdade das regras de negócio
+│   ├── Regras_MVP_Addendum.md                  # escopo desta fase (dentro x fora)
+│   ├── Guia_Desenvolvimento_MVP_ClaudeCode.md  # passo a passo de execução por sprint
+│   └── modelo_relacional.md                    # schema relacional original de referência
+├── prisma/
+│   └── schema.prisma
+├── src/
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   └── server/                                 # regras de negócio / use-cases, separado da UI
+└── tests/
+```
+
+## Documentação — onde procurar o quê
+
+| Pergunta | Documento |
+|---|---|
+| "Qual é a regra de negócio disso?" | `docs/Regras_de_Negocio_Consolidado.md` |
+| "Isso está dentro do MVP?" | `docs/Regras_MVP_Addendum.md` |
+| "Como desenvolvo o próximo sprint?" | `docs/Guia_Desenvolvimento_MVP_ClaudeCode.md` |
+| "Como era o schema antes das mudanças do MVP?" | `docs/modelo_relacional.md` |
+| "Quais são as convenções de código deste projeto?" | `CLAUDE.md` |
+
+Em caso de conflito entre documentos, a ordem de prevalência é: `Regras_MVP_Addendum.md` → `Regras_de_Negocio_Consolidado.md` → `modelo_relacional.md`.
+
+## Como rodar localmente
 
 ```bash
+git clone <url-do-repo>
+cd marmoraria-mvp
 npm install
-```
 
-Este comando irá baixar e instalar todas as bibliotecas e pacotes necessários para a aplicação funcionar corretamente.
+docker compose up -d          # sobe o Postgres local
+cp .env.example .env          # ajuste DATABASE_URL se necessário
 
-### 3. Variáveis de Ambiente
+npx prisma migrate dev
+npx prisma db seed
 
-Algumas funcionalidades do ERP, como integrações com APIs externas, podem exigir chaves de API. Crie um arquivo chamado `.env` na raiz do projeto para armazenar essas chaves.
-
-**Exemplo de `.env`:**
-```
-API_KEY=SUA_CHAVE_DE_API_AQUI
-```
-*A aplicação está configurada para ler a variável `API_KEY` do ambiente para integrações com serviços de IA.*
-
-### 4. Executando a Aplicação
-
-Após a instalação das dependências, você pode iniciar o servidor de desenvolvimento:
-
-```bash
 npm run dev
 ```
 
-Este comando iniciará a aplicação em modo de desenvolvimento. Você poderá acessá-la em `http://localhost:5173` (ou a porta indicada no seu terminal).
+## Roadmap do MVP
 
----
+| Sprint | Entrega | Status |
+|---|---|---|
+| `MVP-S0` | Fundação — schema, RBAC, auth (senha + PIN), seed | ⬜ |
+| `MVP-S1` | Orçamento — clientes, itens, editor grid+snap | ⬜ |
+| `MVP-S2` | Aceite, conversão em pedido, sinal e parcelas | ⬜ |
+| `MVP-S3` | Produção — OS e kanban | ⬜ |
+| `MVP-S4` | Expedição, entrega e montagem | ⬜ |
+| `MVP-S5` | Adendos, dashboards por perfil, preparação da demo | ⬜ |
 
-## 🔮 Futuras Configurações
+Detalhes de cada sprint (tabelas, regras, definição de pronto) em [`docs/Guia_Desenvolvimento_MVP_ClaudeCode.md`](docs/Guia_Desenvolvimento_MVP_ClaudeCode.md).
 
-### Conexão com Banco de Dados
+## Perfis de usuário (RBAC)
 
-Atualmente, o projeto utiliza dados estáticos (mock data) para facilitar o desenvolvimento do frontend. Estes dados estão localizados no diretório `/data`.
+| Perfil | Acesso |
+|---|---|
+| `administrador`, `gestor_financeiro`, `vendedor`, `gp` | Login e senha |
+| `motorista`, `montador`, `medidor` | PIN numérico simples |
+| `operador` (`serrador`, `acabador`) | Sem login — alocado por outros perfis |
 
-O planejamento futuro inclui a integração com um banco de dados real (como PostgreSQL, MySQL, ou um serviço de BaaS como Firebase). Quando essa integração for realizada, as credenciais de conexão do banco de dados deverão ser adicionadas ao arquivo `.env` para garantir a segurança.
+Detalhes completos de permissões e dashboards em `docs/Regras_de_Negocio_Consolidado.md` §2 e §7.
 
-**Exemplo de futuras variáveis para o banco de dados:**
-```
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=seu_usuario
-DB_PASSWORD=sua_senha
-DB_NAME=marmoraria_db
-```
+## Fora de escopo nesta fase
+
+Despesas gerais, comissionamento de operadores, procurement, emissão fiscal real, integração WhatsApp real, estoque de chapas/retalhos/patrimônio. Lista completa e justificativa em `docs/Regras_MVP_Addendum.md` §1.
+
+## Metodologia
+
+Desenvolvimento guiado por documentação: nenhuma ambiguidade de negócio é resolvida por suposição — é levantada e decidida antes de virar código. As convenções de trabalho com o Claude Code (limiar de certeza, decomposição de tarefas, cobertura de testes) estão em `CLAUDE.md`.
