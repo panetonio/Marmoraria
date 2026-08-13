@@ -1,0 +1,570 @@
+// Schema base do MVP-S0 a MVP-S5.
+//
+// Fontes de verdade, em ordem de precedência:
+//   1. docs/Regras_MVP_Addendum.md          — o que está dentro/fora desta fase
+//   2. docs/Regras_de_Negocio_Consolidado.md — regras, máquinas de estado, RBAC
+//   3. docs/modelo_relacional.md             — schema de referência v2.0
+//
+// Tabelas fora do MVP não estão aqui (chapas, retalhos, patrimônio,
+// notas_fiscais, checklist_os) — ver docs/Regras_MVP_Addendum.md §1 e §5.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7: a connection string vive em prisma.config.ts, não aqui.
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+// Consolidado §2.2 e §2.4 — 8 perfis (7 com login + operador sem login)
+enum Credencial {
+  administrador
+  gestor_financeiro
+  vendedor
+  gp
+  motorista
+  montador
+  medidor
+  operador
+}
+
+// Consolidado §2.3 — recursos alocáveis de chão de fábrica
+enum Especialidade {
+  serrador
+  acabador
+}
+
+// Consolidado §2.3 — 'completo' também atende demanda 'simples' (hierárquico,
+// não é match exato). A hierarquia é resolvida na query de alocação.
+enum NivelAcabamento {
+  simples
+  completo
+}
+
+enum TipoPessoa {
+  PF
+  PJ
+}
+
+// Consolidado §4.2 — máquina de estado do orçamento
+enum StatusOrcamento {
+  rascunho
+  aprovado
+  arquivado
+}
+
+// regra 5.3 — formas de aceite do cliente (mínimo uma confirmação)
+enum TipoAceite {
+  upload
+  assinatura
+  contrato // gerado automaticamente para orçamento >= R$ 10.000
+}
+
+// Consolidado §4.1 — status financeiro do pedido (independente do operacional)
+enum StatusFinanceiroPedido {
+  pendente
+  parcial
+  pago
+  atrasado
+  cancelado
+}
+
+// Consolidado §4.1 — status operacional do pedido (independente do financeiro).
+// 'montado' só é alcançável se o pedido contém item que requer montagem.
+// "Finalizado" NÃO existe aqui: é condição derivada (teto operacional + pago).
+enum StatusOperacionalPedido {
+  aguardando_producao
+  em_producao
+  entregue
+  montado
+}
+
+// Consolidado §4.4 — 'decorativa' pula produção
+enum TipoOs {
+  producao
+  entrega
+  montagem
+  decorativa
+}
+
+// Consolidado §4.3 — DERIVADO/AGREGADO de etapas_os, nunca editado pelo GP
+enum StatusOs {
+  criada
+  em_andamento
+  bloqueada
+  cancelada
+  finalizada
+}
+
+// Consolidado §4.4 — etapas predefinidas por tipo de OS, não configuráveis pelo GP
+enum NomeEtapa {
+  corte
+  acabamento
+  checklist_expedicao
+  saida_para_entrega
+  entrega_confirmada
+  montagem
+  confirmacao_cliente
+}
+
+// Consolidado §4.5 — sub-máquina de cada etapa
+enum StatusEtapa {
+  nao_iniciado
+  em_andamento
+  finalizado
+}
+
+// Consolidado §4.6
+enum StatusAdendo {
+  pendente
+  aprovado
+  rejeitado
+}
+
+// Addendum §2 — 'despesa' já existe no enum, mas despesa geral (id_pedido null)
+// está FORA desta fase. Nenhum campo de aprovação de despesa é criado agora.
+enum TipoLancamento {
+  receita
+  despesa
+}
+
+enum StatusLancamento {
+  pendente
+  pago
+  atrasado
+  cancelado
+}
+
+enum TipoAssinatura {
+  digital
+  fisica
+  whatsapp
+}
+
+// ============================================================
+// CADASTROS
+// ============================================================
+
+model Endereco {
+  idEndereco  Int     @id @default(autoincrement()) @map("id_endereco")
+  cep         String
+  logradouro  String
+  numero      String
+  bairro      String
+  cidade      String
+  uf          String  @db.Char(2)
+  complemento String?
+
+  clientes     Cliente[]
+  fornecedores Fornecedor[]
+  pedidos      Pedido[]
+
+  @@map("enderecos")
+}
+
+model Cliente {
+  idCliente    Int        @id @default(autoincrement()) @map("id_cliente")
+  nome         String
+  tipo         TipoPessoa
+  cpfCnpj      String     @unique @map("cpf_cnpj")
+  telefone     String?
+  email        String?
+  enderecoId   Int?       @map("endereco_id")
+  dataCadastro DateTime   @default(now()) @map("data_cadastro")
+
+  endereco   Endereco?   @relation(fields: [enderecoId], references: [idEndereco])
+  orcamentos Orcamento[]
+  pedidos    Pedido[]
+
+  @@map("clientes")
+}
+
+// Addendum §1 — procurement FORA do MVP. Tabela existe apenas porque
+// materiais.fornecedor_id a referencia; sem tela de gestão nesta fase.
+model Fornecedor {
+  idFornecedor       Int     @id @default(autoincrement()) @map("id_fornecedor")
+  razaoSocial        String  @map("razao_social")
+  nomeFantasia       String? @map("nome_fantasia")
+  cnpj               String  @unique
+  telefone           String?
+  email              String?
+  enderecoId         Int?    @map("endereco_id")
+  contatoResponsavel String? @map("contato_responsavel")
+
+  endereco  Endereco?  @relation(fields: [enderecoId], references: [idEndereco])
+  materiais Material[]
+
+  @@map("fornecedores")
+}
+
+// Decisão D1 (Addendum §5) — catálogo genérico. Sem chapa física,
+// QR code, retalho ou patrimônio nesta fase.
+model Material {
+  idMaterial    Int     @id @default(autoincrement()) @map("id_material")
+  nome          String
+  tipo          String?
+  fornecedorId  Int?    @map("fornecedor_id")
+  precoPadraoM2 Decimal @map("preco_padrao_m2") @db.Decimal(12, 2)
+  medidasPadrao String? @map("medidas_padrao")
+  fotoUrl       String? @map("foto_url")
+  ativo         Boolean @default(true)
+
+  fornecedor Fornecedor?     @relation(fields: [fornecedorId], references: [idFornecedor])
+  itens      ItemOrcamento[]
+  ordens     Producao[]
+
+  @@map("materiais")
+}
+
+// regra 5.2 — a categoria determina o fluxo de OS que o item vai gerar.
+// Seed: Soleira/Peitoril, Pia/Lavatório/Balcão/Nicho, Pedra Decorativa, Padrão.
+model CategoriaItem {
+  idCategoria             Int              @id @default(autoincrement()) @map("id_categoria")
+  nome                    String           @unique
+  requerProducao          Boolean          @map("requer_producao")
+  requerMontagem          Boolean          @map("requer_montagem")
+  tipoAcabamentoRequerido NivelAcabamento? @map("tipo_acabamento_requerido")
+
+  itens  ItemOrcamento[]
+  ordens Producao[]
+
+  @@map("categorias_item")
+}
+
+// Consolidado §2.4 + decisão D3 (PIN para motorista/montador/medidor)
+model Usuario {
+  idUsuario  Int        @id @default(autoincrement()) @map("id_usuario")
+  nome       String
+  email      String?    @unique
+  credencial Credencial
+
+  // só quando credencial = 'operador'
+  especialidade Especialidade?
+
+  // só quando especialidade = 'acabador'
+  nivelAcabamento NivelAcabamento? @map("nivel_acabamento")
+
+  // regra 5.12 — armazenado, SEM lógica de cálculo nesta fase
+  comissaoPercentual Decimal? @map("comissao_percentual") @db.Decimal(5, 2)
+
+  // login completo: administrador, gestor_financeiro, vendedor, gp
+  senhaHash String? @map("senha_hash")
+
+  // decisão D3 — PIN numérico simples: motorista, montador, medidor.
+  // Sempre hash, nunca PIN em texto puro.
+  pinHash String? @map("pin_hash")
+
+  ativo Boolean @default(true)
+
+  orcamentos        Orcamento[]
+  medicoes          Medicao[]
+  ordensResponsavel Producao[]
+  etapas            EtapaOs[]
+  entregas          Entrega[]
+  baixas            Financeiro[]
+
+  @@map("usuarios")
+}
+
+// ============================================================
+// ORÇAMENTO
+// ============================================================
+
+model Orcamento {
+  idOrcamento Int      @id @default(autoincrement()) @map("id_orcamento")
+  idCliente   Int      @map("id_cliente")
+  idVendedor  Int      @map("id_vendedor")
+  dataCriacao DateTime @default(now()) @map("data_criacao")
+
+  // Consolidado §4.2 — rascunho -> aprovado (na conversão) -> arquivado.
+  // Não há gate de aprovação do administrador (regra 5.3).
+  status StatusOrcamento @default(rascunho)
+
+  validade       DateTime?
+  descontoTotal  Decimal   @default(0) @map("desconto_total") @db.Decimal(12, 2)
+  valorFrete     Decimal   @default(0) @map("valor_frete") @db.Decimal(12, 2)
+  formaPagamento String?   @map("forma_pagamento")
+  observacao     String?
+
+  // regra 5.3 — insumos da geração automática de parcelas na conversão.
+  // percentualSinal tem mínimo de 10% (validado no service layer).
+  percentualSinal Decimal @default(10) @map("percentual_sinal") @db.Decimal(5, 2)
+  numeroParcelas  Int     @default(1) @map("numero_parcelas")
+
+  // regra 5.3 — aceite do cliente: upload OU assinatura; contrato automático
+  // substitui ambos quando o valor for >= R$ 10.000 (configurável).
+  tipoAceite         TipoAceite? @map("tipo_aceite")
+  documentoAceiteUrl String?     @map("documento_aceite_url")
+  dataAceite         DateTime?   @map("data_aceite")
+
+  cliente  Cliente         @relation(fields: [idCliente], references: [idCliente])
+  vendedor Usuario         @relation(fields: [idVendedor], references: [idUsuario])
+  itens    ItemOrcamento[]
+  medicoes Medicao[]
+  pedido   Pedido?
+
+  @@index([idCliente])
+  @@index([idVendedor])
+  @@map("orcamentos")
+}
+
+model ItemOrcamento {
+  idItem      Int @id @default(autoincrement()) @map("id_item")
+  idOrcamento Int @map("id_orcamento")
+  idMaterial  Int @map("id_material")
+  idCategoria Int @map("id_categoria")
+
+  // regra 5.5.1 — item composto (pia = tampo + saia + espelho) é uma unidade
+  // indivisível: os componentes vão obrigatoriamente na mesma OS do pai.
+  idItemPai Int? @map("id_item_pai")
+
+  // regra 5.5 — GP distribui os itens do pedido em N OSs.
+  // null = item ainda não alocado a nenhuma OS.
+  idOs Int? @map("id_os")
+
+  descricao      String
+  qtde           Int              @default(1)
+  largura        Decimal?         @db.Decimal(10, 4)
+  comprimento    Decimal?         @db.Decimal(10, 4)
+  area           Decimal?         @db.Decimal(10, 4)
+  tipoAcabamento NivelAcabamento? @map("tipo_acabamento")
+
+  // regra 5.2 / decisão D2 — editor 2D grid+snap: polilinha de pontos com snap
+  // formando apenas retas (figuras em "L" ou com insertos em "U").
+  // NÃO é desenhador vetorial livre.
+  forma2d Json? @map("forma_2d")
+
+  // regra 5.2 — categoria "Padrão" tem montagem "dependendo do item".
+  // null = herda categoria.requerMontagem; true/false = override do item.
+  requerMontagem Boolean? @map("requer_montagem")
+
+  precoUnitario Decimal @map("preco_unitario") @db.Decimal(12, 2)
+  subtotal      Decimal @db.Decimal(12, 2)
+
+  orcamento   Orcamento       @relation(fields: [idOrcamento], references: [idOrcamento], onDelete: Cascade)
+  material    Material        @relation(fields: [idMaterial], references: [idMaterial])
+  categoria   CategoriaItem   @relation(fields: [idCategoria], references: [idCategoria])
+  os          Producao?       @relation(fields: [idOs], references: [idOs])
+  pai         ItemOrcamento?  @relation("Composicao", fields: [idItemPai], references: [idItem])
+  componentes ItemOrcamento[] @relation("Composicao")
+
+  @@index([idOrcamento])
+  @@index([idOs])
+  @@index([idItemPai])
+  @@map("itens_orcamento")
+}
+
+// regra 5.1 — medidor atua ANTES do orçamento; upload de foto/PDF do
+// projeto, vinculado a um orçamento em rascunho que o vendedor usa como base.
+model Medicao {
+  idMedicao   Int      @id @default(autoincrement()) @map("id_medicao")
+  idOrcamento Int      @map("id_orcamento")
+  medidorId   Int      @map("medidor_id")
+  arquivoUrl  String   @map("arquivo_url")
+  data        DateTime @default(now())
+
+  orcamento Orcamento @relation(fields: [idOrcamento], references: [idOrcamento], onDelete: Cascade)
+  medidor   Usuario   @relation(fields: [medidorId], references: [idUsuario])
+
+  @@index([idOrcamento])
+  @@map("medicoes")
+}
+
+// ============================================================
+// PEDIDO
+// ============================================================
+
+model Pedido {
+  idPedido      Int      @id @default(autoincrement()) @map("id_pedido")
+  idOrcamento   Int      @unique @map("id_orcamento")
+  idCliente     Int      @map("id_cliente")
+  dataAprovacao DateTime @default(now()) @map("data_aprovacao")
+
+  // Consolidado §4.1 — dois status INDEPENDENTES; substituem o status único
+  // do modelo original. "Finalizado" é condição derivada, nunca armazenada:
+  // teto operacional aplicável (entregue, ou montado quando exigido) E pago.
+  statusFinanceiro  StatusFinanceiroPedido  @default(pendente) @map("status_financeiro")
+  statusOperacional StatusOperacionalPedido @default(aguardando_producao) @map("status_operacional")
+
+  // regra 5.2 — taxa de entrega é definida no nível do PEDIDO, não por OS.
+  taxaEntrega       Decimal @default(0) @map("taxa_entrega") @db.Decimal(12, 2)
+  enderecoEntregaId Int?    @map("endereco_entrega_id")
+  observacao        String?
+
+  orcamento       Orcamento    @relation(fields: [idOrcamento], references: [idOrcamento])
+  cliente         Cliente      @relation(fields: [idCliente], references: [idCliente])
+  enderecoEntrega Endereco?    @relation(fields: [enderecoEntregaId], references: [idEndereco])
+  contrato        Contrato?
+  adendos         Adendo[]
+  ordens          Producao[]
+  lancamentos     Financeiro[]
+
+  @@index([idCliente])
+  @@map("pedidos")
+}
+
+// regra 5.3 — orçamento >= R$ 10.000 gera contrato automático dinâmico,
+// que substitui assinatura/print. NÃO pode ser editado após assinado.
+model Contrato {
+  idContrato     Int             @id @default(autoincrement()) @map("id_contrato")
+  idPedido       Int             @unique @map("id_pedido")
+  arquivoUrl     String?         @map("arquivo_url")
+  termoHtml      String?         @map("termo_html")
+  dataAssinatura DateTime?       @map("data_assinatura")
+  tipoAssinatura TipoAssinatura? @map("tipo_assinatura")
+
+  pedido Pedido @relation(fields: [idPedido], references: [idPedido])
+
+  @@map("contratos")
+}
+
+// ============================================================
+// PRODUÇÃO
+// ============================================================
+
+model Producao {
+  idOs     Int @id @default(autoincrement()) @map("id_os")
+  idPedido Int @map("id_pedido")
+
+  // regra 5.5.2 — OS nunca mistura materiais diferentes.
+  idMaterial Int @map("id_material")
+
+  // regra 5.5.3 — OS nunca mistura categorias com fluxo incompatível;
+  // a OS herda o fluxo de etapas inteiramente da categoria dos seus itens.
+  idCategoria Int @map("id_categoria")
+
+  tipo TipoOs
+
+  // Consolidado §4.3 — DERIVADO/AGREGADO de etapas_os. Mantido como coluna-cache
+  // por performance de query, recalculado a cada mudança de etapa.
+  // NUNCA escrito diretamente pela UI/GP.
+  status StatusOs @default(criada)
+
+  responsavelId Int?      @map("responsavel_id")
+  dataInicio    DateTime? @map("data_inicio")
+  dataFim       DateTime? @map("data_fim")
+
+  pedido      Pedido          @relation(fields: [idPedido], references: [idPedido])
+  material    Material        @relation(fields: [idMaterial], references: [idMaterial])
+  categoria   CategoriaItem   @relation(fields: [idCategoria], references: [idCategoria])
+  responsavel Usuario?        @relation(fields: [responsavelId], references: [idUsuario])
+  itens       ItemOrcamento[]
+  etapas      EtapaOs[]
+  entrega     Entrega?
+
+  @@index([idPedido])
+  @@map("producoes")
+}
+
+// Consolidado §4.4 / §4.5 — etapas predefinidas pelo sistema por tipo de OS,
+// NÃO configuráveis pelo GP. O avanço é sempre manual pelo GP; sem alocação
+// de recurso (responsavelId), a etapa não pode ser iniciada.
+model EtapaOs {
+  idEtapa     Int         @id @default(autoincrement()) @map("id_etapa")
+  idOs        Int         @map("id_os")
+  nomeEtapa   NomeEtapa   @map("nome_etapa")
+  ordem       Int
+  statusEtapa StatusEtapa @default(nao_iniciado) @map("status_etapa")
+
+  // regra 5.6 — nullable até a alocação. Base de rastreio de produtividade
+  // por operador mesmo sem login (serrador/acabador).
+  responsavelId Int?      @map("responsavel_id")
+  dataInicio    DateTime? @map("data_inicio")
+  dataFim       DateTime? @map("data_fim")
+
+  os          Producao @relation(fields: [idOs], references: [idOs], onDelete: Cascade)
+  responsavel Usuario? @relation(fields: [responsavelId], references: [idUsuario])
+
+  @@unique([idOs, nomeEtapa])
+  @@index([idOs])
+  @@map("etapas_os")
+}
+
+// regra 5.8 — fila de entrega reordenável por drag-and-drop (roteirização
+// estilo fila, NÃO otimização automática de rota) + confirmação de
+// recebimento com nome, documento e assinatura.
+model Entrega {
+  idEntrega          Int       @id @default(autoincrement()) @map("id_entrega")
+  idOs               Int       @unique @map("id_os")
+  posicaoFila        Int       @map("posicao_fila")
+  motoristaId        Int?      @map("motorista_id")
+  recebedorNome      String?   @map("recebedor_nome")
+  recebedorDocumento String?   @map("recebedor_documento")
+  assinaturaUrl      String?   @map("assinatura_url")
+  dataEntrega        DateTime? @map("data_entrega")
+
+  os        Producao @relation(fields: [idOs], references: [idOs], onDelete: Cascade)
+  motorista Usuario? @relation(fields: [motoristaId], references: [idUsuario])
+
+  @@map("entregas")
+}
+
+// ============================================================
+// ADENDO
+// ============================================================
+
+// regra 5.7 — só altera itens/OS que ainda não iniciaram. Uma vez que a OS
+// iniciou qualquer etapa, bloqueio total. Parcelas já pagas nunca são alteradas.
+model Adendo {
+  idAdendo      Int          @id @default(autoincrement()) @map("id_adendo")
+  idPedido      Int          @map("id_pedido")
+  dataCriacao   DateTime     @default(now()) @map("data_criacao")
+  status        StatusAdendo @default(pendente)
+  justificativa String
+
+  // upload (foto/print/PDF) OU assinatura — mesmo padrão do aceite (5.3)
+  documentoAprovacao String? @map("documento_aprovacao")
+
+  // regra 5.7 — se o adendo reduz o valor total, o abatimento é lançado na
+  // ÚLTIMA parcela em aberto primeiro, cascateando para as anteriores.
+  valorAbatimento  Decimal? @map("valor_abatimento") @db.Decimal(12, 2)
+  parcelaAfetadaId Int?     @map("parcela_afetada_id")
+
+  pedido         Pedido      @relation(fields: [idPedido], references: [idPedido])
+  parcelaAfetada Financeiro? @relation(fields: [parcelaAfetadaId], references: [idLancamento])
+
+  @@index([idPedido])
+  @@map("adendos")
+}
+
+// ============================================================
+// FINANCEIRO (AR vinculado a pedido)
+// ============================================================
+
+// Addendum §2 — id_pedido permanece NULLABLE de propósito: já nasce preparado
+// para despesas gerais, evitando migração destrutiva depois. No MVP, apenas
+// lançamentos com id_pedido preenchido têm fluxo funcional (regra 5.4).
+// NENHUM campo de aprovação de despesa é criado agora (aprovado_por,
+// nivel_aprovacao, limite_valor) — mudança aditiva quando o stakeholder decidir.
+model Financeiro {
+  idLancamento   Int              @id @default(autoincrement()) @map("id_lancamento")
+  idPedido       Int?             @map("id_pedido")
+  tipo           TipoLancamento
+  categoria      String?
+  descricao      String
+  valor          Decimal          @db.Decimal(12, 2)
+  dataVencimento DateTime         @map("data_vencimento")
+  dataPagamento  DateTime?        @map("data_pagamento")
+  formaPagamento String?          @map("forma_pagamento")
+  status         StatusLancamento @default(pendente)
+
+  // regra 5.4 — GATE: o GP não cria OS até o sinal ser baixado pelo financeiro.
+  // Marca explícita, pois o sinal não é identificável só pelo vencimento.
+  ehSinal       Boolean @default(false) @map("eh_sinal")
+  numeroParcela Int?    @map("numero_parcela")
+
+  // regra 5.4 — baixa por gestor_financeiro ou administrador
+  baixadoPorId Int? @map("baixado_por_id")
+
+  pedido          Pedido?  @relation(fields: [idPedido], references: [idPedido])
+  baixadoPor      Usuario? @relation(fields: [baixadoPorId], references: [idUsuario])
+  adendosAbatendo Adendo[]
+
+  @@index([idPedido])
+  @@map("financeiro")
+}
